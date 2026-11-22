@@ -299,8 +299,8 @@
   const SKILL = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 
   const ENEMY = {
-    w: { name: { ru: 'Волк', kz: 'Қасқыр' }, hp: 34, r: 13, speed: 72, dmg: 14, xp: 8, coin: 2, ai: 'wolf' },
-    s: { name: { ru: 'Тарантул', kz: 'Бүйі' }, hp: 16, r: 9, speed: 92, dmg: 10, xp: 4, coin: 1, ai: 'spider' },
+    w: { name: { ru: 'Волк', kz: 'Қасқыр' }, hp: 34, r: 13, speed: 70, dmg: 12, xp: 8, coin: 2, ai: 'wolf' },
+    s: { name: { ru: 'Тарантул', kz: 'Бүйі' }, hp: 16, r: 9, speed: 88, dmg: 9, xp: 4, coin: 1, ai: 'spider' },
     j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ' }, hp: 38, r: 12, speed: 48, dmg: 12, xp: 10, coin: 3, ai: 'shooter' },
     a: { name: { ru: 'Албасты', kz: 'Албасты' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
     m: { name: { ru: 'Мыстан', kz: 'Мыстан' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
@@ -367,7 +367,7 @@
   const xpNeed = lvl => 12 + lvl * 8;
 
   function newRun() {
-    const maxHp = Math.round(120 * (1 + 0.1 * upHp));
+    const maxHp = Math.round(150 * (1 + 0.1 * upHp));
     run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, sk: {}, pendingLv: 0 };
     player = {
       x: W / 2, y: AY2 - 30, r: 11, hp: maxHp, maxHp, inv: 0, face: -Math.PI / 2,
@@ -602,7 +602,7 @@
   function hurtPlayer(dmg) {
     if (player.inv > 0 || scene !== 'play' || TEST_MODE) return;
     dmg = Math.round(dmg);
-    player.hp -= dmg; player.inv = 0.75; shake = Math.max(shake, 8);
+    player.hp -= dmg; player.inv = 0.9; shake = Math.max(shake, 8);
     floatText(player.x, player.y, '-' + dmg, '#ff4b4b', 15);
     Sound.hurt();
     if (player.hp <= 0) {
@@ -751,11 +751,11 @@
           e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player);
           if (e.t <= 0) { e.st = 'dash'; e.t = 0.38; e.dashA = e.face; }
         } else if (e.st === 'dash') {
-          e.vx = Math.cos(e.dashA) * 330; e.vy = Math.sin(e.dashA) * 330;
+          e.vx = Math.cos(e.dashA) * 300; e.vy = Math.sin(e.dashA) * 300;
           if (e.t <= 0) { e.st = 'rest'; e.t = 0.5; }
         } else {
           e.vx *= 0.85; e.vy *= 0.85;
-          if (e.t <= 0) { e.st = 'chase'; e.cd = rand(1.4, 2.2); }
+          if (e.t <= 0) { e.st = 'chase'; e.cd = rand(1.8, 2.6); }
         }
         break;
       case 'spider':
