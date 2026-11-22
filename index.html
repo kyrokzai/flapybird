@@ -1769,7 +1769,7 @@
     'transformed.z -= uWind * back * (0.84 - position.y) * 0.5;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB' };
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -1942,6 +1942,35 @@
     const gl = glow('#9fd0ff', 1.6, 0.35); gl.position.y = 0.7; body.add(gl);
   }
 
+  // Жезтырнақ model: hair and hem sway, arms lift forward before she throws her copper claws.
+  // Each one gets its own material copy so the aim pose is per enemy (textures and shader program are shared).
+  const ZHEZ_VS = [
+    'vec3 transformed = vec3(position);',
+    'float hem = 1.0 - smoothstep(0.0, 0.35, position.y);',
+    'transformed.x += sin(uT * 2.4 + position.y * 12.0 + uPh) * 0.012 * hem;',
+    'float hair = smoothstep(0.3, 0.85, position.y) * smoothstep(-0.02, -0.08, position.z);',
+    'transformed.z -= (0.5 + 0.5 * sin(uT * 2.8 + position.y * 9.0 + uPh)) * 0.025 * hair;',
+    'float arm = smoothstep(0.15, 0.2, abs(position.x)) * smoothstep(0.25, 0.35, position.y) * (1.0 - smoothstep(0.7, 0.76, position.y));',
+    'if (arm > 0.0) {',
+    '  float a = (-uAim * 1.25 + sin(uT * 2.0 + uPh) * 0.06) * arm, dy = transformed.y - 0.72, dz = transformed.z;',
+    '  transformed.y = 0.72 + dy * cos(a) - dz * sin(a);',
+    '  transformed.z = dy * sin(a) + dz * cos(a);',
+    '}',
+  ].join('\n');
+  function addZhezModel(body) {
+    const m = G3.models.zheztyrnak.clone();
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.2);
+    const uni = { uT: { value: 0 }, uAim: { value: 0 }, uPh: { value: Math.random() * 6 } };
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      const mt = o.material.clone();
+      mt.onBeforeCompile = sh => { Object.assign(sh.uniforms, uni); sh.vertexShader = 'uniform float uT;\nuniform float uAim;\nuniform float uPh;\n' + sh.vertexShader.replace('#include <begin_vertex>', ZHEZ_VS); };
+      o.material = mt;
+    });
+    body.add(m);
+    return uni;
+  }
+
   function makeEagleModel() {
     const g = new THREE.Group(), m = G3.models.eagle.clone();
     m.rotation.y = Math.PI / 2; m.scale.setScalar(0.78); m.position.y = -0.22;
@@ -2028,6 +2057,7 @@
         break;
       }
       case 'j': {
+        if (G3.models.zheztyrnak) { m.extra.model = true; m.extra.uni = addZhezModel(body); break; }
         const dress = M('#b0222c', { r: 0.6 }), gold = M('#e8b830', { r: 0.3, m: 0.7 }), skin = M('#efe2d2'), hair = M('#120e14', { r: 0.5 }), copper = M('#e08a3a', { r: 0.25, m: 0.9 });
         body.add(mesh(G3.geo.cone, dress, 0, 0.32, 0, 0.27, 0.62, 0.27));
         const hm = mesh(G3.geo.hem, gold, 0, 0.04, 0, 0.92, 0.92, 0.92); hm.rotation.x = Math.PI / 2; body.add(hm);
@@ -2187,6 +2217,12 @@
         m.legs.forEach(l => { l.rotation.y = l.userData.base + Math.sin(a * 22 + l.userData.i * 1.7 + (l.userData.s > 0 ? 1 : 0)) * 0.3; });
         break;
       case 'j':
+        if (m.extra.model) {
+          const u = m.extra.uni; u.uT.value = time;
+          u.uAim.value += ((e.st === 'aim' ? 1 : 0) - u.uAim.value) * 0.2;
+          m.body.position.y = Math.sin(a * 3) * 0.015;
+          break;
+        }
         m.extra.arms.forEach((pv, i) => { pv.rotation.z = e.st === 'aim' ? -1.35 : Math.sin(a * 3 + i) * 0.25; });
         m.body.position.y = Math.sin(a * 3) * 0.02;
         break;
@@ -2813,7 +2849,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
-  loadModel('batyr', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar')))))));
+  loadModel('batyr', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar'))))))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
