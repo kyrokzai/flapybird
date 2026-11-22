@@ -1769,7 +1769,7 @@
     'transformed.z -= uWind * back * (0.84 - position.y) * 0.5;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB' };
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -1971,6 +1971,29 @@
     return uni;
   }
 
+  // Қасқыр model: diagonal-pair gallop and a swinging tail (own material copy per wolf for its own gait)
+  const WOLF_VS = [
+    'vec3 transformed = vec3(position);',
+    'float legW = 1.0 - smoothstep(0.2, 0.3, position.y);',
+    'float pair = (position.x > 0.0 ? 1.0 : -1.0) * (position.z > 0.0 ? 1.0 : -1.0);',
+    'transformed.z += (0.3 - position.y) * sin(uRun * pair) * legW;',
+    'float tail = smoothstep(-0.28, -0.38, position.z);',
+    'transformed.x += sin(uT * 7.0 + uPh) * 0.09 * tail * (-position.z - 0.28) * 4.0;',
+  ].join('\n');
+  function addWolfModel(body) {
+    const m = G3.models.wolf.clone();
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.1);
+    const uni = { uT: { value: 0 }, uRun: { value: 0 }, uPh: { value: Math.random() * 6 } };
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      const mt = o.material.clone();
+      mt.onBeforeCompile = sh => { Object.assign(sh.uniforms, uni); sh.vertexShader = 'uniform float uT;\nuniform float uRun;\nuniform float uPh;\n' + sh.vertexShader.replace('#include <begin_vertex>', WOLF_VS); };
+      o.material = mt;
+    });
+    body.add(m);
+    return uni;
+  }
+
   function makeEagleModel() {
     const g = new THREE.Group(), m = G3.models.eagle.clone();
     m.rotation.y = Math.PI / 2; m.scale.setScalar(0.78); m.position.y = -0.22;
@@ -2028,6 +2051,7 @@
     const eyes = (hex, pts, s) => { const em = M(hex, { e: hex, ei: 2 }); for (const p of pts) body.add(mesh(G3.geo.sLow, em, p[0], p[1], p[2], s, s, s, false)); };
     switch (e.type) {
       case 'w': {
+        if (G3.models.wolf) { m.extra.model = true; m.extra.uni = addWolfModel(body); break; }
         const fur = M('#8d929b', { r: 0.9 }), dark = M('#62666e', { r: 0.9 }), light = M('#c3c6cc', { r: 0.9 }), black = M('#111');
         body.add(mesh(G3.geo.sphere, fur, 0, 0.38, 0, 0.36, 0.19, 0.17));
         body.add(mesh(G3.geo.sphere, light, 0.2, 0.4, 0, 0.18, 0.18, 0.15));
@@ -2209,6 +2233,14 @@
     const moving = Math.hypot(e.vx, e.vy) > 5, a = e.anim;
     switch (e.type) {
       case 'w':
+        if (m.extra.model) {
+          const u = m.extra.uni; u.uT.value = time;
+          const sp = e.st === 'dash' ? 22 : 15;
+          u.uRun.value = moving ? Math.sin(a * sp + u.uPh.value) * 0.55 : 0;
+          m.body.position.y = e.wind ? -0.06 : (moving ? Math.abs(Math.sin(a * sp)) * 0.03 : 0);
+          m.body.rotation.z = e.st === 'dash' ? -0.08 : 0;
+          break;
+        }
         m.legs.forEach((l, i) => { l.rotation.z = moving ? Math.sin(a * 15 + (i % 3 ? 0 : Math.PI)) * 0.7 : 0; });
         m.extra.tail.rotation.y = Math.sin(a * 9) * 0.4;
         m.body.position.y = e.wind ? -0.06 : 0;
@@ -2849,7 +2881,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
-  loadModel('batyr', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar'))))))));
+  loadModel('batyr', () => loadModel('wolf', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar')))))))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
