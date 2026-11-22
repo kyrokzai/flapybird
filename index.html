@@ -1767,9 +1767,13 @@
     '}',
     'float back = smoothstep(-0.03, -0.12, position.z) * (1.0 - smoothstep(0.72, 0.84, position.y));',
     'transformed.z -= uWind * back * (0.84 - position.y) * 0.5;',
+    // archer model only: the bow arm (his left, +x) comes up to a shooting pose
+    'float aimW = uBow * smoothstep(0.15, 0.22, position.x) * smoothstep(-0.06, 0.0, position.z);',
+    'transformed.z += uAim * 0.22 * aimW;',
+    'transformed.y += uAim * 0.05 * aimW;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -2030,29 +2034,30 @@
     return { g, wings: [], model: true };
   }
 
-  function makeBatyr() {
+  function makeBatyr(model, bow) {
     const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
-    const model = G3.batyrScene;
     model.rotation.y = Math.PI / 2; model.scale.setScalar(1.48);
-    const uni = { uSwing: { value: 0 }, uWind: { value: 0 } };
+    const uni = { uSwing: { value: 0 }, uWind: { value: 0 }, uAim: { value: 0 }, uBow: { value: bow ? 1 : 0 } };
     model.traverse(o => {
       if (!o.isMesh) return;
       o.castShadow = true;
       const m = o.material;
       G3.metalMats.add(m); if (G3.envRT) m.envMap = G3.envRT.texture;
       m.onBeforeCompile = sh => {
-        sh.uniforms.uSwing = uni.uSwing; sh.uniforms.uWind = uni.uWind;
-        sh.vertexShader = 'uniform float uSwing;\nuniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', BATYR_VS);
+        Object.assign(sh.uniforms, uni);
+        sh.vertexShader = 'uniform float uSwing;\nuniform float uWind;\nuniform float uAim;\nuniform float uBow;\n' + sh.vertexShader.replace('#include <begin_vertex>', BATYR_VS);
       };
     });
     up.add(model);
-    return { g, up, uni, batyr: true, mats: [] };
+    return { g, up, uni, batyr: true, bow, mats: [] };
   }
   function animateBatyr(m, o) {
     m.uni.uSwing.value = o.moving ? Math.sin(o.walk) * 0.55 : 0;
     m.uni.uWind.value = o.moving ? 0.35 : 0.05 + Math.sin(time * 1.7) * 0.04;
     m.up.position.y = o.moving ? Math.abs(Math.cos(o.walk)) * 0.03 : 0;
-    m.up.rotation.z = o.moving ? -0.08 : -(o.pull || 0) * 0.07;
+    m.up.rotation.z = o.moving ? -0.08 : (m.bow ? 0 : -(o.pull || 0) * 0.07);
+    const aim = !o.menu && !o.moving && enemies.some(e => e.spawn <= 0) ? 1 : 0;
+    m.uni.uAim.value += (aim - m.uni.uAim.value) * 0.2;
     m.up.scale.y = 1 + Math.sin(time * 2) * 0.005;
   }
 
@@ -2406,8 +2411,12 @@
       if (shake > 0) { c.position.x += rand(-1, 1) * shake * 0.012; c.position.y += rand(-1, 1) * shake * 0.012; }
     }
     // hero
-    if (G3.batyrScene && (!G3.hero || !G3.hero.batyr)) { if (G3.hero) G3.dyn.remove(G3.hero.g); G3.hero = makeBatyr(); G3.dyn.add(G3.hero.g); }
-    if (!G3.hero) { G3.hero = makeHero(); G3.dyn.add(G3.hero.g); G3.heroRing = decal(G3.ringTex, '#5fd3ff', 0.95, 0.55); G3.dyn.add(G3.heroRing); }
+    // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
+    if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
+    if (G3.models.batyr_bow && !G3.heroBow) { G3.heroBow = makeBatyr(G3.models.batyr_bow, true); G3.dyn.add(G3.heroBow.g); }
+    if (!G3.heroProc) { G3.heroProc = makeHero(); G3.dyn.add(G3.heroProc.g); G3.heroRing = decal(G3.ringTex, '#5fd3ff', 0.95, 0.55); G3.dyn.add(G3.heroRing); }
+    G3.hero = menu ? (G3.heroSpear || G3.heroBow || G3.heroProc) : (G3.heroBow || G3.heroSpear || G3.heroProc);
+    for (const h of [G3.heroSpear, G3.heroBow, G3.heroProc]) if (h && h !== G3.hero) h.g.visible = false;
     G3.heroRing.visible = !menu && scene === 'play';
     if (G3.heroRing.visible) { G3.heroRing.position.set(X3(player.x), 0.025, Z3(player.y)); G3.heroRing.rotation.z = time * 0.8; }
     const hm = G3.hero;
@@ -2905,7 +2914,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
-  loadModel('batyr', () => loadModel('wolf', () => loadModel('tarantula', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar'))))))))));
+  loadModel('batyr', () => loadModel('batyr_bow', () => loadModel('wolf', () => loadModel('tarantula', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar')))))))))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
