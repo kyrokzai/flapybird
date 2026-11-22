@@ -1707,6 +1707,18 @@
       for (let y = 4; y < h; y += 8) for (let x = 3; x < w; x += 8) { g.fillStyle = r() < 0.35 ? lit : 'rgba(255,255,255,0.18)'; g.fillRect(x, y, 5, 5); }
     }, true);
   }
+  // generated landmark models are normalised to ~1 unit around the origin: scale to a real-looking height and stand them on the ground
+  const LM_HEIGHT = { baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11 };
+  function landmarkModel(kind) {
+    const src = G3.models['lm_' + kind];
+    if (!src) return null;
+    const m = src.clone();
+    const box = new THREE.Box3().setFromObject(src), k = LM_HEIGHT[kind] / (box.max.y - box.min.y);
+    m.scale.setScalar(k); m.position.y = -box.min.y * k;
+    m.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    const g = new THREE.Group(); g.add(m);
+    return g;
+  }
   function landmark(kind) {
     const g = new THREE.Group();
     const white = mat('#f2f1ec', { r: 0.5 }), gold = mat('#ffcf5a', { m: 1, r: 0.18, e: '#6a3a00', ei: 0.25 });
@@ -1874,7 +1886,6 @@
       G3.doors = []; G3.gateGlow = null;
       return;
     }
-    G3.camRoom = null;
     const n = run.room, def = ROOM_DEFS[n - 1], th = THEMES[def.theme], theme = def.theme;
     const zN = Z3(ARENA.y), zS = Z3(AY2), zc = (zN + zS) / 2, rnd = mulberry32(n * 71 + 9);
     G3.scene.background = null;
@@ -1913,7 +1924,7 @@
       else if (theme === 'beach') R.add(themeProp('beach', 'stone', { seed: Math.floor(rnd() * 1e5) * 3 }, x, z));
     }
     // landmarks to the north, seen in the fly-over
-    for (const [kind, x, dz, s] of def.lm) { const lm = landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.setScalar(s); R.add(lm); }
+    for (const [kind, x, dz, s] of def.lm) { const lm = landmarkModel(kind) || landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.multiplyScalar(s); R.add(lm); }
     const city = mulberry32(n * 13);
     for (let i = 0; i < 10; i++) {
       const h = 3 + city() * 7, x = -26 + i * 5.5 + city() * 2, z = zN - 26 - city() * 10;
@@ -2144,7 +2155,8 @@
     'transformed.y += uAim * 0.05 * aimW;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
+    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -2157,7 +2169,7 @@
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
           if (name === 'batyr') G3.batyrScene = gltf.scene;
           if (name === 'kydyr') makeKydyrPortrait();
-          if (name === 'yurt' || name === 'balbal' || name === 'horse') G3.dirty = true;
+          if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_')) G3.dirty = true;
           if (done) done();
         }, () => { if (done) done(); });
       } catch (e) { if (done) done(); }
@@ -3344,7 +3356,10 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
-  loadModel('batyr', () => loadModel('batyr_bow', () => loadModel('horse', () => loadModel('yurt', () => loadModel('balbal', () => loadModel('wolf', () => loadModel('tarantula', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('mystan', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar')))))))))))))));
+  // load one model after another, most needed first
+  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+    'mystan', 'dau', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar'];
+  (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
