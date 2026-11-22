@@ -1585,6 +1585,7 @@
           add(G3.geo.cyl, M('#6b4a2e'), 0, 0.3, 0, 0.07, 0.6, 0.07);
           const leaf = M(r() < 0.5 ? '#4f7f35' : '#5f9440', { r: 0.9, flat: true });
           for (let i = 0; i < 4; i++) add(G3.geo.dodeca, leaf, (r() - 0.5) * 0.3, 0.75 + r() * 0.25, (r() - 0.5) * 0.3, 0.28 + r() * 0.1);
+        } else if (v < 0.8 && G3.models.prop_bench) { const bm = propModel('prop_bench', 0.9, 'w'); bm.rotation.y = r() < 0.5 ? 0 : Math.PI / 2; g.add(bm);
         } else if (v < 0.8) { // bench
           const wood = M('#a0683a', { r: 0.6 }), iron = M('#2a2a2a', { m: 0.6, r: 0.5 });
           for (const z of [-0.06, 0, 0.06]) add(G3.geo.box, wood, 0, 0.22, z, 0.8, 0.03, 0.05);
@@ -1643,7 +1644,8 @@
     } else if (theme === 'office') {
       if (big) {
         const v = r();
-        if (v < 0.4) { // server racks
+        if (v < 0.4 && G3.models.prop_server) { const sm = propModel('prop_server', 1.25, 'h'); sm.rotation.y = r() < 0.5 ? 0 : Math.PI; g.add(sm); }
+        else if (v < 0.4) { // server racks
           for (const x of [-0.22, 0.22]) {
             add(G3.geo.box, M('#1b1e24', { m: 0.4, r: 0.4 }), x, 0.55, 0, 0.4, 1.1, 0.45);
             for (let k = 0; k < 6; k++) add(G3.geo.box, M(k % 3 ? '#3fd06a' : '#3fa0ff', { e: k % 3 ? '#20ff60' : '#2080ff', ei: 1.6 }), x - 0.12, 0.2 + k * 0.15, 0.226, 0.06, 0.012, 0.005).castShadow = false;
@@ -2223,7 +2225,7 @@
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
-    prop_desk: 'PROP_DESK_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
+    prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -3428,8 +3430,8 @@
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
-    'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_palm', 'prop_umbrella'];
+  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+    'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   loadSky('menu', () => loadSky('street', () => loadSky('office', () => loadSky('beach', () => {
     (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
   }))));
