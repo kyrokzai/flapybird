@@ -1600,7 +1600,8 @@
       }
     } else if (theme === 'street') {
       if (big) {
-        if (r() < 0.6) { // bus stop
+        if (r() < 0.6 && G3.models.prop_busstop) { g.add(propModel('prop_busstop', 0.98, 'w')); }
+        else if (r() < 0.6) { // bus stop
           const steel = M('#5d6670', { m: 0.7, r: 0.4 }), glass = M('#9fd3ee', { op: 0.35, r: 0.05, m: 0.3 });
           add(G3.geo.box, steel, 0, 0.82, 0, 0.95, 0.05, 0.5);
           add(G3.geo.box, glass, 0, 0.42, -0.22, 0.9, 0.78, 0.02);
@@ -1616,7 +1617,8 @@
         }
       } else {
         const v = r();
-        if (v < 0.65) { // car
+        if (v < 0.65 && G3.models.prop_car) { const cm = propModel('prop_car', 0.95, 'w'); cm.rotation.y = Math.PI / 2 + (r() < 0.5 ? 0 : Math.PI) + (r() - 0.5) * 0.25; g.add(cm); }
+        else if (v < 0.65) { // car
           const colors = ['#d8dbe0', '#1f2a3a', '#b8262e', '#e8e3d6', '#2f5f9a', '#3a3a3a', '#f2c230'];
           const paint = M(colors[Math.floor(r() * colors.length)], { m: 0.6, r: 0.3 }), glass = M('#1c2633', { m: 0.5, r: 0.1 }), tyre = M('#151515');
           const car = new THREE.Group();
@@ -1658,7 +1660,8 @@
         }
       } else {
         const v = r();
-        if (v < 0.65) { // workstation
+        if (v < 0.65 && G3.models.prop_desk) { const dm2 = propModel('prop_desk', 0.92, 'w'); dm2.rotation.y = r() < 0.5 ? 0 : Math.PI; g.add(dm2); }
+        else if (v < 0.65) { // workstation
           const desk = new THREE.Group();
           desk.add(mesh(G3.geo.box, M('#eceae6', { r: 0.4 }), 0, 0.38, 0, 0.86, 0.04, 0.5));
           for (const x of [-0.4, 0.4]) desk.add(mesh(G3.geo.box, M('#8a8f96', { m: 0.7 }), x, 0.19, 0, 0.03, 0.38, 0.46));
@@ -1714,8 +1717,19 @@
     }, true);
   }
   // generated landmark models are normalised to ~1 unit around the origin: scale to a real-looking height and stand them on the ground
-  const LM_HEIGHT = { baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11 };
+  const LM_HEIGHT = { baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11, station: 5.5 };
   function landmarkModel(kind) {
+    if (kind === 'towers' && G3.models.lm_towers) {
+      // a cluster of emerald skyscrapers of different heights
+      const src = G3.models.lm_towers, box = new THREE.Box3().setFromObject(src), g = new THREE.Group(), r = mulberry32(5);
+      for (let i = 0; i < 6; i++) {
+        const k = (8 + r() * 9) / (box.max.y - box.min.y), m = src.clone();
+        m.scale.setScalar(k); m.position.set((i - 2.5) * 3.4 + r(), -box.min.y * k, -r() * 4); m.rotation.y = r() * TAU;
+        m.traverse(o => { if (o.isMesh) o.castShadow = false; });
+        g.add(m);
+      }
+      return g;
+    }
     const src = G3.models['lm_' + kind];
     if (!src) return null;
     const m = src.clone();
@@ -2208,7 +2222,8 @@
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB',
-    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
+    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
+    prop_desk: 'PROP_DESK_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -3413,8 +3428,8 @@
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
-    'mystan', 'dau', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_palm', 'prop_umbrella'];
+  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+    'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_palm', 'prop_umbrella'];
   loadSky('menu', () => loadSky('street', () => loadSky('office', () => loadSky('beach', () => {
     (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
   }))));
