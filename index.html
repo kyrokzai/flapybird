@@ -66,7 +66,7 @@
   const Z3 = y => (y - ACY) / CELL;
   // model heights (3D units) used to place health bars and damage numbers
   const MS = 1.22;   // visual scale of characters (hitboxes are unchanged)
-  const MODEL_H = { w: 0.95, s: 0.66, j: 1.28, a: 1.65, m: 1.52, D: 2.7, J: 2.5, A: 2.4 };
+  const MODEL_H = { w: 0.95, s: 0.66, j: 1.28, a: 1.65, m: 1.52, D: 2.7, J: 2.5, A: 2.1 };
 
   // =================================================================== helpers
   const store = {
@@ -1768,7 +1768,7 @@
     'transformed.z -= uWind * back * (0.84 - position.y) * 0.5;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB' };
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -1818,6 +1818,40 @@
     'transformed.x = x0 + dx * cos(a) - dy * sin(a);',
     'transformed.y = y0 + dx * sin(a) + dy * cos(a);',
   ].join('\n');
+  // Айдаһар model: wings flap, legs step and the tail sways in the vertex shader
+  const DRAGON_VS = [
+    'vec3 transformed = vec3(position);',
+    'float lw = 1.0 - smoothstep(0.1, 0.2, position.y);',
+    'float pair = (position.z > 0.0 ? 1.0 : -1.0) * (position.x > 0.0 ? 1.0 : -1.0);',
+    'transformed.x += (0.2 - position.y) * sin(uWalk * pair) * lw;',
+    'float ww = smoothstep(0.1, 0.2, abs(position.z)) * smoothstep(0.22, 0.3, position.y);',
+    'if (ww > 0.0) {',
+    '  float s = position.z > 0.0 ? 1.0 : -1.0, a = uFlap * s * ww;',
+    '  float z0 = 0.09 * s, y0 = 0.32, dz = position.z - z0, dy = position.y - y0;',
+    '  transformed.z = z0 + dz * cos(a) - dy * sin(a);',
+    '  transformed.y = y0 + dz * sin(a) + dy * cos(a);',
+    '}',
+    'float tw = smoothstep(-0.12, -0.3, position.x);',
+    'transformed.z += sin(uT * 3.0 + position.x * 9.0) * 0.18 * tw * (-position.x - 0.12);',
+  ].join('\n');
+  function addDragonModel(body) {
+    const m = G3.models.aydahar.clone();
+    m.scale.setScalar(2.6);
+    if (!G3.dragonUni) G3.dragonUni = { uFlap: { value: 0 }, uWalk: { value: 0 }, uT: { value: 0 } };
+    m.traverse(o => {
+      if (!o.isMesh || o.material.userData.dragon) return;
+      o.material.userData.dragon = true;
+      o.material.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, G3.dragonUni);
+        sh.vertexShader = 'uniform float uFlap;\nuniform float uWalk;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', DRAGON_VS);
+      };
+      o.material.needsUpdate = true;
+    });
+    body.add(m);
+    const fire = glow('#ff8a20', 1.2, 0); fire.position.set(1.25, 1.0, 0); body.add(fire);
+    return fire;
+  }
+
   function makeEagleModel() {
     const g = new THREE.Group(), m = G3.models.eagle.clone();
     m.rotation.y = Math.PI / 2; m.scale.setScalar(0.78); m.position.y = -0.22;
@@ -1988,6 +2022,7 @@
         break;
       }
       case 'A': {
+        if (G3.models.aydahar) { m.extra.model = true; m.extra.fire = addDragonModel(body); break; }
         const scale = M('#3b9a5b', { r: 0.55, m: 0.1 }), belly = M('#e2c25a', { r: 0.7 }), dark = M('#2b6a40', { r: 0.6 }), horn = M('#efe2c4'), wingm = M('#2f7d4a', { ds: true, r: 0.7 });
         m.legs = addLegs(body, M, '#2b6a40', [[0.35, 0.42, 0.3], [0.35, 0.42, -0.3], [-0.35, 0.42, 0.3], [-0.35, 0.42, -0.3]], 0.1, 0.42);
         body.add(mesh(G3.geo.sphere, scale, 0, 0.8, 0, 0.75, 0.45, 0.5));
@@ -2074,6 +2109,14 @@
         m.body.position.y = Math.sin(a * 2) * 0.05 + 0.05;
         break;
       case 'A':
+        if (m.extra.model) {
+          G3.dragonUni.uFlap.value = Math.sin(a * 4.5) * 0.5 - 0.1;
+          G3.dragonUni.uWalk.value = moving ? Math.sin(a * 8) * 0.45 : 0;
+          G3.dragonUni.uT.value = a;
+          m.extra.fire.material.opacity = e.wind ? 0.95 : 0;
+          m.body.rotation.z = e.wind ? 0.08 : 0;
+          break;
+        }
         m.legs.forEach((l, i) => { l.rotation.z = moving ? Math.sin(a * 9 + (i % 3 ? 0 : Math.PI)) * 0.5 : 0; });
         m.extra.wings.forEach(({ pv, s }) => { pv.rotation.x = s * (Math.sin(a * 5) * 0.45 - 0.15); });
         m.extra.tail.forEach((seg, i) => { seg.position.z = Math.sin(a * 4 - i * 0.6) * 0.05 * i; });
@@ -2662,7 +2705,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
-  loadModel('batyr', () => loadModel('eagle', () => loadModel('kydyr')));
+  loadModel('batyr', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('aydahar'))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
