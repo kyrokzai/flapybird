@@ -1769,7 +1769,7 @@
     'transformed.z -= uWind * back * (0.84 - position.y) * 0.5;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB' };
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
     const go = () => {
@@ -1994,6 +1994,28 @@
     return uni;
   }
 
+  // Бүйі model: the eight legs ripple in a wave (own material copy per spider for its own rhythm)
+  const SPIDER_VS = [
+    'vec3 transformed = vec3(position);',
+    'float leg = smoothstep(0.13, 0.24, abs(position.x));',
+    'float w = sin(uT * uSp + position.z * 9.0 + (position.x > 0.0 ? 0.0 : 3.1416) + uPh);',
+    'transformed.z += w * 0.045 * leg;',
+    'transformed.y += max(0.0, w) * 0.025 * leg * smoothstep(0.0, 0.12, position.y + 0.02);',
+  ].join('\n');
+  function addSpiderModel(body) {
+    const m = G3.models.tarantula.clone();
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(0.66);
+    const uni = { uT: { value: 0 }, uSp: { value: 6 }, uPh: { value: Math.random() * 6 } };
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      const mt = o.material.clone();
+      mt.onBeforeCompile = sh => { Object.assign(sh.uniforms, uni); sh.vertexShader = 'uniform float uT;\nuniform float uSp;\nuniform float uPh;\n' + sh.vertexShader.replace('#include <begin_vertex>', SPIDER_VS); };
+      o.material = mt;
+    });
+    body.add(m);
+    return uni;
+  }
+
   function makeEagleModel() {
     const g = new THREE.Group(), m = G3.models.eagle.clone();
     m.rotation.y = Math.PI / 2; m.scale.setScalar(0.78); m.position.y = -0.22;
@@ -2066,6 +2088,7 @@
         break;
       }
       case 's': {
+        if (G3.models.tarantula) { m.extra.model = true; m.extra.uni = addSpiderModel(body); break; }
         const shell = M('#4a2d1b', { r: 0.5 }), head = M('#5b3a24', { r: 0.6 }), legc = M('#2a1a10');
         body.add(mesh(G3.geo.sphere, shell, -0.14, 0.21, 0, 0.2, 0.16, 0.18));
         const sp = M('#ff8a2a', { e: '#ff6a00', ei: 0.6 });
@@ -2246,6 +2269,7 @@
         m.body.position.y = e.wind ? -0.06 : 0;
         break;
       case 's':
+        if (m.extra.model) { const u = m.extra.uni; u.uT.value = time; u.uSp.value = moving ? 20 : 4; break; }
         m.legs.forEach(l => { l.rotation.y = l.userData.base + Math.sin(a * 22 + l.userData.i * 1.7 + (l.userData.s > 0 ? 1 : 0)) * 0.3; });
         break;
       case 'j':
@@ -2881,7 +2905,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
-  loadModel('batyr', () => loadModel('wolf', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar')))))))));
+  loadModel('batyr', () => loadModel('wolf', () => loadModel('tarantula', () => loadModel('zheztyrnak', () => loadModel('albasty', () => loadModel('dau', () => loadModel('eagle', () => loadModel('kydyr', () => loadModel('zhalmauyz', () => loadModel('aydahar'))))))))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
