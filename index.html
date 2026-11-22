@@ -1109,7 +1109,7 @@
 
   // =================================================================== 3D world (Three.js)
   const G3 = {
-    r: null, dirty: true, built: '', hero: null, eagle: null, charms: [], metalMats: new Set(), models: {},
+    r: null, dirty: true, built: '', hero: null, eagle: null, charms: [], metalMats: new Set(), models: {}, skyTex: {},
     ents: new Map(), arrowsM: new Map(), bulletsM: new Map(), pickM: new Map(), aimM: new Map(),
   };
   const colorCache = new Map();
@@ -1427,7 +1427,8 @@
   }
 
   // cinematic menu backdrop: sunset mountains, a lake, pine forest and a rock for the batyr
-  function buildMenuScenery(R) {
+  function buildMenuScenery(R, pano) {
+    if (!pano) {
     const rnd = mulberry32(42);
     const rockA = mat('#8d6b55', { flat: true, r: 0.9 }), rockB = mat('#6e5245', { flat: true, r: 0.9 }), snow = mat('#efe2d6', { flat: true, r: 0.7 });
     for (let i = 0; i < 12; i++) {
@@ -1461,6 +1462,7 @@
       pines.setMatrixAt(k, dm.matrix); cc.copy(colC(rnd() < 0.5 ? '#2c4a2e' : '#24402a')); pines.setColorAt(k, cc); k++;
     }
     pines.count = k; pines.castShadow = true; R.add(pines);
+    }
     const geo = new THREE.IcosahedronGeometry(1, 1);
     const rp = geo.attributes.position;
     for (let i = 0; i < rp.count; i++) { const q = Math.sin(rp.getX(i) * 9.1 + rp.getY(i) * 5.3 + rp.getZ(i) * 7.7) * 43758.5; const f = 0.85 + (q - Math.floor(q)) * 0.3; rp.setXYZ(i, rp.getX(i) * f, rp.getY(i) * f, rp.getZ(i) * f); }
@@ -1561,7 +1563,8 @@
     if (theme === 'park') {
       if (big) {
         const v = r();
-        if (v < 0.35) { // fountain
+        if (v < 0.35 && G3.models.prop_fountain) g.add(propModel('prop_fountain', 0.98, 'w'));
+        else if (v < 0.35) { // fountain
           add(G3.geo.cyl, M('#cfc6b6', { r: 0.7 }), 0, 0.12, 0, 0.47, 0.24, 0.47);
           const w = add(G3.geo.cyl, G3.waterMat, 0, 0.23, 0, 0.42, 0.02, 0.42);
           add(G3.geo.cyl, M('#cfc6b6'), 0, 0.45, 0, 0.07, 0.5, 0.07);
@@ -1577,6 +1580,7 @@
       } else {
         const v = r();
         if (v < 0.2 && G3.models.balbal) { const b = G3.models.balbal.clone(); b.scale.setScalar(1.05); g.add(b); }
+        else if (v < 0.55 && G3.models.prop_tree) { const t = propModel('prop_tree', 1.5 + r() * 0.5, 'h'); t.rotation.y = r() * TAU; g.add(t); }
         else if (v < 0.55) { // tree
           add(G3.geo.cyl, M('#6b4a2e'), 0, 0.3, 0, 0.07, 0.6, 0.07);
           const leaf = M(r() < 0.5 ? '#4f7f35' : '#5f9440', { r: 0.9, flat: true });
@@ -1678,11 +1682,13 @@
         }
       }
     } else { // beach
-      if (big) { // beach umbrella with a table
+      if (big && G3.models.prop_umbrella) { const u = propModel('prop_umbrella', 1.25, 'h'); u.rotation.y = r() * TAU; g.add(u); }
+      else if (big) { // beach umbrella with a table
         add(G3.geo.cyl, M('#e8e2d6'), 0, 0.5, 0, 0.025, 1.0, 0.025);
         const um = canvasTex(64, 8, (c, w2) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#ffffff' : '#e8463a'; c.fillRect(i * w2 / 8, 0, w2 / 8, 8); } }, true);
         add(new THREE.ConeGeometry(0.6, 0.3, 16, 1, true), M('#ffffff', { map: um, ds: true }), 0, 1.05, 0);
         add(G3.geo.cyl, M('#f4efe6'), 0, 0.36, 0, 0.3, 0.03, 0.3);
+      } else if (r() < 0.6 && G3.models.prop_palm) { const p = propModel('prop_palm', 2.0 + r() * 0.5, 'h'); p.rotation.y = r() * TAU; g.add(p);
       } else if (r() < 0.6) { // palm tree
         const trunk = M('#8a6a44', { r: 0.9 });
         let x = 0, y = 0;
@@ -1719,6 +1725,48 @@
     const g = new THREE.Group(); g.add(m);
     return g;
   }
+  // small generated props, normalised the same way: fit to a height ('h') or a footprint width ('w')
+  function propModel(name, size, by) {
+    const src = G3.models[name], box = new THREE.Box3().setFromObject(src);
+    const k = by === 'w' ? size / Math.max(box.max.x - box.min.x, box.max.z - box.min.z) : size / (box.max.y - box.min.y);
+    const m = src.clone(); m.scale.setScalar(k); m.position.y = -box.min.y * k;
+    m.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
+    const g = new THREE.Group(); g.add(m);
+    return g;
+  }
+
+  // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
+  const SKY_KEYS = { menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH' };
+  function loadSky(name, done) {
+    const key = SKY_KEYS[name];
+    const go = () => {
+      if (!window[key]) { done && done(); return; }
+      new THREE.TextureLoader().load(window[key], tex => {
+        window[key] = null;
+        tex.encoding = THREE.sRGBEncoding; tex.mapping = THREE.EquirectangularReflectionMapping;
+        G3.skyTex[name] = tex; G3.dirty = true; done && done();
+      }, undefined, () => done && done());
+    };
+    if (window[key]) go();
+    else { const sc = document.createElement('script'); sc.src = 'assets/sky_' + name + '.js'; sc.onload = go; sc.onerror = () => done && done(); document.head.appendChild(sc); }
+  }
+  function setPano(name, yaw) {
+    const tex = name && G3.skyTex[name];
+    if (!G3.pano) {
+      G3.pano = new THREE.Mesh(new THREE.SphereGeometry(88, 64, 32), new THREE.MeshBasicMaterial({ side: THREE.BackSide, depthWrite: false, fog: false }));
+      G3.pano.renderOrder = -1; G3.pano.frustumCulled = false; G3.pano.scale.x = -1; G3.scene.add(G3.pano);
+    }
+    G3.pano.visible = !!tex; G3.sky.visible = !tex;
+    if (!tex) return false;
+    G3.pano.material.map = tex; G3.pano.material.color.setScalar(name === 'menu' ? 1.15 : 1.35); G3.pano.material.needsUpdate = true;
+    G3.pano.rotation.y = yaw || 0;
+    const rt = G3.pmrem.fromEquirectangular(tex);
+    if (G3.envRT) G3.envRT.dispose();
+    G3.envRT = rt;
+    for (const m of G3.metalMats) { if (!m.envMap) m.needsUpdate = true; m.envMap = rt.texture; }
+    return true;
+  }
+
   function landmark(kind) {
     const g = new THREE.Group();
     const white = mat('#f2f1ec', { r: 0.5 }), gold = mat('#ffcf5a', { m: 1, r: 0.18, e: '#6a3a00', ei: 0.25 });
@@ -1845,6 +1893,7 @@
     G3.gateGlow = glow('#ffe7a0', 2.4, 0); G3.gateGlow.position.set(0, 0.6, zN - 0.25); R.add(G3.gateGlow);
   }
 
+  const PANO_YAW = { menu: -Math.PI / 2, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2 };   // image centre faces the gate
   function build3D() {
     const menu = scene === 'menu';
     const key = menu ? 'menu' : 'room' + run.room;
@@ -1857,6 +1906,7 @@
       const b = THEMES.park, rnd = mulberry32(80);
       G3.scene.background = null;
       setSky('#34446c', '#f2a35a', '#4a3a2c', new THREE.Vector3(-0.38, 0.07, -1), '#ffc06e');
+      const menuPano = setPano('menu', PANO_YAW.menu);
       G3.sun.position.set(-7, 5.5, -12); G3.sun.target.position.set(0, 0, 0); G3.sun.color = col('#ffc27a'); G3.sun.intensity = 2.3;
       G3.fill.intensity = 1.6; G3.hemi.intensity = 0.35; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
       const outer = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), mat('#6a8338', { r: 1 })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.01; outer.receiveShadow = true; R.add(outer);
@@ -1871,7 +1921,7 @@
       grass.count = k; R.add(grass);
       for (const o of MENU_OBS) R.add(o.kind === 'yurt' ? makeYurt(X3(o.x + 20), Z3(o.y + 20)) : makeRock(o, X3(o.x + 20), Z3(o.y + 20)));
       for (const [x, z, s] of [[-2.6, -4.2, 1.6], [2.8, -3.2, 1.3], [-3.4, 3.6, 1.2]]) R.add(makeYurt(x, z, s));
-      buildMenuScenery(R);
+      buildMenuScenery(R, menuPano);
       if (G3.models.horse) {
         const h = G3.models.horse.clone(); h.scale.setScalar(1.95); h.position.set(1.75, 0, 0.75); h.rotation.y = 0.2;
         if (!G3.horseUni) G3.horseUni = { uT: { value: 0 } };
@@ -1890,6 +1940,7 @@
     const zN = Z3(ARENA.y), zS = Z3(AY2), zc = (zN + zS) / 2, rnd = mulberry32(n * 71 + 9);
     G3.scene.background = null;
     setSky(th.sky[0], th.sky[1], th.outer, new THREE.Vector3(-0.4, 0.55, 0.45), th.sun);
+    const pano = setPano(theme === 'park' ? null : theme, PANO_YAW[theme]);
     G3.sun.color = col(th.sun); G3.sun.intensity = th.sunI; G3.fill.intensity = 0;
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
     G3.themeSun = th.sunPos;
@@ -1924,9 +1975,9 @@
       else if (theme === 'beach') R.add(themeProp('beach', 'stone', { seed: Math.floor(rnd() * 1e5) * 3 }, x, z));
     }
     // landmarks to the north, seen in the fly-over
-    for (const [kind, x, dz, s] of def.lm) { const lm = landmarkModel(kind) || landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.multiplyScalar(s); R.add(lm); }
+    if (!(pano && theme === 'beach')) for (const [kind, x, dz, s] of def.lm) { const lm = landmarkModel(kind) || landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.multiplyScalar(s); R.add(lm); }
     const city = mulberry32(n * 13);
-    for (let i = 0; i < 10; i++) {
+    if (!pano) for (let i = 0; i < 10; i++) {
       const h = 3 + city() * 7, x = -26 + i * 5.5 + city() * 2, z = zN - 26 - city() * 10;
       const b = mesh(G3.geo.box, mat('#ffffff', { map: windowsTex(city() < 0.5 ? '#8a96a8' : '#c8c0b0', '#fff0c0'), r: 0.5 }), x, h / 2, z, 2.5, h, 2.5, false);
       b.material.map.repeat.set(1, h / 6); R.add(b);
@@ -2156,6 +2207,7 @@
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
+    prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
@@ -2169,7 +2221,7 @@
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
           if (name === 'batyr') G3.batyrScene = gltf.scene;
           if (name === 'kydyr') makeKydyrPortrait();
-          if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_')) G3.dirty = true;
+          if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_') || name.startsWith('prop_')) G3.dirty = true;
           if (done) done();
         }, () => { if (done) done(); });
       } catch (e) { if (done) done(); }
@@ -2826,9 +2878,11 @@
     const c = G3.cam;
     if (menu) {
       const sw2 = Math.sin(time * 0.25) * 0.6;
+      if (c.fov !== 30) { c.fov = 30; c.updateProjectionMatrix(); }
       c.position.set(sw2, 0.5, 10.4); c.lookAt(sw2 * 0.2, 0.5, 1.4); c.updateMatrixWorld();
       G3.scene.fog.near = 18; G3.scene.fog.far = 95;
     } else {
+      if (introT <= 0 && c.fov !== 30) { c.fov = 30; c.updateProjectionMatrix(); }
       const cb = G3.camBase, top = cb.tz, bottom = cb.tz + Math.max(0, ROWS - 13);
       const want = clamp(cb.tz + Z3(player.y) - (Z3(ARENA.y) + 8.5), top, bottom);
       if (G3.camRoom !== run.room) { G3.camRoom = run.room; G3.camTz = bottom; }
@@ -2841,6 +2895,7 @@
         const zN = Z3(ARENA.y), zS = Z3(AY2);
         const p0 = new THREE.Vector3(1.6, 2.9, zS + 2.6), t0 = new THREE.Vector3(0, 6, zN - 16);
         const p1 = c.position.clone(), t1 = new THREE.Vector3(0, 0, G3.camTz);
+        c.fov = 58 - 28 * e2; c.updateProjectionMatrix();
         c.position.lerpVectors(p0, p1, e2); c.lookAt(t0.lerp(t1, e2)); c.updateMatrixWorld();
         G3.scene.fog.near = 40 - e2 * (40 - cb.d - 12); G3.scene.fog.far = 140 - e2 * (140 - cb.d - 70);
       }
@@ -2848,6 +2903,7 @@
       G3.sun.position.set(sp[0], sp[1], sp[2] + G3.camTz); G3.sun.target.position.set(0, 0, G3.camTz); G3.sun.target.updateMatrixWorld();
       if (shake > 0) { c.position.x += rand(-1, 1) * shake * 0.012; c.position.y += rand(-1, 1) * shake * 0.012; }
     }
+    if (G3.pano) G3.pano.position.set(c.position.x, 0, c.position.z);
     // hero
     // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
     if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
@@ -3357,9 +3413,11 @@
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
-    'mystan', 'dau', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar'];
-  (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
+  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+    'mystan', 'dau', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_palm', 'prop_umbrella'];
+  loadSky('menu', () => loadSky('street', () => loadSky('office', () => loadSky('beach', () => {
+    (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
+  }))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
