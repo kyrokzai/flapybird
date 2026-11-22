@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Мерген — Степной батыр</title>
-<meta name="description" content="Мерген: браузерный 3D экшен-рогалик с лучником в казахском стиле.">
+<title>БАТЫР01</title>
+<meta name="description" content="БАТЫР01: браузерный 3D экшен-рогалик с лучником в казахском стиле.">
 <meta name="theme-color" content="#0b3a48">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@
 <body>
 <div id="wrap">
   <canvas id="gl"></canvas>
-  <canvas id="game" tabindex="0" aria-label="Мерген"></canvas>
+  <canvas id="game" tabindex="0" aria-label="БАТЫР01"></canvas>
   <div id="nogl">Не удалось запустить 3D-графику (WebGL). Обновите браузер или включите аппаратное ускорение.</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -120,7 +120,7 @@
     },
   };
   const tr = (k, n) => { const s = STR[lang][k] || STR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
-  function setLang(l) { lang = l; store.set('lang', l); document.documentElement.lang = l === 'kz' ? 'kk' : 'ru'; document.title = l === 'kz' ? 'Мерген — Дала батыры' : 'Мерген — Степной батыр'; }
+  function setLang(l) { lang = l; store.set('lang', l); document.documentElement.lang = l === 'kz' ? 'kk' : 'ru'; document.title = 'БАТЫР01'; }
   setLang(lang);
 
   // =================================================================== canvases
@@ -3237,7 +3237,7 @@
     ctx.fillStyle = top; ctx.fillRect(0, 0, W, 200);
     ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold);
     const wob = Math.sin(time * 1.5) * 2;
-    txt('МЕРГЕН', W / 2, 92 + wob, 58, C.gold, { stroke: C.ink, lw: 10, weight: 900 });
+    txt('БАТЫР01', W / 2, 92 + wob, fitText('БАТЫР01', W - 40, 56), C.gold, { stroke: C.ink, lw: 10, weight: 900 });
     koshkar(ctx, W / 2, 136, 30, C.red, 3.5);
     txt(tr('subtitle'), W / 2, 160, 16, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
     button(W / 2 - 100, 372, 200, 56, tr('play'), () => { Sound.init(); Sound.click(); newRun(); }, { size: 24 });
