@@ -24,7 +24,7 @@
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
-  if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
+  if (document.fonts && document.fonts.load) for (const f of [`800 20px "Montserrat"`, `600 20px "Montserrat"`, `700 20px "Cormorant SC"`, `900 20px "Cinzel"`]) document.fonts.load(f, "БҚӘ01").catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
   const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',

@@ -11,11 +11,13 @@
     if (menu) {
       // close-up portrait of the batyr: slow small orbit around him, camera a little below his chest (heroic angle)
       const a = Math.sin(time * 0.18) * 0.16, dist = MENU_CAM.dist;
-      if (c.fov !== MENU_CAM.fov) { c.fov = MENU_CAM.fov; c.updateProjectionMatrix(); }
+      const mf = 2 * Math.atan(Math.tan(MENU_CAM.fov * Math.PI / 360) * H / 640) * 180 / Math.PI;
+      if (c.fov !== mf) { c.fov = mf; c.updateProjectionMatrix(); }
       c.position.set(Math.sin(a) * dist, MENU_CAM.y, 1.4 + Math.cos(a) * dist); c.lookAt(0, MENU_CAM.look, 1.4); c.updateMatrixWorld();
       G3.scene.fog.near = 18; G3.scene.fog.far = 95;
     } else {
-      if (introT <= 0 && c.fov !== 30) { c.fov = 30; c.updateProjectionMatrix(); }
+      const bf = G3.baseFov || 30;
+      if (introT <= 0 && c.fov !== bf) { c.fov = bf; c.updateProjectionMatrix(); }
       const cb = G3.camBase, top = cb.tz, bottom = cb.tz + Math.max(0, ROWS - 13);
       const want = clamp(cb.tz + Z3(player.y) - (Z3(ARENA.y) + 8.5), top, bottom);
       if (G3.camRoom !== run.room) { G3.camRoom = run.room; G3.camTz = bottom; }
@@ -28,7 +30,7 @@
         const zN = Z3(ARENA.y), zS = Z3(AY2);
         const p0 = new THREE.Vector3(1.6, 2.9, zS + 2.6), t0 = new THREE.Vector3(0, 6, zN - 16);
         const p1 = c.position.clone(), t1 = new THREE.Vector3(0, 0, G3.camTz);
-        c.fov = 58 - 28 * e2; c.updateProjectionMatrix();
+        c.fov = 58 - (58 - bf) * e2; c.updateProjectionMatrix();
         c.position.lerpVectors(p0, p1, e2); c.lookAt(t0.lerp(t1, e2)); c.updateMatrixWorld();
         G3.scene.fog.near = 40 - e2 * (40 - cb.d - 12); G3.scene.fog.far = 140 - e2 * (140 - cb.d - 70);
       }

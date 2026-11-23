@@ -18,16 +18,18 @@
           ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
         }
       }
-      drawHud();
+      shiftUI(SAFE.t, drawHud);
       drawJoystick();
-      drawBanner();
-      if (scene === 'play' && !modal) drawTutorial();
+      shiftUI(SAFE.t, drawBanner);
+      if (scene === 'play' && !modal) shiftUI(SAFE.t, drawTutorial);
+      // modals are laid out for 640 px; centre them on taller screens
+      const oy = Math.round((H - 640) / 2);
       if (scene === 'play') {
-        if (modal === 'levelup') drawLevelUp();
-        else if (modal === 'kydyr') drawKydyrModal();
-        else if (modal === 'pause') drawPause();
-        else if (modal === 'revive') drawRevive();
-      } else { ui = []; drawEnd(); }
+        if (modal === 'levelup') shiftUI(oy, drawLevelUp);
+        else if (modal === 'kydyr') shiftUI(oy, drawKydyrModal);
+        else if (modal === 'pause') shiftUI(oy, drawPause);
+        else if (modal === 'revive') shiftUI(oy, drawRevive);
+      } else { ui = []; shiftUI(oy, drawEnd); }
     }
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }
     drawTransition();

@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>БАТЫР01</title>
 <meta name="description" content="БАТЫР01: браузерный 3D экшен-рогалик с лучником в казахском стиле.">
-<meta name="theme-color" content="#0b3a48">
+<meta name="theme-color" content="#0b0f17">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Cormorant+SC:wght@600;700&family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+  :root { --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); }
   html, body {
     margin: 0; height: 100%; overflow: hidden;
     background: #0b2630;
@@ -18,12 +19,12 @@
   }
   body {
     display: flex; align-items: center; justify-content: center;
-    background: radial-gradient(ellipse at center, #124556 0%, #071a21 75%);
+    background: radial-gradient(ellipse at 50% 40%, #2a2214 0%, #121826 38%, #07090f 80%);
   }
-  #wrap { position: relative; box-shadow: 0 0 50px rgba(0,0,0,.6); background: #0d3b47; }
+  #wrap { position: relative; box-shadow: 0 0 60px rgba(0,0,0,.75), 0 0 0 1px rgba(220,183,94,.35); background: #0b0f17; }
   #wrap canvas { position: absolute; left: 0; top: 0; display: block; outline: none; }
   #nogl { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
-          color: #f7edd5; font: 600 16px Rubik, Arial, sans-serif; padding: 24px; }
+          color: #f7edd5; font: 600 16px Montserrat, Arial, sans-serif; padding: 24px; }
 </style>
 </head>
 <body>

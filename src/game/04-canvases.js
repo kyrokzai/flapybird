@@ -5,14 +5,21 @@
   const ctx = canvas.getContext('2d');
   let K = 1, cssW = W, cssH = H;
   function resize() {
-    const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+    const iw = window.innerWidth, ih = window.innerHeight, oldH = H;
+    H = Math.round(Math.min(860, Math.max(640, W * ih / iw)));
+    const scale = Math.min(iw / W, ih / H);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     cssW = Math.floor(W * scale); cssH = Math.floor(H * scale);
+    // safe-area insets only matter where the canvas reaches the screen edge
+    const cs = getComputedStyle(document.documentElement), off = (ih - cssH) / 2;
+    SAFE.t = Math.max(0, (parseFloat(cs.getPropertyValue('--sat')) || 0) - off) / scale;
+    SAFE.b = Math.max(0, (parseFloat(cs.getPropertyValue('--sab')) || 0) - off) / scale;
     wrapEl.style.width = cssW + 'px'; wrapEl.style.height = cssH + 'px';
     for (const c of [canvas, glCanvas]) { c.style.width = cssW + 'px'; c.style.height = cssH + 'px'; }
     canvas.width = Math.round(W * scale * dpr);
     canvas.height = Math.round(H * scale * dpr);
     K = canvas.width / W;
+    if (G3.cam && oldH !== H) fitCamera();
     if (G3.r) {
       const pr = G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
       G3.r.setPixelRatio(pr); G3.r.setSize(cssW, cssH, false);

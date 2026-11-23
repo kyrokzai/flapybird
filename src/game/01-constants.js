@@ -1,6 +1,9 @@
 
   // =================================================================== constants
-  const W = 360, H = 640;
+  // logical screen: always 360 wide; the height follows the device (640 on 16:9, up to 860 on tall phones)
+  const W = 360;
+  let H = 640;
+  const SAFE = { t: 0, b: 0 };   // notch / home-indicator insets in logical px
   const CELL = 40, COLS = 8;
   let ROWS = 13;            // rooms have different lengths; set in buildRoom
   const ARENA = { x: 20, y: 96, w: COLS * CELL, h: ROWS * CELL };
@@ -9,7 +12,7 @@
   const ACY = ARENA.y + ARENA.h / 2;
   const GATE_X = W / 2, GATE_W = 60;
   const DT = 1 / 60;
-  const FONT = '"Rubik", "Segoe UI", Arial, sans-serif';
+  const FONT = '"Montserrat", "Segoe UI", Arial, sans-serif';
   const TOTAL_ROOMS = 15;
   const TEST_MODE = location.hash === '#test';   // automated tests: hero cannot be hurt
   const KYDYR_AFTER = [3, 5, 8, 10, 13];

@@ -21,12 +21,12 @@
 
   function polishTick() {
     const now = performance.now(); pdt = Math.min(0.05, (now - pNow) / 1000); pNow = now;
-    if (lastScene !== scene) { if (lastScene !== null) transA = 1; lastScene = scene; }
+    if (lastScene !== scene) { if (lastScene !== null) transA = 1; lastScene = scene; if (scene === 'menu') logoT0 = now; }
     transA = Math.max(0, transA - pdt * 2.6);
     if (menuTab !== lastTab) { lastTab = menuTab; tabT0 = now; }
     if (menuPopup !== lastPopup) { lastPopup = menuPopup; popT0 = now; }
     if (!splashOut && (G3.heroSpear && since(splashT0) > 2.4 || since(splashT0) > 20)) splashOut = true;
-    if (splashOut) splashA = Math.max(0, splashA - pdt * 1.6);
+    if (splashOut) { if (splashA > 0 && splashA - pdt * 1.6 <= 0) logoT0 = now; splashA = Math.max(0, splashA - pdt * 1.6); }
   }
 
   // ---- splash while the menu scene loads
@@ -39,28 +39,25 @@
     if (splashA <= 0) return;
     ui.push({ x: 0, y: 0, w: W, h: H, fn: null });
     ctx.save(); ctx.globalAlpha = splashA;
-    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b3a46'); g.addColorStop(0.55, '#07262e'); g.addColorStop(1, '#1a0f0a');
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0c1220'); g.addColorStop(0.6, '#0a0e18'); g.addColorStop(1, '#140f0a');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    // soft sun disc behind the logo
-    const sun = ctx.createRadialGradient(W / 2, 250, 10, W / 2, 250, 200);
-    sun.addColorStop(0, 'rgba(255,200,90,0.35)'); sun.addColorStop(1, 'rgba(255,200,90,0)');
-    ctx.fillStyle = sun; ctx.fillRect(0, 50, W, 400);
-    ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold); ornamentBand(ctx, 0, H - 16, W, 16, C.red, C.gold);
-    const t = since(splashT0), rise = easeOut(t / 0.9);
-    ctx.save(); ctx.globalAlpha = splashA * rise;
-    koshkar(ctx, W / 2, 178 - (1 - rise) * 20, 40 + Math.sin(t * 2) * 1.5, C.gold, 4);
-    txt('БАТЫР01', W / 2, 250 + (1 - rise) * 16, fitText('БАТЫР01', W - 50, 60), C.gold, { stroke: C.ink, lw: 11, weight: 900 });
-    txt(tr('subtitle'), W / 2, 298, 15, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
-    ctx.restore();
-    const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 220, bx = (W - bw) / 2, by = 440;
-    rr(ctx, bx - 2, by - 6, bw + 4, 12, 6); ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+    const cy = H * 0.4;
+    const sun = ctx.createRadialGradient(W / 2, cy, 10, W / 2, cy, 220);
+    sun.addColorStop(0, 'rgba(232,164,60,0.28)'); sun.addColorStop(1, 'rgba(232,164,60,0)');
+    ctx.fillStyle = sun; ctx.fillRect(0, cy - 220, W, 440);
+    frameBand(SAFE.t + 10); frameBand(H - SAFE.b - 10, true);
+    const t = since(splashT0), rise = REDUCED_MOTION ? 1 : easeOut(t / 0.9);
+    drawLogo(W / 2, cy + (1 - rise) * 14, 1, rise);
+    const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 200, bx = (W - bw) / 2, by = H * 0.68;
+    rr(ctx, bx - 2, by - 5, bw + 4, 10, 5); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill(); ctx.strokeStyle = 'rgba(220,183,94,0.35)'; ctx.lineWidth = 1; ctx.stroke();
     const fillW = Math.max(8, bw * (G3.heroSpear ? Math.max(k, 0.35) : Math.min(0.33, 0.05 + t * 0.08)));
-    rr(ctx, bx, by - 4, fillW, 8, 4); const pg = ctx.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, C.goldDk); pg.addColorStop(1, '#ffe27a'); ctx.fillStyle = pg; ctx.fill();
-    txt(tr('loading'), W / 2, by + 22, 12, '#9fb3b8', { weight: 700 });
+    rr(ctx, bx, by - 3, fillW, 6, 3); const pg = ctx.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#9b7228'); pg.addColorStop(1, '#ffe08a'); ctx.fillStyle = pg; ctx.fill();
+    txt(tr('loading'), W / 2, by + 20, 12, T.muted, { weight: 600 });
     tipI = Math.floor(t / 3.2) % TIPS.ru.length;
     const tip = TIPS[lang][tipI], ta = clamp(Math.min((t % 3.2) / 0.4, (3.2 - t % 3.2) / 0.4), 0, 1);
     ctx.save(); ctx.globalAlpha = splashA * ta;
-    wrap('💡 ' + tip, W / 2, 520, W - 70, 18, 13, C.cream, { weight: 700 });
+    wrap(tip, W / 2, by + 64, W - 80, 18, 13, T.text, { weight: 500 });
+    ctx.restore();
     ctx.restore();
     ctx.restore();
   }
@@ -68,16 +65,17 @@
   // ---- whole-screen fade when the scene changes (menu → battle → results → menu)
   function drawTransition() {
     if (transA <= 0) return;
-    ctx.fillStyle = `rgba(4,16,22,${easeOut(transA) * 0.95})`; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(6,9,16,${easeOut(transA) * 0.95})`; ctx.fillRect(0, 0, W, H);
   }
   // tab content slides in, popups pop
   function tabEase() { return easeOut(since(tabT0) / 0.22); }
   function popEase() { return easeBack(since(popT0) / 0.26); }
-  function withPop(fn) {
+  // popups laid out for a 640-high screen are centred on taller ones (shift = true)
+  function withPop(fn, shift) {
     const k = popEase(), a = clamp(since(popT0) / 0.12, 0, 1);
     ctx.save(); ctx.globalAlpha = a;
     ctx.translate(W / 2, H / 2); ctx.scale(0.86 + 0.14 * k, 0.86 + 0.14 * k); ctx.translate(-W / 2, -H / 2);
-    fn(); ctx.restore();
+    shiftUI(shift ? Math.round((H - 640) / 2) : 0, fn); ctx.restore();
   }
 
   // ---- chest and reward reveal
@@ -118,7 +116,7 @@
     if (!tutActive()) return;
     const msg = mt(['tutMove', 'tutStop', 'tutGood'][tut.step]);
     const y = 104;
-    rr(ctx, 30, y - 24, W - 60, 46, 14); ctx.fillStyle = 'rgba(7,30,38,0.82)'; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.stroke();
+    rr(ctx, 30, y - 24, W - 60, 46, 14); ctx.fillStyle = 'rgba(12,16,26,0.88)'; ctx.fill(); goldFrame(30, y - 24, W - 60, 46, 14, 1.6);
     txt(msg, W / 2, y - 1, fitText(msg, W - 80, 15), '#fff', { weight: 900 });
     if (tut.step === 0) {
       // finger swiping left and right

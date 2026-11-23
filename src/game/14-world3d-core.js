@@ -111,6 +111,7 @@
     Save.data.settings.quality = next; Save.write();
     applyQuality(effectiveQuality()); Sound.click();
   }
+  function setQuality(q) { Save.data.settings.quality = q; Save.write(); applyQuality(effectiveQuality()); }
   const qualityLabel = () => tr('q' + Save.data.settings.quality) + (Save.data.settings.quality === 'auto' ? ' · ' + tr('q' + QL) : '');
 
   function initGL() {
@@ -224,13 +225,15 @@
   function placeCam(d, tz, el) { const c = G3.cam; c.position.set(0, Math.sin(el) * d, tz + Math.cos(el) * d); c.lookAt(0, 0, tz); c.updateMatrixWorld(); }
   function fitCamera() {
     const el = 1.2, c = G3.cam;
-    c.aspect = W / H; c.updateProjectionMatrix();
+    // keep the horizontal view of the 360×640 layout on taller screens: they simply see more vertically
+    G3.baseFov = 2 * Math.atan(Math.tan(15 * Math.PI / 180) * H / 640) * 180 / Math.PI;
+    c.aspect = W / H; c.fov = G3.baseFov; c.updateProjectionMatrix();
     for (let d = 12; d < 80; d += 0.25) {
       let lo = -8, hi = 8;
       for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; placeCam(d, m, el); if (proj3(0, 0, -6.5).y < 100) hi = m; else lo = m; }
       const tz = (lo + hi) / 2; placeCam(d, tz, el);
       const bl = proj3(-4.05, 0, 6.6), br = proj3(4.05, 0, 6.6);
-      if (bl.y <= 632 && bl.x >= 0 && br.x <= W) { G3.camBase = { d, tz, el }; return; }
+      if (bl.y <= H - 8 && bl.x >= 0 && br.x <= W) { G3.camBase = { d, tz, el }; return; }
     }
     G3.camBase = { d: 30, tz: 0, el };
   }
