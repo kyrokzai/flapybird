@@ -73,17 +73,24 @@
         const b = m.g.userData.body; b.position.y = 0.36 + Math.sin(G3.rt * 3 + p.x) * 0.06; b.rotation.y = G3.rt * 1.6;
         m.g.children[0].rotation.z = G3.rt; m.g.children[0].position.y = 0.03;
         if (m.g.userData.spark) m.g.userData.spark.material.opacity = 0.6 + Math.random() * 0.4;
-        m.g.children[2].position.y = 0.36;
+        m.g.children[2].position.y = 0.5;
+        const pu = 1 + Math.sin(G3.rt * 4 + p.x) * 0.12;
+        m.g.children[0].scale.set(1.15 * pu, 1.15 * pu, 1); m.g.children[0].rotation.z = G3.rt * 0.8;
+        if (m.g.userData.beam) m.g.userData.beam.material.opacity = 0.4 + Math.sin(G3.rt * 3 + p.y) * 0.15;
         return;
       }
       m.g.position.set(X3(p.x), 0.22 + Math.sin(time * 5 + p.x) * 0.05, Z3(p.y)); m.g.rotation.y = time * 3 + p.x;
     });
     syncList(menu ? [] : crates.filter(c => !c.open), G3.crateM || (G3.crateM = new Map()), makeCrateModel, (c, m) => {
-      m.g.position.set(X3(c.x), 0, Z3(c.y)); m.g.userData.glow.material.opacity = 0.25 + Math.sin(G3.rt * 3) * 0.12;
+      const u = m.g.userData, t = G3.rt * 3 + c.x;
+      m.g.position.set(X3(c.x), 0, Z3(c.y)); u.glow.material.opacity = 0.3 + Math.sin(t) * 0.12;
+      const pu = 1 + Math.sin(t * 1.3) * 0.14; u.ring.scale.set(1.25 * pu, 1.25 * pu, 1); u.ring.material.opacity = 0.75 + Math.sin(t * 1.3) * 0.25; u.ring.rotation.z = G3.rt * 0.7;
+      u.beam.material.opacity = 0.32 + Math.sin(t) * 0.12;
+      u.marker.position.y = 0.98 + Math.sin(t * 1.2) * 0.08; u.marker.rotation.y = G3.rt * 2.2;
     });
     syncList(menu ? [] : thrown, G3.bombM || (G3.bombM = new Map()), () => ({ g: makeBonusModel('bomb').children[1].parent }), (b, m) => {
       const k = b.t; m.g.position.set(X3(b.x0 + (b.x1 - b.x0) * k), 0, Z3(b.y0 + (b.y1 - b.y0) * k));
-      m.g.userData.body.position.y = 0.4 + 4 * k * (1 - k) * 1.6; m.g.userData.body.rotation.z = k * 8; m.g.children[0].visible = false;
+      m.g.userData.body.position.y = 0.4 + 4 * k * (1 - k) * 1.6; m.g.userData.body.rotation.z = k * 8; m.g.children[0].visible = false; if (m.g.userData.beam) m.g.userData.beam.visible = false; m.g.userData.body.scale.setScalar(1);
     });
     if (!G3.shieldBubble) {
       G3.shieldBubble = new THREE.Mesh(G3.geo.sphere, new THREE.MeshBasicMaterial({ color: col('#5fc8ff'), transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));

@@ -10,7 +10,7 @@
     { id: 'wall', max: 2, col: '#7fd6e8', name: { ru: 'Отскок от стен', kz: 'Қабырға секірісі', en: 'Wall Bounce' }, desc: { ru: 'Стрелы отскакивают от стен', kz: 'Жебелер қабырғадан серпіледі', en: 'Arrows bounce off walls' } },
     { id: 'atk', max: 6, col: '#ff7b54', name: { ru: 'Сила батыра', kz: 'Батыр күші', en: 'Batyr\'s Might' }, desc: { ru: 'Урон +25%', kz: 'Шабуыл +25%', en: 'Damage +25%' } },
     { id: 'spd', max: 5, col: '#ff7b54', name: { ru: 'Быстрые руки', kz: 'Шапшаңдық', en: 'Quick Hands' }, desc: { ru: 'Скорость атаки +20%', kz: 'Ату жылдамдығы +20%', en: 'Attack speed +20%' } },
-    { id: 'crit', max: 4, col: '#ff7b54', name: { ru: 'Глаз мергена', kz: 'Мерген көз', en: 'Marksman\'s Eye' }, desc: { ru: 'Шанс крита +10%, сила крита +25%', kz: 'Сыни соққы +10%, күші +25%', en: 'Crit chance +10%, crit damage +25%' } },
+    { id: 'crit', max: 4, col: '#ff7b54', name: { ru: 'Глаз батыра', kz: 'Батыр көзі', en: 'Batyr\'s Eye' }, desc: { ru: 'Шанс крита +10%, сила крита +25%', kz: 'Сыни соққы +10%, күші +25%', en: 'Crit chance +10%, crit damage +25%' } },
     { id: 'hp', max: 6, col: '#8be07a', name: { ru: 'Кумыс', kz: 'Қымыз', en: 'Kumis' }, desc: { ru: 'Макс. здоровье +20% и лечение', kz: 'Денсаулық +20% және емделу', en: 'Max health +20% and heal' } },
     { id: 'blood', max: 3, col: '#8be07a', name: { ru: 'Жажда крови', kz: 'Қанішер', en: 'Bloodthirst' }, desc: { ru: 'Лечение за каждое убийство', kz: 'Әр жеңіс үшін емделу', en: 'Heal on every kill' } },
     { id: 'fire', max: 2, col: '#ff9a3c', name: { ru: 'Огненные стрелы', kz: 'От жебе', en: 'Fire Arrows' }, desc: { ru: 'Стрелы поджигают врагов', kz: 'Жебелер жауды өртейді', en: 'Arrows set enemies on fire' } },

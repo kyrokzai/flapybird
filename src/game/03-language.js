@@ -2,7 +2,7 @@
   let lang = ['ru', 'kz', 'en'].includes(Save.data.settings.lang) ? Save.data.settings.lang : 'ru';
   const STR = {
     ru: {
-      subtitle: 'СТЕПНОЙ БАТЫР', play: 'ИГРАТЬ', room: 'КОМНАТА', boss: 'Босс',
+      play: 'ИГРАТЬ', room: 'КОМНАТА', boss: 'Босс',
       levelUp: 'НОВЫЙ УРОВЕНЬ!', choose: 'Уровень {n} — выберите навык',
       kydyr: 'КЫДЫР-АТА', kydyrText: 'Старец Кыдыр встречает батыра в степи и предлагает дар',
       heal: 'ЛЕЧЕНИЕ · +40% здоровья', bless: 'БЛАГОСЛОВЕНИЕ · навык', blessGot: 'Благословение',
@@ -18,7 +18,7 @@
       revive: 'ВОСКРЕСНУТЬ?', reviveText: 'Батыр ещё может подняться!', reviveBtn: 'ВОСКРЕСНУТЬ · {n} ₸', reviveNeed: 'Нужно {n} ₸', reviveNo: 'Отказаться',
     },
     kz: {
-      subtitle: 'ДАЛА БАТЫРЫ', play: 'ОЙНАУ', room: 'БӨЛМЕ', boss: 'Босс',
+      play: 'ОЙНАУ', room: 'БӨЛМЕ', boss: 'Босс',
       levelUp: 'ДЕҢГЕЙ ЖОҒАРЫЛАДЫ!', choose: '{n}-деңгей — дағдыны таңдаңыз',
       kydyr: 'ҚЫДЫР АТА', kydyrText: 'Қыдыр ата батырды далада кездестіріп, сый ұсынады',
       heal: 'САУЫҒУ · +40% денсаулық', bless: 'БАТА · кездейсоқ дағды', blessGot: 'Бата',
@@ -34,7 +34,7 @@
       revive: 'ҚАЙТА ТҰРУ?', reviveText: 'Батыр әлі де тұра алады!', reviveBtn: 'ҚАЙТА ТҰРУ · {n} ₸', reviveNeed: '{n} ₸ керек', reviveNo: 'Бас тарту',
     },
     en: {
-      subtitle: 'STEPPE BATYR', play: 'PLAY', room: 'ROOM', boss: 'Boss',
+      play: 'PLAY', room: 'ROOM', boss: 'Boss',
       levelUp: 'LEVEL UP!', choose: 'Level {n} — choose a skill',
       kydyr: 'KYDYR ATA', kydyrText: 'The elder Kydyr meets the batyr on the steppe and offers a gift',
       heal: 'HEALING · +40% health', bless: 'BLESSING · random skill', blessGot: 'Blessing',

@@ -30,13 +30,32 @@
     }
     return { g };
   }
+  // ---- loot beacons: a column of light and a pulsing ground ring say "pick me up" from across the room
+  function lootBeam(hex, h, r) {
+    if (!G3.beamTex) G3.beamTex = canvasTex(4, 64, (g, w, hh) => {
+      const gr = g.createLinearGradient(0, 0, 0, hh); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0.9)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, hh);
+    });
+    const geo = new THREE.CylinderGeometry(r * 0.55, r, h, 14, 1, true).translate(0, h / 2, 0);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: G3.beamTex, color: col(hex), transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    m.renderOrder = 3;
+    return m;
+  }
+  // dark soft disc under loot so the bright ring reads on light grass and sand
+  function lootShadow(size) {
+    if (!G3.lootShadowTex) G3.lootShadowTex = canvasTex(128, 128, (g, w, h) => {
+      const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,0.75)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    });
+    const d = decal(G3.lootShadowTex, '#ffffff', size, 0.55); d.position.y = 0.012; return d;
+  }
   function makeBonusModel(item) {
     const g = new THREE.Group(), it = ITEMS[item];
-    const ring = decal(G3.ringTex, it.col, 0.75, 0.7); ring.material.blending = THREE.AdditiveBlending; ring.userData.ground = true; g.add(ring);
-    const body = new THREE.Group(); g.add(body); g.userData.body = body;
+    const ring = decal(G3.ringTex, it.col, 1.15, 1); ring.userData.ground = true; g.add(ring);
+    const body = new THREE.Group(); body.scale.setScalar(1.6); g.add(body); g.userData.body = body;
     if (item === 'medkit') {
       body.add(mesh(G3.geo.box, mat('#f4f4f0', { r: 0.4 }), 0, 0, 0, 0.26, 0.17, 0.2));
-      const red = mat('#e8262e', { e: '#600', ei: 0.4 });
+      const red = mat('#ff2a32', { e: '#ff1a20', ei: 1.1 });
       body.add(mesh(G3.geo.box, red, 0, 0.087, 0, 0.16, 0.01, 0.05)); body.add(mesh(G3.geo.box, red, 0, 0.087, 0, 0.05, 0.01, 0.16));
       body.add(mesh(G3.geo.box, red, 0.131, 0, 0, 0.01, 0.1, 0.035)); body.add(mesh(G3.geo.box, red, 0.131, 0, 0, 0.01, 0.035, 0.1));
       body.add(mesh(G3.geo.box, mat('#c8c8c4'), 0, 0.1, 0, 0.08, 0.03, 0.03));
@@ -52,7 +71,9 @@
       const bow = mesh(G3.geo.bow, mat('#c89a40', { m: 0.7, r: 0.3, e: it.col, ei: 0.35 }), 0, 0, 0, 0.7, 0.7, 0.7); bow.rotation.z = -1.15; body.add(bow);
       const ar = mesh(G3.geo.cyl, mat(it.col, { e: it.col, ei: 0.8 }), 0.05, 0, 0, 0.012, 0.46, 0.012); ar.rotation.z = Math.PI / 2; body.add(ar);
     }
-    const gl = glow(it.col, 0.9, 0.5); g.add(gl);
+    const gl = glow(it.col, 1.25, 0.6); g.add(gl);
+    const beam = lootBeam(it.col, 1.7, 0.26); g.add(beam); g.userData.beam = beam;
+    g.add(lootShadow(1.5));
     return g;
   }
   function makeCrateModel() {
@@ -63,11 +84,17 @@
       g.beginPath(); g.moveTo(8, 8); g.lineTo(w - 8, h - 8); g.stroke();
       koshkar(g, w / 2, h / 2 + 4, 36, '#f0c040', 4);
     });
-    const g = new THREE.Group();
-    g.add(mesh(G3.geo.box, mat('#ffffff', { map: G3.crateTex, r: 0.8 }), 0, 0.22, 0, 0.44, 0.44, 0.44));
-    const gold = mat('#f0c040', { m: 0.9, r: 0.3 });
-    for (const y of [0.04, 0.4]) g.add(mesh(G3.geo.box, gold, 0, y, 0, 0.46, 0.04, 0.46));
-    const gl = glow('#ffd24a', 1.0, 0.35); gl.position.y = 0.3; g.add(gl); g.userData.glow = gl;
+    const g = new THREE.Group(), box = new THREE.Group(); box.scale.setScalar(1.3); g.add(box);
+    box.add(mesh(G3.geo.box, mat('#ffffff', { map: G3.crateTex, r: 0.8, e: '#3a2208', ei: 0.35 }), 0, 0.22, 0, 0.44, 0.44, 0.44));
+    const gold = mat('#f0c040', { m: 0.9, r: 0.3, e: '#a8740f', ei: 0.35 });
+    for (const y of [0.04, 0.4]) box.add(mesh(G3.geo.box, gold, 0, y, 0, 0.46, 0.04, 0.46));
+    const gl = glow('#ffd24a', 1.4, 0.4); gl.position.y = 0.35; g.add(gl); g.userData.glow = gl;
+    // gold ring on the ground, a beam of light and a bobbing marker above
+    g.add(lootShadow(1.7));
+    const ring = decal(G3.ringTex, '#ffd24a', 1.25, 1); g.add(ring); g.userData.ring = ring;
+    const beam = lootBeam('#ffcf5a', 1.6, 0.36); g.add(beam); g.userData.beam = beam;
+    const mk = mesh(G3.geo.octa, mat('#ffd24a', { m: 0.6, r: 0.25, e: '#ffb020', ei: 1.2 }), 0, 0, 0, 0.13, 0.22, 0.13);
+    const mg = new THREE.Group(); mg.add(mk); mg.add(glow('#ffd24a', 0.55, 0.8)); mg.position.y = 0.95; g.add(mg); g.userData.marker = mg;
     return { g };
   }
 
@@ -77,9 +104,10 @@
     if (p.kind === 'xp') { g.add(mesh(G3.geo.octa, G3.pm.xp, 0, 0, 0, 0.08, 0.12, 0.08)); g.add(glow('#5fe8ff', 0.4, 0.55)); }
     else if (p.kind === 'coin') { const c = mesh(G3.geo.cyl, G3.pm.coin, 0, 0, 0, 0.09, 0.025, 0.09); c.rotation.x = Math.PI / 2; g.add(c); }
     else {
-      for (const s of [-1, 1]) g.add(mesh(G3.geo.sLow, G3.pm.heart, 0, 0.04, s * 0.05, 0.065));
-      const c = mesh(G3.geo.cone, G3.pm.heart, 0, -0.06, 0, 0.1, 0.14, 0.1); c.rotation.z = Math.PI; g.add(c);
-      g.add(glow('#ff5a6a', 0.5, 0.5));
+      const h = new THREE.Group(); h.scale.setScalar(1.5); g.add(h);
+      for (const s of [-1, 1]) h.add(mesh(G3.geo.sLow, G3.pm.heart, 0, 0.04, s * 0.05, 0.065));
+      const c = mesh(G3.geo.cone, G3.pm.heart, 0, -0.06, 0, 0.1, 0.14, 0.1); c.rotation.z = Math.PI; h.add(c);
+      g.add(glow('#ff5a6a', 0.8, 0.65));
     }
     return { g };
   }
