@@ -89,11 +89,13 @@
 
   function simBatch(o) {
     const runs = o.runs || 20, skill = o.skill === undefined ? 0.6 : o.skill;
-    const keep = { bank, upAtk, upHp };
+    const keep = { bank, talents: Save.data.talents, eq: Save.data.gear.eq };
     const out = { runs, skill, wins: 0, deaths: {}, revives: 0, time: 0, roomTime: {}, roomDmg: {}, roomN: {}, dmgBy: {} };
     SIM.dmgBy = {};
     for (let i = 0; i < runs; i++) {
-      bank = o.bank === undefined ? 0 : o.bank; upAtk = o.upAtk || 0; upHp = o.upHp || 0;
+      bank = o.bank === undefined ? 0 : o.bank;
+      Save.data.talents = Object.assign(Save.defaults().talents, o.talents || {});
+      Save.data.gear.eq = o.gear ? keep.eq : {};
       const r = simRun(skill, o.revive !== false);
       if (r.won) out.wins++; else out.deaths[r.room] = (out.deaths[r.room] || 0) + 1;
       if (r.revived) out.revives++;
@@ -108,6 +110,6 @@
     out.time = +(out.time / runs / 60).toFixed(1);
     const tot = Object.values(SIM.dmgBy).reduce((a, b) => a + b, 0) || 1;
     for (const k of Object.keys(SIM.dmgBy).sort((a, b) => SIM.dmgBy[b] - SIM.dmgBy[a])) out.dmgBy[k] = Math.round(SIM.dmgBy[k] / tot * 100) + '%';
-    bank = keep.bank; upAtk = keep.upAtk; upHp = keep.upHp; saveProgress();
+    bank = keep.bank; Save.data.talents = keep.talents; Save.data.gear.eq = keep.eq; saveProgress();
     return out;
   }

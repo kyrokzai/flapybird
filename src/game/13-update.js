@@ -82,6 +82,8 @@
 
     if (!roomClear && enemies.length === 0) {
       roomClear = true; clearT = 0;
+      questEvent('room'); if (run.roomDmg === 0) questEvent('nohit');
+      if (run.S.regen > 0) healPlayer(player.maxHp * run.S.regen);
       slowT = 0.7; Sound.clear();
       banner = { kind: 'clear', t: 2.0 };
       addFx('ring', player.x, player.y, { col: '#7cf07a', size: 5, max: 0.9 });
@@ -243,7 +245,7 @@
     for (const p of pickups) {
       p.t += dt;
       const d = Math.hypot(player.x - p.x, player.y - p.y);
-      if (p.t > 0.45 && (d < 70 || roomClear)) {
+      if (p.t > 0.45 && (d < 70 * (1 + run.S.magnet) || roomClear)) {
         const a = Math.atan2(player.y - p.y, player.x - p.x), s = 520;
         p.vx += Math.cos(a) * s * dt * 6; p.vy += Math.sin(a) * s * dt * 6;
         const sp = Math.hypot(p.vx, p.vy), mx = 480;
@@ -254,7 +256,7 @@
       if (d < 16 && p.t > 0.3) {
         p.dead = true;
         if (p.kind === 'xp') gainXp(p.v);
-        else if (p.kind === 'coin') run.coins += Math.max(1, Math.round(p.v));
+        else if (p.kind === 'coin') { const c = Math.max(1, Math.round(p.v * (1 + run.S.loot))); run.coins += c; questEvent('coins', c); }
         else if (p.kind === 'bonus') applyBonus(p.item);
         else healPlayer(player.maxHp * 0.15);
         Sound.pick();

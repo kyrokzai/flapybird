@@ -13,8 +13,8 @@
   const SIM = { on: false, mv: { x: 0, y: 0 }, skill: 0.6, noRevive: false, next: 0, dmgBy: {} };
   let choices = [];
   let ui = [];
-  let bank = Save.data.coins, best = Save.data.best, upAtk = Save.data.upAtk, upHp = Save.data.upHp;
-  function saveProgress() { Object.assign(Save.data, { coins: bank, best, upAtk, upHp }); Save.write(); }
+  let bank = Save.data.coins, best = Save.data.best;
+  function saveProgress() { Object.assign(Save.data, { coins: bank, best }); Save.write(); }
 
   let run = null, player = null;
   let crates = [], thrown = [];
@@ -22,23 +22,32 @@
   let roomClear = false, gateOpen = 0, clearT = 0, endT = 0;
 
   const sk = id => (run && run.sk[id]) || 0;
-  const baseAtk = () => 10 * (1 + 0.08 * upAtk);
+  const baseAtk = () => 10 * (1 + (run && run.S ? run.S.atk : 0));
   const atk = () => baseAtk() * (1 + 0.25 * sk('atk'));
-  const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd')) / (player && player.weapon && player.weapon.kind === 'w_rapid' ? 1.9 : 1);
+  const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd')) / (1 + (run && run.S ? run.S.aspd : 0)) / (player && player.weapon && player.weapon.kind === 'w_rapid' ? 1.9 : 1);
   const moveSpeed = () => 140 * (1 + 0.15 * sk('speed'));
   const upCost = lvl => Math.round(40 * Math.pow(lvl + 1, 1.45) / 10) * 10;
   const xpNeed = lvl => 12 + lvl * 8;
 
+  // menu "play": costs energy (free in test mode); without enough energy the menu shows how to get more
+  function startGame() {
+    if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
+    newRun();
+  }
+
   function newRun() {
-    const maxHp = Math.round(150 * (1 + 0.1 * upHp));
-    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, sk: {}, pendingLv: 0, bombs: 1 };
+    const S = statsTotal();   // talents + equipped gear
+    const maxHp = Math.round(150 * (1 + S.hp));
+    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null };
     player = {
       x: W / 2, y: AY2 - 30, r: 11, hp: maxHp, maxHp, inv: 0, face: -Math.PI / 2,
       fireCd: 0.3, volleys: [], atkAnim: 0, moving: false, walk: 0,
-      crit: 0.05, critMul: 2, orbitA: 0, orbitHits: new Map(),
+      crit: 0.05 + S.crit, critMul: 2 + S.critDmg, armor: Math.min(0.6, S.armor), orbitA: 0, orbitHits: new Map(),
       eagle: { x: W / 2, y: AY2 - 60, cd: 1, a: 0 }, shield: 0, weapon: null,
     };
     scene = 'play'; modal = null;
     buildRoom(1);
+    // talent "ancestral skill": start the run with random skills
+    for (let i = 0; i < S.startSkill; i++) { const c = rollChoices(); if (c.length) applySkill(c[Math.floor(Math.random() * c.length)]); }
   }
 

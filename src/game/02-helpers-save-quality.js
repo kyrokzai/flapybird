@@ -1,9 +1,20 @@
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 1;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 2;
   const Save = {
     data: null,
-    defaults() { return { v: SAVE_VERSION, coins: 0, best: 0, upAtk: 0, upHp: 0, settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null } }; },
+    defaults() {
+      return {
+        v: SAVE_VERSION, coins: 0, gems: 0, best: 0,
+        talents: { atk: 0, hp: 0, armor: 0, magnet: 0, regen: 0, loot: 0, start: 0 },
+        // starter gear: a common bow and chapan, already equipped
+        gear: { items: [{ id: 1, b: 'bow', r: 0, l: 1 }, { id: 2, b: 'shapan', r: 0, l: 1 }], eq: { weapon: 1, armor: 2 }, next: 3 },
+        energy: { val: 20, t: Date.now() },
+        daily: { day: 0, last: '' },
+        quests: { date: '', list: [], bonus: false },
+        settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null },
+      };
+    },
     load() {
       let d = null;
       try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { d = null; }
@@ -11,7 +22,8 @@
       this.write();
     },
     fromOldKeys() {   // saves made before version 1 (separate mergen.* keys)
-      const d = this.defaults(), g = k => { try { return localStorage.getItem('mergen.' + k); } catch (e) { return null; } };
+      const d = this.defaults(); d.v = 0;
+      const g = k => { try { return localStorage.getItem('mergen.' + k); } catch (e) { return null; } };
       for (const k of ['coins', 'best', 'upAtk', 'upHp']) if (g(k) !== null) d[k] = parseInt(g(k), 10) || 0;
       if (g('lang')) d.settings.lang = g('lang');
       if (g('music') !== null) d.settings.music = g('music') === '1';
@@ -20,9 +32,15 @@
       return d;
     },
     upgrade(d) {
-      const out = Object.assign(this.defaults(), d);
-      out.settings = Object.assign(this.defaults().settings, d.settings || {});
-      // future format changes go here: if (out.v < 2) { ...; }
+      const def = this.defaults(), out = Object.assign(def, d);
+      for (const k of ['settings', 'talents', 'energy', 'daily', 'quests']) out[k] = Object.assign(this.defaults()[k], d[k] || {});
+      if (!d.gear || !Array.isArray(d.gear.items)) out.gear = this.defaults().gear;
+      // v1 → v2: the two shop upgrades become talents (old +8% / +10% steps = two new talent levels each)
+      if ((d.v || 0) < 2) {
+        out.talents.atk = Math.min(20, (d.upAtk || 0) * 2);
+        out.talents.hp = Math.min(20, (d.upHp || 0) * 2);
+        delete out.upAtk; delete out.upHp;
+      }
       out.v = SAVE_VERSION;
       return out;
     },

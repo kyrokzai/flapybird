@@ -5,7 +5,7 @@
     flow = new Int16Array(COLS * ROWS);
     introT = INTRO_T;
     obstacles = []; enemies = []; arrows = []; bullets = []; pickups = []; particles = []; texts = []; crates = []; thrown = [];
-    roomClear = false; gateOpen = 0; clearT = 0;
+    roomClear = false; gateOpen = 0; clearT = 0; if (run) run.roomDmg = 0;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const ch = L[r][c];

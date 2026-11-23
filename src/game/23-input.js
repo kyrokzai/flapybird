@@ -30,8 +30,8 @@
     if ((e.code === 'Escape' || e.code === 'KeyP') && scene === 'play') { modal = modal === 'pause' ? null : (modal || 'pause'); }
     if (e.code === 'KeyE' || e.code === 'KeyB') throwBomb();
     if (e.code === 'Enter' || e.code === 'Space') {
-      if (scene === 'menu') newRun();
-      else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) newRun();
+      if (scene === 'menu' && !menuPopup) startGame();
+      else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) startGame();
     }
     if (modal === 'levelup' && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) pickCard(+e.code.slice(-1) - 1);
   });

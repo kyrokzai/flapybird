@@ -329,68 +329,34 @@
     const won = scene === 'victory';
     overlay(clamp(endT * 1.5, 0, 0.72));
     if (endT < 0.5) return;
-    panel(30, 130, W - 60, 380);
+    panel(30, 110, W - 60, 420);
     if (won) {
-      txt(tr('victory'), W / 2, 180, 40, C.gold, { stroke: C.ink, lw: 7, weight: 900 });
-      txt(tr('victoryText'), W / 2, 214, 13, C.ink, { weight: 500 });
+      txt(tr('victory'), W / 2, 156, 40, C.gold, { stroke: C.ink, lw: 7, weight: 900 });
+      txt(tr('victoryText'), W / 2, 188, 13, C.ink, { weight: 500 });
     } else {
-      txt(tr('dead'), W / 2, 180, 28, C.redDk, { weight: 900 });
-      txt(tr('deadText'), W / 2, 210, 13, C.ink, { weight: 500 });
+      txt(tr('dead'), W / 2, 156, 28, C.redDk, { weight: 900 });
+      txt(tr('deadText'), W / 2, 184, 13, C.ink, { weight: 500 });
     }
     const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(run.kills)], [tr('sCoins'), '+' + run.coins + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
-      txt(k, 60, 250 + i * 30, 15, '#6a5a45', { align: 'left', weight: 500 });
-      txt(v, W - 60, 250 + i * 30, 16, C.ink, { align: 'right', weight: 900 });
+      txt(k, 60, 214 + i * 24, 14, '#6a5a45', { align: 'left', weight: 500 });
+      txt(v, W - 60, 214 + i * 24, 15, C.ink, { align: 'right', weight: 900 });
     });
-    button(54, 410, W - 108, 48, tr('again'), () => { Sound.click(); newRun(); });
-    button(54, 464, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
-  }
-
-  function drawMenu() {
-    const top = ctx.createLinearGradient(0, 0, 0, 200);
-    top.addColorStop(0, 'rgba(7,30,38,0.75)'); top.addColorStop(1, 'rgba(7,30,38,0)');
-    ctx.fillStyle = top; ctx.fillRect(0, 0, W, 200);
-    ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold);
-    const wob = Math.sin(time * 1.5) * 2;
-    txt('БАТЫР01', W / 2, 92 + wob, fitText('БАТЫР01', W - 40, 56), C.gold, { stroke: C.ink, lw: 10, weight: 900 });
-    koshkar(ctx, W / 2, 136, 30, C.red, 3.5);
-    txt(tr('subtitle'), W / 2, 160, 16, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
-    button(W / 2 - 100, 372, 200, 56, tr('play'), () => { Sound.init(); Sound.click(); newRun(); }, { size: 24 });
-    txt(tr('hint'), W / 2, 442, 11, '#fff', { stroke: C.ink, lw: 3, weight: 700 });
-    panel(24, 456, W - 48, 146);
-    ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(W / 2 - 34, 481, 8, 0, TAU); ctx.fill(); ctx.stroke();
-    txt('₸', W / 2 - 34, 481.5, 10, C.goldDk, { weight: 900 });
-    txt(String(bank), W / 2 - 20, 481, 17, C.ink, { align: 'left', weight: 900 });
-    const rowsU = [
-      [tr('upAtk'), tr('upAtkD'), upAtk, () => { const c = upCost(upAtk); if (bank >= c && upAtk < 10) { bank -= c; upAtk++; saveProgress(); Sound.level(); } }],
-      [tr('upHp'), tr('upHpD'), upHp, () => { const c = upCost(upHp); if (bank >= c && upHp < 10) { bank -= c; upHp++; saveProgress(); Sound.level(); } }],
-    ];
-    rowsU.forEach(([name, desc, lv, fn], i) => {
-      const y = 505 + i * 45;
-      txt(name + ' · ' + tr('lvl') + ' ' + lv, 44, y, 15, C.redDk, { align: 'left', weight: 900 });
-      txt(desc, 44, y + 17, 11, '#6a5a45', { align: 'left', weight: 500 });
-      const c = upCost(lv), maxed = lv >= 10;
-      button(W - 142, y - 14, 104, 36, maxed ? tr('max') : c + ' ₸', fn, { disabled: maxed || bank < c, size: 15, col: '#8be07a', col2: '#3d9a36' });
-    });
-    if ((G3.loadDone || 0) < (G3.loadTotal || 1)) {
-      const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 180, bx = (W - bw) / 2, by = G3.heroSpear ? 636 : 300;
-      if (!G3.heroSpear) txt(tr('loading'), W / 2, by - 16, 15, '#fff', { stroke: C.ink, lw: 4, weight: 900 });
-      rr(ctx, bx, by - 3, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
-      rr(ctx, bx, by - 3, Math.max(6, bw * k), 6, 3); ctx.fillStyle = C.gold; ctx.fill();
+    // progress through the chapter: one pip per room, bosses bigger
+    const reached = won ? TOTAL_ROOMS : run.room, pw = (W - 120) / TOTAL_ROOMS;
+    for (let r = 1; r <= TOTAL_ROOMS; r++) {
+      const boss = r % 5 === 0, px = 60 + (r - 0.5) * pw, rad = boss ? 6 : 4;
+      ctx.fillStyle = r < reached || won ? C.gold : r === reached ? C.red : 'rgba(42,22,12,0.2)';
+      ctx.beginPath(); ctx.arc(px, 342, rad, 0, TAU); ctx.fill();
+      if (r === best && !won) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
     }
-    txt(tr('best', best), W / 2, 620, 12, C.cream, { stroke: C.ink, lw: 3, weight: 700 });
-    // language + sound toggles
-    const tg = (x, w, on, label, fn) => {
-      rr(ctx, x, 24, w, 34, 9); ctx.fillStyle = C.ink; ctx.fill();
-      rr(ctx, x + 3, 27, w - 6, 28, 7); ctx.fillStyle = on ? C.blueDk : '#5a3a30'; ctx.fill();
-      txt(label, x + w / 2, 41.5, 14, on ? '#fff' : '#c9a9a0', { weight: 900 });
-      ui.push({ x, y: 22, w, h: 38, fn });
-    };
-    tg(10, 44, lang === 'ru', 'RU', () => { setLang('ru'); Sound.click(); });
-    tg(58, 54, lang === 'kz', 'ҚАЗ', () => { setLang('kz'); Sound.click(); });
-    tg(116, 44, lang === 'en', 'EN', () => { setLang('en'); Sound.click(); });
-    tg(W - 172, 72, true, '⚙ ' + tr('q' + Save.data.settings.quality), cycleQuality);
-    tg(W - 96, 40, Sound.music, '♪', () => { Sound.init(); Sound.setMusic(!Sound.music); });
-    tg(W - 52, 40, Sound.sfx, '♫', () => { Sound.init(); Sound.setSfx(!Sound.sfx); });
+    const rw = run.rewards;
+    txt(mt('rewards'), 60, 368, 14, C.redDk, { align: 'left', weight: 900 });
+    let rx = 60;
+    if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + rw.gems, rx + 20, 396, 15, C.ink, { align: 'left', weight: 900 }); rx += 60; }
+    if (rw) rw.items.forEach(it => { itemCard(it, rx, 376, 40, null); rx += 46; });
+    if (!rw || (!rw.gems && !rw.items.length)) txt(mt('noChest'), W / 2, 396, 12, '#8a7a65', { weight: 500 });
+    button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(); });
+    button(54, 478, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
   }
 

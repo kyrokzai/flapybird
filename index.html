@@ -75,10 +75,21 @@
 
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 1;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 2;
   const Save = {
     data: null,
-    defaults() { return { v: SAVE_VERSION, coins: 0, best: 0, upAtk: 0, upHp: 0, settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null } }; },
+    defaults() {
+      return {
+        v: SAVE_VERSION, coins: 0, gems: 0, best: 0,
+        talents: { atk: 0, hp: 0, armor: 0, magnet: 0, regen: 0, loot: 0, start: 0 },
+        // starter gear: a common bow and chapan, already equipped
+        gear: { items: [{ id: 1, b: 'bow', r: 0, l: 1 }, { id: 2, b: 'shapan', r: 0, l: 1 }], eq: { weapon: 1, armor: 2 }, next: 3 },
+        energy: { val: 20, t: Date.now() },
+        daily: { day: 0, last: '' },
+        quests: { date: '', list: [], bonus: false },
+        settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null },
+      };
+    },
     load() {
       let d = null;
       try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { d = null; }
@@ -86,7 +97,8 @@
       this.write();
     },
     fromOldKeys() {   // saves made before version 1 (separate mergen.* keys)
-      const d = this.defaults(), g = k => { try { return localStorage.getItem('mergen.' + k); } catch (e) { return null; } };
+      const d = this.defaults(); d.v = 0;
+      const g = k => { try { return localStorage.getItem('mergen.' + k); } catch (e) { return null; } };
       for (const k of ['coins', 'best', 'upAtk', 'upHp']) if (g(k) !== null) d[k] = parseInt(g(k), 10) || 0;
       if (g('lang')) d.settings.lang = g('lang');
       if (g('music') !== null) d.settings.music = g('music') === '1';
@@ -95,9 +107,15 @@
       return d;
     },
     upgrade(d) {
-      const out = Object.assign(this.defaults(), d);
-      out.settings = Object.assign(this.defaults().settings, d.settings || {});
-      // future format changes go here: if (out.v < 2) { ...; }
+      const def = this.defaults(), out = Object.assign(def, d);
+      for (const k of ['settings', 'talents', 'energy', 'daily', 'quests']) out[k] = Object.assign(this.defaults()[k], d[k] || {});
+      if (!d.gear || !Array.isArray(d.gear.items)) out.gear = this.defaults().gear;
+      // v1 → v2: the two shop upgrades become talents (old +8% / +10% steps = two new talent levels each)
+      if ((d.v || 0) < 2) {
+        out.talents.atk = Math.min(20, (d.upAtk || 0) * 2);
+        out.talents.hp = Math.min(20, (d.upHp || 0) * 2);
+        delete out.upAtk; delete out.upHp;
+      }
       out.v = SAVE_VERSION;
       return out;
     },
@@ -554,8 +572,8 @@
   const SIM = { on: false, mv: { x: 0, y: 0 }, skill: 0.6, noRevive: false, next: 0, dmgBy: {} };
   let choices = [];
   let ui = [];
-  let bank = Save.data.coins, best = Save.data.best, upAtk = Save.data.upAtk, upHp = Save.data.upHp;
-  function saveProgress() { Object.assign(Save.data, { coins: bank, best, upAtk, upHp }); Save.write(); }
+  let bank = Save.data.coins, best = Save.data.best;
+  function saveProgress() { Object.assign(Save.data, { coins: bank, best }); Save.write(); }
 
   let run = null, player = null;
   let crates = [], thrown = [];
@@ -563,24 +581,33 @@
   let roomClear = false, gateOpen = 0, clearT = 0, endT = 0;
 
   const sk = id => (run && run.sk[id]) || 0;
-  const baseAtk = () => 10 * (1 + 0.08 * upAtk);
+  const baseAtk = () => 10 * (1 + (run && run.S ? run.S.atk : 0));
   const atk = () => baseAtk() * (1 + 0.25 * sk('atk'));
-  const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd')) / (player && player.weapon && player.weapon.kind === 'w_rapid' ? 1.9 : 1);
+  const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd')) / (1 + (run && run.S ? run.S.aspd : 0)) / (player && player.weapon && player.weapon.kind === 'w_rapid' ? 1.9 : 1);
   const moveSpeed = () => 140 * (1 + 0.15 * sk('speed'));
   const upCost = lvl => Math.round(40 * Math.pow(lvl + 1, 1.45) / 10) * 10;
   const xpNeed = lvl => 12 + lvl * 8;
 
+  // menu "play": costs energy (free in test mode); without enough energy the menu shows how to get more
+  function startGame() {
+    if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
+    newRun();
+  }
+
   function newRun() {
-    const maxHp = Math.round(150 * (1 + 0.1 * upHp));
-    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, sk: {}, pendingLv: 0, bombs: 1 };
+    const S = statsTotal();   // talents + equipped gear
+    const maxHp = Math.round(150 * (1 + S.hp));
+    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null };
     player = {
       x: W / 2, y: AY2 - 30, r: 11, hp: maxHp, maxHp, inv: 0, face: -Math.PI / 2,
       fireCd: 0.3, volleys: [], atkAnim: 0, moving: false, walk: 0,
-      crit: 0.05, critMul: 2, orbitA: 0, orbitHits: new Map(),
+      crit: 0.05 + S.crit, critMul: 2 + S.critDmg, armor: Math.min(0.6, S.armor), orbitA: 0, orbitHits: new Map(),
       eagle: { x: W / 2, y: AY2 - 60, cd: 1, a: 0 }, shield: 0, weapon: null,
     };
     scene = 'play'; modal = null;
     buildRoom(1);
+    // talent "ancestral skill": start the run with random skills
+    for (let i = 0; i < S.startSkill; i++) { const c = rollChoices(); if (c.length) applySkill(c[Math.floor(Math.random() * c.length)]); }
   }
 
   // =================================================================== rooms
@@ -590,7 +617,7 @@
     flow = new Int16Array(COLS * ROWS);
     introT = INTRO_T;
     obstacles = []; enemies = []; arrows = []; bullets = []; pickups = []; particles = []; texts = []; crates = []; thrown = [];
-    roomClear = false; gateOpen = 0; clearT = 0;
+    roomClear = false; gateOpen = 0; clearT = 0; if (run) run.roomDmg = 0;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const ch = L[r][c];
@@ -788,6 +815,7 @@
     if (e.dead) return;
     e.dead = true;
     run.kills++;
+    questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; }
     Sound.kill();
     const col = { w: '#9a9ea8', s: '#5b3a24', j: '#c4572f', a: '#dfe9f2', m: '#6d4c8f', D: '#a8683a', J: '#7a4fa0', A: '#3b9a5b' }[e.type];
     burst(e.x, e.y, col, e.boss ? 60 : 16, e.boss ? 260 : 150, e.boss ? 5 : 3.5);
@@ -809,6 +837,7 @@
   function dropBonus(x, y, item) { const a = Math.random() * TAU; pickups.push({ x, y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, kind: 'bonus', item, v: 0, t: 0 }); }
   function openCrate(c) {
     if (c.open) return;
+    questEvent('crate');
     c.open = true; Sound.crate();
     burst(c.x, c.y, '#b07a3e', 18, 160, 3); burst(c.x, c.y, '#ffe08a', 8, 120, 2.5);
     addFx('ring', c.x, c.y, { col: '#ffd24a', size: 1.6, max: 0.45 });
@@ -828,7 +857,7 @@
   // bomb: thrown at the nearest enemy (or straight ahead), explodes after a short arc
   function throwBomb() {
     if (scene !== 'play' || modal || introT > 0 || !run || run.bombs <= 0) return;
-    run.bombs--;
+    run.bombs--; questEvent('bomb');
     let tx = player.x + Math.cos(player.face) * 120, ty = player.y + Math.sin(player.face) * 120, bd = 1e9;
     for (const e of enemies) { if (e.dead || e.spawn > 0) continue; const d = dist(player, e); if (d < bd && d < 260) { bd = d; tx = e.x; ty = e.y; } }
     thrown.push({ x0: player.x, y0: player.y, x1: clamp(tx, ARENA.x + 10, AX2 - 10), y1: clamp(ty, ARENA.y + 10, AY2 - 10), t: 0 });
@@ -869,7 +898,8 @@
       addFx('ring', player.x, player.y, { col: '#5fc8ff', size: 1.8, max: 0.4 });
       return;
     }
-    dmg = Math.round(dmg);
+    dmg = Math.max(1, Math.round(dmg * (1 - (player.armor || 0))));
+    run.roomDmg += dmg;
     if (SIM.on && src) SIM.dmgBy[src] = (SIM.dmgBy[src] || 0) + dmg;
     player.hp -= dmg; player.inv = 0.9; shake = Math.max(shake, 8); hitStop = Math.max(hitStop, 0.06); hurtFlash = 0.4;
     floatText(player.x, player.y, '-' + dmg, '#ff4b4b', 15);
@@ -903,6 +933,7 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
+    if (!SIM.on) runRewards(won);
     bank += run.coins; saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
     if (reached > best) { best = reached; saveProgress(); }
@@ -912,7 +943,7 @@
     run.xp += v;
     while (run.xp >= xpNeed(run.level)) {
       run.xp -= xpNeed(run.level);
-      run.level++;
+      run.level++; questEvent('level', run.level);
       run.pendingLv++;
     }
   }
@@ -1190,6 +1221,8 @@
 
     if (!roomClear && enemies.length === 0) {
       roomClear = true; clearT = 0;
+      questEvent('room'); if (run.roomDmg === 0) questEvent('nohit');
+      if (run.S.regen > 0) healPlayer(player.maxHp * run.S.regen);
       slowT = 0.7; Sound.clear();
       banner = { kind: 'clear', t: 2.0 };
       addFx('ring', player.x, player.y, { col: '#7cf07a', size: 5, max: 0.9 });
@@ -1351,7 +1384,7 @@
     for (const p of pickups) {
       p.t += dt;
       const d = Math.hypot(player.x - p.x, player.y - p.y);
-      if (p.t > 0.45 && (d < 70 || roomClear)) {
+      if (p.t > 0.45 && (d < 70 * (1 + run.S.magnet) || roomClear)) {
         const a = Math.atan2(player.y - p.y, player.x - p.x), s = 520;
         p.vx += Math.cos(a) * s * dt * 6; p.vy += Math.sin(a) * s * dt * 6;
         const sp = Math.hypot(p.vx, p.vy), mx = 480;
@@ -1362,7 +1395,7 @@
       if (d < 16 && p.t > 0.3) {
         p.dead = true;
         if (p.kind === 'xp') gainXp(p.v);
-        else if (p.kind === 'coin') run.coins += Math.max(1, Math.round(p.v));
+        else if (p.kind === 'coin') { const c = Math.max(1, Math.round(p.v * (1 + run.S.loot))); run.coins += c; questEvent('coins', c); }
         else if (p.kind === 'bonus') applyBonus(p.item);
         else healPlayer(player.maxHp * 0.15);
         Sound.pick();
@@ -3978,69 +4011,35 @@
     const won = scene === 'victory';
     overlay(clamp(endT * 1.5, 0, 0.72));
     if (endT < 0.5) return;
-    panel(30, 130, W - 60, 380);
+    panel(30, 110, W - 60, 420);
     if (won) {
-      txt(tr('victory'), W / 2, 180, 40, C.gold, { stroke: C.ink, lw: 7, weight: 900 });
-      txt(tr('victoryText'), W / 2, 214, 13, C.ink, { weight: 500 });
+      txt(tr('victory'), W / 2, 156, 40, C.gold, { stroke: C.ink, lw: 7, weight: 900 });
+      txt(tr('victoryText'), W / 2, 188, 13, C.ink, { weight: 500 });
     } else {
-      txt(tr('dead'), W / 2, 180, 28, C.redDk, { weight: 900 });
-      txt(tr('deadText'), W / 2, 210, 13, C.ink, { weight: 500 });
+      txt(tr('dead'), W / 2, 156, 28, C.redDk, { weight: 900 });
+      txt(tr('deadText'), W / 2, 184, 13, C.ink, { weight: 500 });
     }
     const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(run.kills)], [tr('sCoins'), '+' + run.coins + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
-      txt(k, 60, 250 + i * 30, 15, '#6a5a45', { align: 'left', weight: 500 });
-      txt(v, W - 60, 250 + i * 30, 16, C.ink, { align: 'right', weight: 900 });
+      txt(k, 60, 214 + i * 24, 14, '#6a5a45', { align: 'left', weight: 500 });
+      txt(v, W - 60, 214 + i * 24, 15, C.ink, { align: 'right', weight: 900 });
     });
-    button(54, 410, W - 108, 48, tr('again'), () => { Sound.click(); newRun(); });
-    button(54, 464, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
-  }
-
-  function drawMenu() {
-    const top = ctx.createLinearGradient(0, 0, 0, 200);
-    top.addColorStop(0, 'rgba(7,30,38,0.75)'); top.addColorStop(1, 'rgba(7,30,38,0)');
-    ctx.fillStyle = top; ctx.fillRect(0, 0, W, 200);
-    ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold);
-    const wob = Math.sin(time * 1.5) * 2;
-    txt('БАТЫР01', W / 2, 92 + wob, fitText('БАТЫР01', W - 40, 56), C.gold, { stroke: C.ink, lw: 10, weight: 900 });
-    koshkar(ctx, W / 2, 136, 30, C.red, 3.5);
-    txt(tr('subtitle'), W / 2, 160, 16, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
-    button(W / 2 - 100, 372, 200, 56, tr('play'), () => { Sound.init(); Sound.click(); newRun(); }, { size: 24 });
-    txt(tr('hint'), W / 2, 442, 11, '#fff', { stroke: C.ink, lw: 3, weight: 700 });
-    panel(24, 456, W - 48, 146);
-    ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(W / 2 - 34, 481, 8, 0, TAU); ctx.fill(); ctx.stroke();
-    txt('₸', W / 2 - 34, 481.5, 10, C.goldDk, { weight: 900 });
-    txt(String(bank), W / 2 - 20, 481, 17, C.ink, { align: 'left', weight: 900 });
-    const rowsU = [
-      [tr('upAtk'), tr('upAtkD'), upAtk, () => { const c = upCost(upAtk); if (bank >= c && upAtk < 10) { bank -= c; upAtk++; saveProgress(); Sound.level(); } }],
-      [tr('upHp'), tr('upHpD'), upHp, () => { const c = upCost(upHp); if (bank >= c && upHp < 10) { bank -= c; upHp++; saveProgress(); Sound.level(); } }],
-    ];
-    rowsU.forEach(([name, desc, lv, fn], i) => {
-      const y = 505 + i * 45;
-      txt(name + ' · ' + tr('lvl') + ' ' + lv, 44, y, 15, C.redDk, { align: 'left', weight: 900 });
-      txt(desc, 44, y + 17, 11, '#6a5a45', { align: 'left', weight: 500 });
-      const c = upCost(lv), maxed = lv >= 10;
-      button(W - 142, y - 14, 104, 36, maxed ? tr('max') : c + ' ₸', fn, { disabled: maxed || bank < c, size: 15, col: '#8be07a', col2: '#3d9a36' });
-    });
-    if ((G3.loadDone || 0) < (G3.loadTotal || 1)) {
-      const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 180, bx = (W - bw) / 2, by = G3.heroSpear ? 636 : 300;
-      if (!G3.heroSpear) txt(tr('loading'), W / 2, by - 16, 15, '#fff', { stroke: C.ink, lw: 4, weight: 900 });
-      rr(ctx, bx, by - 3, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
-      rr(ctx, bx, by - 3, Math.max(6, bw * k), 6, 3); ctx.fillStyle = C.gold; ctx.fill();
+    // progress through the chapter: one pip per room, bosses bigger
+    const reached = won ? TOTAL_ROOMS : run.room, pw = (W - 120) / TOTAL_ROOMS;
+    for (let r = 1; r <= TOTAL_ROOMS; r++) {
+      const boss = r % 5 === 0, px = 60 + (r - 0.5) * pw, rad = boss ? 6 : 4;
+      ctx.fillStyle = r < reached || won ? C.gold : r === reached ? C.red : 'rgba(42,22,12,0.2)';
+      ctx.beginPath(); ctx.arc(px, 342, rad, 0, TAU); ctx.fill();
+      if (r === best && !won) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
     }
-    txt(tr('best', best), W / 2, 620, 12, C.cream, { stroke: C.ink, lw: 3, weight: 700 });
-    // language + sound toggles
-    const tg = (x, w, on, label, fn) => {
-      rr(ctx, x, 24, w, 34, 9); ctx.fillStyle = C.ink; ctx.fill();
-      rr(ctx, x + 3, 27, w - 6, 28, 7); ctx.fillStyle = on ? C.blueDk : '#5a3a30'; ctx.fill();
-      txt(label, x + w / 2, 41.5, 14, on ? '#fff' : '#c9a9a0', { weight: 900 });
-      ui.push({ x, y: 22, w, h: 38, fn });
-    };
-    tg(10, 44, lang === 'ru', 'RU', () => { setLang('ru'); Sound.click(); });
-    tg(58, 54, lang === 'kz', 'ҚАЗ', () => { setLang('kz'); Sound.click(); });
-    tg(116, 44, lang === 'en', 'EN', () => { setLang('en'); Sound.click(); });
-    tg(W - 172, 72, true, '⚙ ' + tr('q' + Save.data.settings.quality), cycleQuality);
-    tg(W - 96, 40, Sound.music, '♪', () => { Sound.init(); Sound.setMusic(!Sound.music); });
-    tg(W - 52, 40, Sound.sfx, '♫', () => { Sound.init(); Sound.setSfx(!Sound.sfx); });
+    const rw = run.rewards;
+    txt(mt('rewards'), 60, 368, 14, C.redDk, { align: 'left', weight: 900 });
+    let rx = 60;
+    if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + rw.gems, rx + 20, 396, 15, C.ink, { align: 'left', weight: 900 }); rx += 60; }
+    if (rw) rw.items.forEach(it => { itemCard(it, rx, 376, 40, null); rx += 46; });
+    if (!rw || (!rw.gems && !rw.items.length)) txt(mt('noChest'), W / 2, 396, 12, '#8a7a65', { weight: 500 });
+    button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(); });
+    button(54, 478, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
   }
 
   // =================================================================== render
@@ -4107,8 +4106,8 @@
     if ((e.code === 'Escape' || e.code === 'KeyP') && scene === 'play') { modal = modal === 'pause' ? null : (modal || 'pause'); }
     if (e.code === 'KeyE' || e.code === 'KeyB') throwBomb();
     if (e.code === 'Enter' || e.code === 'Space') {
-      if (scene === 'menu') newRun();
-      else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) newRun();
+      if (scene === 'menu' && !menuPopup) startGame();
+      else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) startGame();
     }
     if (modal === 'levelup' && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) pickCard(+e.code.slice(-1) - 1);
   });
@@ -4164,6 +4163,9 @@
     give(item) { if (TEST_MODE && player) dropBonus(player.x, player.y - 60, item); },
     get crates() { return crates.filter(c => !c.open).length; }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
+    tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
+    end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
+    get save() { return TEST_MODE ? Save.data : null; },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },
@@ -4268,11 +4270,13 @@
 
   function simBatch(o) {
     const runs = o.runs || 20, skill = o.skill === undefined ? 0.6 : o.skill;
-    const keep = { bank, upAtk, upHp };
+    const keep = { bank, talents: Save.data.talents, eq: Save.data.gear.eq };
     const out = { runs, skill, wins: 0, deaths: {}, revives: 0, time: 0, roomTime: {}, roomDmg: {}, roomN: {}, dmgBy: {} };
     SIM.dmgBy = {};
     for (let i = 0; i < runs; i++) {
-      bank = o.bank === undefined ? 0 : o.bank; upAtk = o.upAtk || 0; upHp = o.upHp || 0;
+      bank = o.bank === undefined ? 0 : o.bank;
+      Save.data.talents = Object.assign(Save.defaults().talents, o.talents || {});
+      Save.data.gear.eq = o.gear ? keep.eq : {};
       const r = simRun(skill, o.revive !== false);
       if (r.won) out.wins++; else out.deaths[r.room] = (out.deaths[r.room] || 0) + 1;
       if (r.revived) out.revives++;
@@ -4287,8 +4291,530 @@
     out.time = +(out.time / runs / 60).toFixed(1);
     const tot = Object.values(SIM.dmgBy).reduce((a, b) => a + b, 0) || 1;
     for (const k of Object.keys(SIM.dmgBy).sort((a, b) => SIM.dmgBy[b] - SIM.dmgBy[a])) out.dmgBy[k] = Math.round(SIM.dmgBy[k] / tot * 100) + '%';
-    bank = keep.bank; upAtk = keep.upAtk; upHp = keep.upHp; saveProgress();
+    bank = keep.bank; Save.data.talents = keep.talents; Save.data.gear.eq = keep.eq; saveProgress();
     return out;
+  }
+  // =================================================================== meta progression: gear, chests, talents, energy, daily rewards, quests
+  const RARITY = [
+    { col: '#b9b6ad', mul: 1, cap: 10, w: 70, name: { ru: 'Обычный', kz: 'Қарапайым', en: 'Common' } },
+    { col: '#4aa8ff', mul: 1.7, cap: 20, w: 25, name: { ru: 'Редкий', kz: 'Сирек', en: 'Rare' } },
+    { col: '#b45aff', mul: 2.6, cap: 30, w: 4.5, name: { ru: 'Эпический', kz: 'Эпикалық', en: 'Epic' } },
+    { col: '#ffb020', mul: 4, cap: 40, w: 0.5, name: { ru: 'Легендарный', kz: 'Аңыздық', en: 'Legendary' } },
+  ];
+  const SLOTS = ['weapon', 'helmet', 'armor', 'belt', 'ring', 'amulet'];
+  const SLOT_NAME = {
+    weapon: { ru: 'Оружие', kz: 'Қару', en: 'Weapon' }, helmet: { ru: 'Шлем', kz: 'Дулыға', en: 'Helmet' },
+    armor: { ru: 'Доспех', kz: 'Сауыт', en: 'Armour' }, belt: { ru: 'Пояс', kz: 'Белбеу', en: 'Belt' },
+    ring: { ru: 'Кольцо', kz: 'Жүзік', en: 'Ring' }, amulet: { ru: 'Амулет', kz: 'Тұмар', en: 'Amulet' },
+  };
+  const STAT = {
+    atk: { pct: true, name: { ru: 'Атака', kz: 'Шабуыл', en: 'Attack' } },
+    aspd: { pct: true, name: { ru: 'Скорость атаки', kz: 'Ату жылдамдығы', en: 'Attack speed' } },
+    hp: { pct: true, name: { ru: 'Здоровье', kz: 'Денсаулық', en: 'Health' } },
+    armor: { pct: true, name: { ru: 'Защита', kz: 'Қорғаныс', en: 'Defence' } },
+    crit: { pct: true, name: { ru: 'Шанс крита', kz: 'Сыни соққы', en: 'Crit chance' } },
+    critDmg: { pct: true, name: { ru: 'Сила крита', kz: 'Сыни күш', en: 'Crit damage' } },
+    magnet: { pct: true, name: { ru: 'Магнит', kz: 'Магнит', en: 'Magnet' } },
+    regen: { pct: true, name: { ru: 'Лечение за комнату', kz: 'Бөлмеден соң емделу', en: 'Heal per room' } },
+    loot: { pct: true, name: { ru: 'Монеты', kz: 'Тиын', en: 'Coins' } },
+    startSkill: { pct: false, name: { ru: 'Навыков на старте', kz: 'Бастапқы дағды', en: 'Starting skills' } },
+  };
+  const GEAR = {
+    bow: { slot: 'weapon', stat: 'atk', v: 0.06, name: { ru: 'Батырский лук', kz: 'Батыр садағы', en: "Batyr's Bow" } },
+    swiftbow: { slot: 'weapon', stat: 'aspd', v: 0.05, name: { ru: 'Лёгкий лук', kz: 'Жеңіл садақ', en: 'Swift Bow' } },
+    dulyga: { slot: 'helmet', stat: 'hp', v: 0.05, name: { ru: 'Дулыга', kz: 'Дулыға', en: 'Dulyga Helmet' } },
+    borik: { slot: 'helmet', stat: 'armor', v: 0.025, name: { ru: 'Меховой бөрік', kz: 'Бөрік', en: 'Fur Borik' } },
+    shapan: { slot: 'armor', stat: 'hp', v: 0.07, name: { ru: 'Стёганый шапан', kz: 'Шапан', en: 'Quilted Chapan' } },
+    saut: { slot: 'armor', stat: 'armor', v: 0.03, name: { ru: 'Пластинчатый доспех', kz: 'Сауыт', en: 'Lamellar Armour' } },
+    beldik: { slot: 'belt', stat: 'hp', v: 0.04, name: { ru: 'Кожаный пояс', kz: 'Белдік', en: 'Leather Belt' } },
+    kemer: { slot: 'belt', stat: 'magnet', v: 0.15, name: { ru: 'Пояс с подсумками', kz: 'Кемер', en: 'Pouch Belt' } },
+    zhuzik: { slot: 'ring', stat: 'crit', v: 0.02, name: { ru: 'Серебряное кольцо', kz: 'Күміс жүзік', en: 'Silver Ring' } },
+    tas: { slot: 'ring', stat: 'critDmg', v: 0.08, name: { ru: 'Кольцо с бирюзой', kz: 'Көгілдір жүзік', en: 'Turquoise Ring' } },
+    tumar: { slot: 'amulet', stat: 'regen', v: 0.02, name: { ru: 'Тумар', kz: 'Тұмар', en: 'Tumar Amulet' } },
+    alka: { slot: 'amulet', stat: 'loot', v: 0.06, name: { ru: 'Ожерелье-алқа', kz: 'Алқа', en: 'Alka Necklace' } },
+  };
+  const GEAR_KEYS = Object.keys(GEAR);
+  const INV_MAX = 60;
+
+  const itemValue = it => GEAR[it.b].v * RARITY[it.r].mul * (1 + 0.1 * (it.l - 1));
+  const itemCap = it => RARITY[it.r].cap;
+  const itemUpCost = it => Math.round(20 * Math.pow(it.l + 1, 1.35) * (1 + it.r * 0.6) / 10) * 10;
+  const fmtStat = (stat, v) => STAT[stat].pct ? '+' + (Math.round(v * 1000) / 10) + '%' : '+' + v;
+  const gearItems = () => Save.data.gear.items;
+  const itemById = id => gearItems().find(it => it.id === id);
+  const equippedIn = slot => itemById(Save.data.gear.eq[slot]);
+  const isEquipped = it => Save.data.gear.eq[GEAR[it.b].slot] === it.id;
+
+  function rollItem(minR, luck) {
+    const ws = RARITY.map((r, i) => i < (minR || 0) ? 0 : r.w * (i > 0 ? (luck || 1) : 1));
+    let t = ws.reduce((a, b) => a + b, 0), x = Math.random() * t, r = 0;
+    for (; r < ws.length - 1; r++) { x -= ws[r]; if (x <= 0) break; }
+    return { b: GEAR_KEYS[Math.floor(Math.random() * GEAR_KEYS.length)], r, l: 1 };
+  }
+  function addItem(it) {
+    const g = Save.data.gear;
+    if (g.items.length >= INV_MAX) { bank += 30 * (it.r + 1); return null; }   // full bag: sold for coins
+    const item = { id: g.next++, b: it.b, r: it.r, l: it.l || 1 };
+    g.items.push(item);
+    // fill an empty slot automatically so new players feel the upgrade at once
+    if (!g.eq[GEAR[item.b].slot]) g.eq[GEAR[item.b].slot] = item.id;
+    return item;
+  }
+  function equipItem(it) { Save.data.gear.eq[GEAR[it.b].slot] = it.id; Save.write(); Sound.click(); }
+  function unequipItem(it) { if (isEquipped(it)) delete Save.data.gear.eq[GEAR[it.b].slot]; Save.write(); Sound.click(); }
+  function upgradeItem(it) {
+    const c = itemUpCost(it);
+    if (it.l >= itemCap(it) || bank < c) return false;
+    bank -= c; it.l++; saveProgress(); Sound.level();
+    return true;
+  }
+  // three items of the same kind and rarity merge into one of the next rarity
+  const mergeMates = it => gearItems().filter(o => o.id !== it.id && o.b === it.b && o.r === it.r);
+  const canMerge = it => it.r < RARITY.length - 1 && mergeMates(it).length >= 2;
+  function mergeItem(it) {
+    if (!canMerge(it)) return null;
+    const mates = mergeMates(it).sort((a, b) => isEquipped(b) - isEquipped(a) || a.l - b.l).slice(0, 2);
+    const g = Save.data.gear, wasEq = [it, ...mates].some(isEquipped);
+    it.r++; it.l = Math.max(it.l, ...mates.map(m => m.l));
+    g.items = g.items.filter(o => !mates.includes(o));
+    if (wasEq) g.eq[GEAR[it.b].slot] = it.id;
+    Save.write(); Sound.level();
+    return it;
+  }
+
+  // ---- talents (permanent upgrades for coins)
+  const TALENTS = [
+    { id: 'atk', stat: 'atk', per: 0.04, max: 20, name: { ru: 'Сила', kz: 'Күш', en: 'Might' } },
+    { id: 'hp', stat: 'hp', per: 0.05, max: 20, name: { ru: 'Здоровье', kz: 'Денсаулық', en: 'Vitality' } },
+    { id: 'armor', stat: 'armor', per: 0.02, max: 10, name: { ru: 'Закалка', kz: 'Шынығу', en: 'Toughness' } },
+    { id: 'magnet', stat: 'magnet', per: 0.2, max: 5, name: { ru: 'Магнит', kz: 'Магнит', en: 'Magnet' } },
+    { id: 'regen', stat: 'regen', per: 0.01, max: 10, name: { ru: 'Передышка', kz: 'Тынығу', en: 'Second Wind' } },
+    { id: 'loot', stat: 'loot', per: 0.05, max: 10, name: { ru: 'Добыча', kz: 'Олжа', en: 'Loot' } },
+    { id: 'start', stat: 'startSkill', per: 1, max: 3, name: { ru: 'Опыт предков', kz: 'Ата тәжірибесі', en: 'Ancestral Skill' } },
+  ];
+  const talentCost = lv => upCost(lv) * (lv >= 10 ? 2 : 1);
+  function buyTalent(t) {
+    const lv = Save.data.talents[t.id] || 0, c = talentCost(lv);
+    if (lv >= t.max || bank < c) return false;
+    bank -= c; Save.data.talents[t.id] = lv + 1; saveProgress(); Sound.level();
+    return true;
+  }
+
+  function statsTotal() {
+    const S = { atk: 0, aspd: 0, hp: 0, armor: 0, crit: 0, critDmg: 0, magnet: 0, regen: 0, loot: 0, startSkill: 0 };
+    for (const t of TALENTS) S[t.stat] += (Save.data.talents[t.id] || 0) * t.per;
+    for (const slot of SLOTS) { const it = equippedIn(slot); if (it) S[GEAR[it.b].stat] += itemValue(it); }
+    return S;
+  }
+
+  // ---- energy: 5 per run, +1 every 12 minutes up to 20 (can go above with purchases)
+  const ENERGY_MAX = 20, RUN_COST = 5, REGEN_MS = 12 * 60 * 1000;
+  function energyTick() {
+    const e = Save.data.energy, now = Date.now();
+    if (e.val >= ENERGY_MAX) { e.t = now; return; }
+    const n = Math.floor((now - e.t) / REGEN_MS);
+    if (n > 0) { e.val = Math.min(ENERGY_MAX, e.val + n); e.t = e.val >= ENERGY_MAX ? now : e.t + n * REGEN_MS; Save.write(); }
+  }
+  const energyLeftMs = () => Math.max(0, REGEN_MS - (Date.now() - Save.data.energy.t));
+  function spendEnergy() {
+    if (TEST_MODE) return true;
+    energyTick();
+    const e = Save.data.energy;
+    if (e.val < RUN_COST) return false;
+    if (e.val >= ENERGY_MAX) e.t = Date.now();
+    e.val -= RUN_COST; Save.write();
+    return true;
+  }
+  const fmtTime = ms => { const s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  // ---- shop (gems)
+  const SHOP = { chest: 60, energy: 30 };
+  function buyChest() { if (Save.data.gems < SHOP.chest) return null; Save.data.gems -= SHOP.chest; const it = addItem(rollItem(0, 2)); saveProgress(); Sound.level(); return it; }
+  function buyEnergy() { if (Save.data.gems < SHOP.energy) return false; Save.data.gems -= SHOP.energy; Save.data.energy.val = Math.min(99, Save.data.energy.val + 20); Save.write(); Sound.level(); return true; }
+
+  // ---- daily login reward (7-day cycle, one claim per calendar day)
+  const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  const DAILY = [{ coins: 100 }, { gems: 10 }, { item: 0 }, { coins: 300 }, { gems: 20 }, { item: 1 }, { gems: 50, item: 2 }];
+  const canClaimDaily = () => Save.data.daily.last !== todayStr();
+  function claimDaily() {
+    if (!canClaimDaily()) return null;
+    const d = Save.data.daily, rw = DAILY[d.day % 7], got = { coins: rw.coins || 0, gems: rw.gems || 0, item: null };
+    bank += got.coins; Save.data.gems += got.gems;
+    if (rw.item !== undefined) got.item = addItem(rollItem(rw.item));
+    d.day++; d.last = todayStr(); saveProgress(); Sound.level();
+    return got;
+  }
+
+  // ---- daily quests (3 per day, reset at local midnight)
+  const QUESTS = {
+    kill: { n: 40, rw: { gems: 15 }, text: { ru: 'Победите {n} врагов', kz: '{n} жауды жеңіңіз', en: 'Defeat {n} enemies' } },
+    wolf: { n: 15, rw: { coins: 200 }, text: { ru: 'Победите {n} волков', kz: '{n} қасқырды жеңіңіз', en: 'Defeat {n} wolves' } },
+    room: { n: 8, rw: { gems: 15 }, text: { ru: 'Пройдите {n} комнат', kz: '{n} бөлмеден өтіңіз', en: 'Clear {n} rooms' } },
+    crate: { n: 3, rw: { coins: 200 }, text: { ru: 'Откройте {n} ящика', kz: '{n} жәшік ашыңыз', en: 'Open {n} crates' } },
+    nohit: { n: 2, rw: { gems: 20 }, text: { ru: 'Пройдите {n} комнаты без урона', kz: '{n} бөлмеден зақымсыз өтіңіз', en: 'Clear {n} rooms without damage' } },
+    bomb: { n: 3, rw: { coins: 150 }, text: { ru: 'Бросьте {n} бомбы', kz: '{n} бомба лақтырыңыз', en: 'Throw {n} bombs' } },
+    boss: { n: 1, rw: { gems: 25 }, text: { ru: 'Победите босса', kz: 'Боссты жеңіңіз', en: 'Defeat a boss' } },
+    coins: { n: 300, rw: { gems: 15 }, text: { ru: 'Соберите {n} ₸ в забегах', kz: 'Жолда {n} ₸ жинаңыз', en: 'Collect {n} ₸ in runs' } },
+    level: { n: 8, rw: { coins: 250 }, text: { ru: 'Достигните {n} уровня за забег', kz: 'Бір жолда {n}-деңгейге жетіңіз', en: 'Reach level {n} in a run' }, max: true },
+  };
+  function questsFresh() {
+    const q = Save.data.quests;
+    if (q.date === todayStr() && q.list.length === 3) return q;
+    const keys = Object.keys(QUESTS).sort(() => Math.random() - 0.5).slice(0, 3);
+    q.date = todayStr(); q.list = keys.map(id => ({ id, prog: 0, claimed: false })); q.bonus = false;
+    Save.write();
+    return q;
+  }
+  function questEvent(id, n) {
+    if (SIM.on) return;
+    const q = questsFresh();
+    for (const it of q.list) {
+      if (it.id !== id || it.claimed) continue;
+      const def = QUESTS[id], before = it.prog;
+      it.prog = Math.min(def.n, def.max ? Math.max(it.prog, n || 0) : it.prog + (n === undefined ? 1 : n));
+      if (before < def.n && it.prog >= def.n) { Save.write(); floatText(player.x, player.y, '✔ ' + def.text[lang].replace('{n}', def.n), '#7cf07a', 13, 2.6); }
+    }
+  }
+  const questDone = it => it.prog >= QUESTS[it.id].n;
+  function claimQuest(it) {
+    if (!questDone(it) || it.claimed) return false;
+    const rw = QUESTS[it.id].rw;
+    it.claimed = true; bank += rw.coins || 0; Save.data.gems += rw.gems || 0; saveProgress(); Sound.level();
+    return true;
+  }
+  const canClaimBonus = () => { const q = questsFresh(); return !q.bonus && q.list.every(it => it.claimed); };
+  function claimQuestBonus() {
+    if (!canClaimBonus()) return null;
+    const q = Save.data.quests; q.bonus = true; Save.data.gems += 20;
+    const it = addItem(rollItem(1)); saveProgress(); Sound.level();
+    return it;
+  }
+  const questsReady = () => { const q = questsFresh(); return q.list.filter(it => questDone(it) && !it.claimed).length + (canClaimBonus() ? 1 : 0); };
+
+  // ---- rewards at the end of a run: chests by progress (opened at once), gems for bosses and victory
+  function runRewards(won) {
+    const chests = won ? [1, 0] : run.room >= 10 ? [0, 0] : run.room >= 5 ? [0] : [];
+    const items = [];
+    for (const minR of chests) { const it = addItem(rollItem(minR)); if (it) items.push(it); }
+    const gems = run.gems + (won ? 10 : 0);
+    Save.data.gems += gems;
+    run.rewards = { items, gems };
+  }
+  // =================================================================== menu tabs and meta screens (Battle · Gear · Talents · Quests)
+  let menuTab = 'fight', menuPopup = null, popupData = null, selItem = null, invPage = 0, dailyShown = false;
+  const TAB_Y = 578;
+  const MSTR = {
+    ru: {
+      tabFight: 'Бой', tabGear: 'Снаряжение', tabTalents: 'Таланты', tabQuests: 'Задания', bag: 'Сумка', bonuses: 'Бонусы снаряжения и талантов',
+      equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
+      daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
+      shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+    },
+    kz: {
+      tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
+      equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
+      daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
+      shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+    },
+    en: {
+      tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
+      equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
+      daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
+      shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
+      noChest: 'Reach room 5 to earn a chest', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+    },
+  };
+  const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
+
+  // ---- small vector icons
+  function gemIcon(x, y, s) {
+    ctx.fillStyle = '#5fe0ff'; ctx.strokeStyle = '#0b4f63'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(x - s, y - s * 0.3); ctx.lineTo(x - s * 0.5, y - s * 0.8); ctx.lineTo(x + s * 0.5, y - s * 0.8); ctx.lineTo(x + s, y - s * 0.3); ctx.lineTo(x, y + s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.moveTo(x - s * 0.5, y - s * 0.3); ctx.lineTo(x, y - s * 0.75); ctx.lineTo(x + s * 0.1, y - s * 0.3); ctx.closePath(); ctx.fill();
+  }
+  function coinIcon(x, y, s) {
+    ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(x, y, s, 0, TAU); ctx.fill(); ctx.stroke();
+    txt('₸', x, y + 0.5, s * 1.25, C.goldDk, { weight: 900 });
+  }
+  function boltIcon(x, y, s) {
+    ctx.fillStyle = '#ffd23a'; ctx.strokeStyle = '#7a5200'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x + s * 0.2, y - s); ctx.lineTo(x - s * 0.6, y + s * 0.15); ctx.lineTo(x - s * 0.05, y + s * 0.15); ctx.lineTo(x - s * 0.25, y + s); ctx.lineTo(x + s * 0.6, y - s * 0.2); ctx.lineTo(x + s * 0.05, y - s * 0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  function slotIcon(slot, x, y, s, color) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    switch (slot) {
+      case 'weapon': ctx.beginPath(); ctx.arc(-4, 0, 13, -1.2, 1.2); ctx.stroke(); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-4 + 13 * Math.cos(1.2), -13 * Math.sin(1.2)); ctx.lineTo(-4 + 13 * Math.cos(1.2), 13 * Math.sin(1.2)); ctx.stroke(); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(14, 0); ctx.moveTo(10, -4); ctx.lineTo(14, 0); ctx.lineTo(10, 4); ctx.stroke(); break;
+      case 'helmet': ctx.beginPath(); ctx.moveTo(-11, 6); ctx.quadraticCurveTo(-11, -9, 0, -10); ctx.quadraticCurveTo(11, -9, 11, 6); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, -16); ctx.stroke(); ctx.fillRect(-13, 5, 26, 4); break;
+      case 'armor': ctx.beginPath(); ctx.moveTo(-12, -8); ctx.lineTo(-5, -11); ctx.quadraticCurveTo(0, -6, 5, -11); ctx.lineTo(12, -8); ctx.lineTo(10, 12); ctx.lineTo(-10, 12); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = -2; i <= 6; i += 4) { ctx.moveTo(-9, i); ctx.lineTo(9, i); } ctx.stroke(); break;
+      case 'belt': ctx.fillRect(-15, -4, 30, 8); ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, TAU); ctx.fill(); break;
+      case 'ring': ctx.lineWidth = 3.4; ctx.beginPath(); ctx.arc(0, 4, 9, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-5, -6); ctx.lineTo(0, -12); ctx.lineTo(5, -6); ctx.lineTo(0, -3); ctx.closePath(); ctx.fill(); break;
+      case 'amulet': ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-11, -13); ctx.lineTo(0, 0); ctx.lineTo(11, -13); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(7, 7); ctx.lineTo(0, 15); ctx.lineTo(-7, 7); ctx.closePath(); ctx.fill(); break;
+      case 'star': ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r2 = i % 2 ? 6 : 14; ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); } ctx.closePath(); ctx.fill(); break;
+      case 'magnet': ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, -1, 9, Math.PI, 0); ctx.moveTo(-9, -1); ctx.lineTo(-9, 10); ctx.moveTo(9, -1); ctx.lineTo(9, 10); ctx.stroke(); break;
+      case 'scroll': ctx.fillRect(-11, -12, 22, 24); ctx.fillStyle = 'rgba(0,0,0,0.35)'; for (let i = -6; i <= 6; i += 6) ctx.fillRect(-7, i - 1, 14, 2); break;
+    }
+    ctx.restore();
+  }
+  const TALENT_ICON = { atk: 'weapon', hp: 'heart', armor: 'armor', magnet: 'magnet', regen: 'heart', loot: 'coin', start: 'star' };
+  function talentIcon(id, x, y, s) {
+    const k = TALENT_ICON[id];
+    if (k === 'heart') heart(x, y + 1, s * 0.5, id === 'regen' ? '#7cf07a' : '#ff5a5f');
+    else if (k === 'coin') coinIcon(x, y, s * 0.55);
+    else slotIcon(k, x, y, s, '#f4c430');
+  }
+
+  function itemCard(it, x, y, s, onTap) {
+    const R = RARITY[it.r];
+    rr(ctx, x, y, s, s, 9); ctx.fillStyle = C.ink; ctx.fill();
+    const g = ctx.createLinearGradient(0, y, 0, y + s); g.addColorStop(0, R.col); g.addColorStop(1, 'rgba(20,12,6,0.95)');
+    rr(ctx, x + 2, y + 2, s - 4, s - 4, 7); ctx.fillStyle = g; ctx.fill();
+    slotIcon(GEAR[it.b].slot, x + s / 2, y + s / 2 - 3, s * 0.36, '#fff');
+    txt(tr('lvl') + it.l, x + s - 5, y + s - 9, Math.max(9, s * 0.17), '#fff', { align: 'right', stroke: C.ink, lw: 3, weight: 900 });
+    if (isEquipped(it)) { ctx.fillStyle = '#7cf07a'; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, TAU); ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
+    if (canMerge(it)) { ctx.fillStyle = '#ff5a3a'; ctx.beginPath(); ctx.arc(x + s - 8, y + 8, 4.5, 0, TAU); ctx.fill(); }
+    if (onTap) ui.push({ x, y, w: s, h: s, fn: onTap });
+  }
+
+  function resourceBar() {
+    const pill = (x, w, icon, label) => {
+      rr(ctx, x, 66, w, 24, 12); ctx.fillStyle = 'rgba(7,30,38,0.82)'; ctx.fill();
+      rr(ctx, x, 66, w, 24, 12); ctx.strokeStyle = 'rgba(244,196,48,0.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+      icon(x + 13, 78);
+      txt(label, x + 26, 78.5, fitText(label, w - 30, 13, 900), '#fff', { align: 'left', weight: 900 });
+    };
+    pill(10, 98, (x, y) => coinIcon(x, y, 8), String(bank));
+    pill(114, 78, (x, y) => gemIcon(x, y, 8), String(Save.data.gems));
+    const e = Save.data.energy, full = e.val >= ENERGY_MAX;
+    pill(198, W - 208, (x, y) => boltIcon(x, y, 8), e.val + '/' + ENERGY_MAX + (full ? '' : '  ' + fmtTime(energyLeftMs())));
+  }
+
+  function tabBar() {
+    ctx.fillStyle = 'rgba(7,30,38,0.94)'; ctx.fillRect(0, TAB_Y, W, H - TAB_Y);
+    ornamentBand(ctx, 0, TAB_Y - 6, W, 8, C.red, C.gold);
+    const tabs = [['fight', 'weapon'], ['gear', 'helmet'], ['talents', 'star'], ['quests', 'scroll']];
+    const w = W / tabs.length;
+    tabs.forEach(([id, icon], i) => {
+      const x = i * w, on = menuTab === id;
+      if (on) { rr(ctx, x + 4, TAB_Y + 4, w - 8, H - TAB_Y - 8, 10); ctx.fillStyle = 'rgba(244,196,48,0.22)'; ctx.fill(); }
+      slotIcon(icon, x + w / 2, TAB_Y + 22, 13, on ? C.gold : '#9fb3b8');
+      const label = mt('tab' + id[0].toUpperCase() + id.slice(1));
+      txt(label, x + w / 2, TAB_Y + 46, fitText(label, w - 8, 11, 900), on ? '#fff' : '#9fb3b8', { weight: 900 });
+      const badge = id === 'quests' ? questsReady() + (canClaimDaily() ? 1 : 0) : id === 'gear' ? (gearItems().some(canMerge) ? 1 : 0) : 0;
+      if (badge) { ctx.fillStyle = '#e8262e'; ctx.beginPath(); ctx.arc(x + w / 2 + 14, TAB_Y + 12, 7, 0, TAU); ctx.fill(); txt(String(badge), x + w / 2 + 14, TAB_Y + 12.5, 10, '#fff', { weight: 900 }); }
+      ui.push({ x, y: TAB_Y, w, h: H - TAB_Y, fn: () => { if (menuTab !== id) { menuTab = id; invPage = 0; Sound.click(); } } });
+    });
+  }
+
+  function screenPanel(title) {
+    rr(ctx, 8, 96, W - 16, TAB_Y - 104, 14); ctx.fillStyle = 'rgba(247,237,213,0.97)'; ctx.fill();
+    rr(ctx, 8, 96, W - 16, TAB_Y - 104, 14); ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
+    txt(title, W / 2, 118, 20, C.redDk, { weight: 900 });
+  }
+
+  // ---- Battle tab
+  function drawFightTab() {
+    const wob = Math.sin(time * 1.5) * 2;
+    txt('БАТЫР01', W / 2, 124 + wob, fitText('БАТЫР01', W - 60, 50), C.gold, { stroke: C.ink, lw: 9, weight: 900 });
+    koshkar(ctx, W / 2, 163, 26, C.red, 3.2);
+    txt(tr('subtitle'), W / 2, 184, 14, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
+    const label = tr('play') + '  ⚡' + RUN_COST;
+    button(W / 2 - 110, 452, 220, 58, label, () => { Sound.init(); Sound.click(); startGame(); }, { size: 24 });
+    txt(tr('hint'), W / 2, 526, 11, '#fff', { stroke: C.ink, lw: 3, weight: 700 });
+    txt(tr('best', best), W / 2, 548, 12, C.cream, { stroke: C.ink, lw: 3, weight: 700 });
+  }
+
+  // ---- Gear tab
+  function drawGearTab() {
+    screenPanel(mt('tabGear'));
+    SLOTS.forEach((slot, i) => {
+      const x = 38 + (i % 3) * 102, y = 132 + Math.floor(i / 3) * 96, s = 78;
+      const it = equippedIn(slot);
+      if (it) itemCard(it, x, y, s, () => { selItem = it; menuPopup = 'item'; Sound.click(); });
+      else {
+        rr(ctx, x, y, s, s, 9); ctx.fillStyle = 'rgba(42,22,12,0.12)'; ctx.fill(); ctx.strokeStyle = 'rgba(42,22,12,0.3)'; ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+        slotIcon(slot, x + s / 2, y + s / 2 - 4, 26, 'rgba(42,22,12,0.25)');
+      }
+      txt(SLOT_NAME[slot][lang], x + s / 2, y + s + 9, 10, '#6a5a45', { weight: 700 });
+    });
+    const S = statsTotal(), parts = [];
+    for (const k of ['atk', 'aspd', 'hp', 'armor', 'crit', 'critDmg', 'magnet', 'regen', 'loot']) if (S[k] > 0) parts.push(STAT[k].name[lang] + ' ' + fmtStat(k, S[k]));
+    txt(mt('bonuses'), W / 2, 340, 11, '#6a5a45', { weight: 700 });
+    wrap(parts.join(' · ') || mt('none'), W / 2, 356, W - 50, 14, 11, C.ink, { weight: 700 });
+    const inv = gearItems().filter(it => !isEquipped(it)).sort((a, b) => b.r - a.r || b.l - a.l || SLOTS.indexOf(GEAR[a.b].slot) - SLOTS.indexOf(GEAR[b.b].slot));
+    const per = 10, pages = Math.max(1, Math.ceil(inv.length / per));
+    invPage = clamp(invPage, 0, pages - 1);
+    txt(mt('bag') + ' ' + gearItems().length + '/' + INV_MAX, 22, 392, 13, C.redDk, { align: 'left', weight: 900 });
+    inv.slice(invPage * per, invPage * per + per).forEach((it, i) => {
+      itemCard(it, 19 + (i % 5) * 66, 404 + Math.floor(i / 5) * 66, 58, () => { selItem = it; menuPopup = 'item'; Sound.click(); });
+    });
+    if (!inv.length) txt(mt('none'), W / 2, 460, 13, '#8a7a65', { weight: 500 });
+    if (pages > 1) {
+      txt((invPage + 1) + '/' + pages, W - 70, 392, 12, C.ink, { weight: 900 });
+      button(W - 52, 380, 22, 24, '‹', () => { invPage = (invPage - 1 + pages) % pages; }, { size: 14 });
+      button(W - 32, 380, 22, 24, '›', () => { invPage = (invPage + 1) % pages; }, { size: 14 });
+    }
+  }
+
+  // ---- Talents tab
+  function drawTalentsTab() {
+    screenPanel(mt('tabTalents'));
+    TALENTS.forEach((t, i) => {
+      const y = 134 + i * 62, lv = Save.data.talents[t.id] || 0, maxed = lv >= t.max, c = talentCost(lv);
+      rr(ctx, 16, y, W - 32, 56, 10); ctx.fillStyle = i % 2 ? 'rgba(42,22,12,0.05)' : 'rgba(42,22,12,0.09)'; ctx.fill();
+      ctx.fillStyle = C.teal; ctx.beginPath(); ctx.arc(42, y + 28, 19, 0, TAU); ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.stroke();
+      talentIcon(t.id, 42, y + 28, 22);
+      txt(t.name[lang] + '  ' + lv + '/' + t.max, 70, y + 17, fitText(t.name[lang] + '  ' + lv + '/' + t.max, 160, 15), C.redDk, { align: 'left', weight: 900 });
+      const cur = lv * t.per, nxt = (lv + 1) * t.per;
+      const desc = STAT[t.stat].name[lang] + ' ' + fmtStat(t.stat, cur) + (maxed ? '' : ' → ' + fmtStat(t.stat, nxt));
+      txt(desc, 70, y + 38, fitText(desc, 170, 11, 500), '#6a5a45', { align: 'left', weight: 500 });
+      button(W - 114, y + 9, 94, 38, maxed ? tr('max') : c + ' ₸', () => buyTalent(t), { disabled: maxed || bank < c, size: 14, col: '#8be07a', col2: '#3d9a36' });
+    });
+  }
+
+  // ---- Quests tab: daily reward strip, 3 quests, bonus, shop
+  function rewardGlyph(rw, x, y) {
+    if (rw.item !== undefined) { rr(ctx, x - 11, y - 11, 22, 22, 5); ctx.fillStyle = RARITY[rw.item].col; ctx.fill(); slotIcon('star', x, y, 9, '#fff'); }
+    else if (rw.gems) gemIcon(x, y, 8); else coinIcon(x, y, 9);
+  }
+  const rewardLabel = rw => rw.item !== undefined ? '×1' : rw.gems ? '+' + rw.gems : '+' + rw.coins;
+  function dailyStrip(y, x0, tw) {
+    const d = Save.data.daily, can = canClaimDaily(), step = tw / 7, w = step - 4;
+    const today = d.day % 7, last = d.day > 0 ? (d.day - 1) % 7 : -1;
+    DAILY.forEach((rw, i) => {
+      const x = x0 + i * step, got = can ? i < today : i <= last, cur = can && i === today;
+      rr(ctx, x, y, w, 58, 8); ctx.fillStyle = cur ? '#ffe9a0' : got ? 'rgba(42,22,12,0.15)' : 'rgba(42,22,12,0.07)'; ctx.fill();
+      if (cur) { ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5; ctx.stroke(); }
+      txt(mt('day', i + 1), x + w / 2, y + 10, 9, '#6a5a45', { weight: 700 });
+      rewardGlyph(rw, x + w / 2, y + 30);
+      txt(rewardLabel(rw), x + w / 2, y + 50, fitText(rewardLabel(rw), w - 4, 9, 900), C.ink, { weight: 900 });
+      if (got) txt('✓', x + w - 8, y + 9, 12, '#3d9a36', { weight: 900 });
+    });
+  }
+  function drawQuestsTab() {
+    screenPanel(mt('tabQuests'));
+    txt(mt('daily'), 20, 142, 13, C.redDk, { align: 'left', weight: 900 });
+    dailyStrip(152, 16, W - 32);
+    if (canClaimDaily()) button(W - 112, 128, 92, 26, mt('claim'), () => openDaily(), { size: 12 });
+    txt(mt('questsToday'), 20, 230, 13, C.redDk, { align: 'left', weight: 900 });
+    const q = questsFresh();
+    q.list.forEach((it, i) => {
+      const y = 240 + i * 62, def = QUESTS[it.id], done = questDone(it);
+      rr(ctx, 16, y, W - 32, 56, 10); ctx.fillStyle = 'rgba(42,22,12,0.07)'; ctx.fill();
+      const text = def.text[lang].replace('{n}', def.n);
+      txt(text, 26, y + 16, fitText(text, 200, 13), C.ink, { align: 'left', weight: 700 });
+      rr(ctx, 26, y + 32, 150, 10, 5); ctx.fillStyle = 'rgba(42,22,12,0.15)'; ctx.fill();
+      rr(ctx, 26, y + 32, Math.max(10, 150 * it.prog / def.n), 10, 5); ctx.fillStyle = done ? '#5fd35a' : C.gold; ctx.fill();
+      txt(it.prog + '/' + def.n, 184, y + 37, 10, '#6a5a45', { align: 'left', weight: 900 });
+      if (it.claimed) txt('✓ ' + mt('claimed'), W - 66, y + 28, 12, '#3d9a36', { weight: 900 });
+      else button(W - 112, y + 10, 90, 36, rewardLabel(def.rw), () => claimQuest(it), { disabled: !done, size: 13, col: def.rw.gems ? '#5fc8de' : C.gold, col2: def.rw.gems ? '#1d7f99' : '#e08a1a' });
+      if (!it.claimed) { if (def.rw.gems) gemIcon(W - 104, y + 28, 6); else coinIcon(W - 104, y + 28, 6); }
+    });
+    const bonusOk = canClaimBonus();
+    button(20, 432, W - 40, 34, (q.bonus ? '✓ ' : '') + mt('allQuests'), () => { const it = claimQuestBonus(); if (it) { popupData = { items: [it], gems: 20 }; menuPopup = 'reward'; } }, { disabled: !bonusOk, size: 13, col: '#c99bff', col2: '#7a4fc8' });
+    txt(mt('shop'), 20, 486, 13, C.redDk, { align: 'left', weight: 900 });
+    button(20, 498, (W - 50) / 2, 52, mt('chest') + '  ' + SHOP.chest, () => { const it = buyChest(); if (it) { popupData = { items: [it], gems: 0 }; menuPopup = 'reward'; } }, { disabled: Save.data.gems < SHOP.chest, size: 14, col: '#c99bff', col2: '#7a4fc8' });
+    button(30 + (W - 50) / 2, 498, (W - 50) / 2, 52, '⚡+20  ' + SHOP.energy, () => buyEnergy(), { disabled: Save.data.gems < SHOP.energy, size: 13, col: '#ffd23a', col2: '#d08a10' });
+    gemIcon(20 + (W - 50) / 2 - 16, 524, 7); gemIcon(W - 36, 524, 7);
+  }
+
+  function openDaily() { const got = claimDaily(); if (got) { popupData = { items: got.item ? [got.item] : [], gems: got.gems, coins: got.coins }; menuPopup = 'reward'; } }
+
+  // ---- popups
+  function popupFrame(y, h) {
+    ui.push({ x: 0, y: 0, w: W, h: H, fn: null });   // blocks the screen underneath
+    overlay(0.65);
+    panel(24, y, W - 48, h);
+  }
+  function drawItemPopup() {
+    const it = selItem; if (!it || !itemById(it.id)) { menuPopup = null; return; }
+    const R = RARITY[it.r], G = GEAR[it.b];
+    popupFrame(126, 380);
+    itemCard(it, W / 2 - 44, 150, 88, null);
+    txt(G.name[lang], W / 2, 260, fitText(G.name[lang], W - 80, 19), R.col, { weight: 900, stroke: C.ink, lw: 3 });
+    txt(R.name[lang] + ' · ' + SLOT_NAME[G.slot][lang] + (isEquipped(it) ? ' · ' + mt('equipped') : ''), W / 2, 284, 12, '#6a5a45', { weight: 700 });
+    txt(STAT[G.stat].name[lang] + ' ' + fmtStat(G.stat, itemValue(it)), W / 2, 310, 17, C.ink, { weight: 900 });
+    txt(tr('lvl') + ' ' + it.l + ' / ' + itemCap(it), W / 2, 332, 12, '#6a5a45', { weight: 700 });
+    const eq = isEquipped(it);
+    button(44, 352, (W - 100) / 2, 44, eq ? mt('unequip') : mt('equip'), () => { eq ? unequipItem(it) : equipItem(it); }, { size: 14, col: '#5fc8de', col2: '#1d7f99' });
+    const maxed = it.l >= itemCap(it), c = itemUpCost(it);
+    button(56 + (W - 100) / 2, 352, (W - 100) / 2, 44, maxed ? tr('max') : mt('upgrade') + ' ' + c, () => upgradeItem(it), { disabled: maxed || bank < c, size: 13, col: '#8be07a', col2: '#3d9a36' });
+    if (it.r < RARITY.length - 1) {
+      const ok = canMerge(it);
+      button(44, 404, W - 88, 40, ok ? mt('merge', RARITY[it.r + 1].name[lang]) : mt('needMerge') + ' (' + (mergeMates(it).length + 1) + '/3)', () => mergeItem(it), { disabled: !ok, size: 12, col: '#c99bff', col2: '#7a4fc8' });
+    }
+    button(W / 2 - 50, 454, 100, 36, mt('ok'), () => { menuPopup = null; Sound.click(); }, { size: 14 });
+  }
+  function drawRewardPopup() {
+    const d = popupData || { items: [] };
+    const h = 150 + (d.coins ? 30 : 0) + (d.gems ? 30 : 0) + (d.items.length ? 104 : 0), top = Math.round((H - h) / 2) - 20;
+    popupFrame(top, h);
+    txt(mt('rewards'), W / 2, top + 40, 22, C.redDk, { weight: 900 });
+    let y = top + 64;
+    if (d.coins) { coinIcon(W / 2 - 30, y + 12, 10); txt('+' + d.coins, W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
+    if (d.gems) { gemIcon(W / 2 - 30, y + 12, 10); txt('+' + d.gems, W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
+    const n = d.items.length;
+    d.items.forEach((it, i) => {
+      const s = 70, x = W / 2 - (n * (s + 10) - 10) / 2 + i * (s + 10);
+      itemCard(it, x, y + 4, s, null);
+      txt(GEAR[it.b].name[lang], x + s / 2, y + s + 16, fitText(GEAR[it.b].name[lang], s + 8, 10), RARITY[it.r].col, { weight: 900, stroke: C.ink, lw: 2.5 });
+    });
+    button(W / 2 - 70, top + h - 68, 140, 44, mt('ok'), () => { menuPopup = null; popupData = null; Sound.click(); }, { size: 16 });
+  }
+  function drawEnergyPopup() {
+    popupFrame(170, 280);
+    boltIcon(W / 2, 214, 22);
+    txt(mt('noEnergy'), W / 2, 258, 20, C.redDk, { weight: 900 });
+    txt(Save.data.energy.val + '/' + ENERGY_MAX + ' · ' + mt('nextEnergy', fmtTime(energyLeftMs())), W / 2, 286, 13, C.ink, { weight: 700 });
+    button(54, 312, W - 108, 48, mt('energyPlus') + '  ' + SHOP.energy, () => { if (buyEnergy()) menuPopup = null; }, { disabled: Save.data.gems < SHOP.energy, size: 15, col: '#ffd23a', col2: '#d08a10' });
+    gemIcon(W - 74, 336, 8);
+    button(W / 2 - 70, 376, 140, 40, mt('wait'), () => { menuPopup = null; Sound.click(); }, { size: 14, col: '#c9b8a0', col2: '#8a7a64' });
+  }
+  function drawDailyPopup() {
+    popupFrame(170, 260);
+    txt(mt('daily'), W / 2, 206, 20, C.redDk, { weight: 900 });
+    dailyStrip(226, 36, W - 72);
+    button(W / 2 - 80, 310, 160, 48, mt('claim'), () => { menuPopup = null; openDaily(); }, { size: 18 });
+    button(W / 2 - 50, 370, 100, 32, '×', () => { menuPopup = null; }, { size: 16, col: '#c9b8a0', col2: '#8a7a64' });
+  }
+
+  function drawMenu() {
+    energyTick();
+    if (!dailyShown && G3.heroSpear) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
+    const top = ctx.createLinearGradient(0, 0, 0, 200);
+    top.addColorStop(0, 'rgba(7,30,38,0.75)'); top.addColorStop(1, 'rgba(7,30,38,0)');
+    ctx.fillStyle = top; ctx.fillRect(0, 0, W, 200);
+    ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold);
+    if (menuTab === 'fight') drawFightTab();
+    else if (menuTab === 'gear') drawGearTab();
+    else if (menuTab === 'talents') drawTalentsTab();
+    else drawQuestsTab();
+    resourceBar();
+    const tg = (x, w, on, label, fn) => {
+      rr(ctx, x, 24, w, 34, 9); ctx.fillStyle = C.ink; ctx.fill();
+      rr(ctx, x + 3, 27, w - 6, 28, 7); ctx.fillStyle = on ? C.blueDk : '#5a3a30'; ctx.fill();
+      txt(label, x + w / 2, 41.5, fitText(label, w - 8, 14), on ? '#fff' : '#c9a9a0', { weight: 900 });
+      ui.push({ x, y: 22, w, h: 38, fn });
+    };
+    tg(10, 44, lang === 'ru', 'RU', () => { setLang('ru'); Sound.click(); });
+    tg(58, 54, lang === 'kz', 'ҚАЗ', () => { setLang('kz'); Sound.click(); });
+    tg(116, 44, lang === 'en', 'EN', () => { setLang('en'); Sound.click(); });
+    tg(W - 172, 72, true, '⚙ ' + tr('q' + Save.data.settings.quality), cycleQuality);
+    tg(W - 96, 40, Sound.music, '♪', () => { Sound.init(); Sound.setMusic(!Sound.music); });
+    tg(W - 52, 40, Sound.sfx, '♫', () => { Sound.init(); Sound.setSfx(!Sound.sfx); });
+    tabBar();
+    if ((G3.loadDone || 0) < (G3.loadTotal || 1)) {
+      const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 180, bx = (W - bw) / 2, by = G3.heroSpear ? TAB_Y - 14 : 300;
+      if (!G3.heroSpear) txt(tr('loading'), W / 2, by - 16, 15, '#fff', { stroke: C.ink, lw: 4, weight: 900 });
+      rr(ctx, bx, by - 3, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
+      rr(ctx, bx, by - 3, Math.max(6, bw * k), 6, 3); ctx.fillStyle = C.gold; ctx.fill();
+    }
+    if (menuPopup === 'item') drawItemPopup();
+    else if (menuPopup === 'reward') drawRewardPopup();
+    else if (menuPopup === 'energy') drawEnergyPopup();
+    else if (menuPopup === 'daily') drawDailyPopup();
   }
 })();
 </script>

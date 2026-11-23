@@ -59,6 +59,7 @@
     if (e.dead) return;
     e.dead = true;
     run.kills++;
+    questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; }
     Sound.kill();
     const col = { w: '#9a9ea8', s: '#5b3a24', j: '#c4572f', a: '#dfe9f2', m: '#6d4c8f', D: '#a8683a', J: '#7a4fa0', A: '#3b9a5b' }[e.type];
     burst(e.x, e.y, col, e.boss ? 60 : 16, e.boss ? 260 : 150, e.boss ? 5 : 3.5);
@@ -80,6 +81,7 @@
   function dropBonus(x, y, item) { const a = Math.random() * TAU; pickups.push({ x, y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, kind: 'bonus', item, v: 0, t: 0 }); }
   function openCrate(c) {
     if (c.open) return;
+    questEvent('crate');
     c.open = true; Sound.crate();
     burst(c.x, c.y, '#b07a3e', 18, 160, 3); burst(c.x, c.y, '#ffe08a', 8, 120, 2.5);
     addFx('ring', c.x, c.y, { col: '#ffd24a', size: 1.6, max: 0.45 });
@@ -99,7 +101,7 @@
   // bomb: thrown at the nearest enemy (or straight ahead), explodes after a short arc
   function throwBomb() {
     if (scene !== 'play' || modal || introT > 0 || !run || run.bombs <= 0) return;
-    run.bombs--;
+    run.bombs--; questEvent('bomb');
     let tx = player.x + Math.cos(player.face) * 120, ty = player.y + Math.sin(player.face) * 120, bd = 1e9;
     for (const e of enemies) { if (e.dead || e.spawn > 0) continue; const d = dist(player, e); if (d < bd && d < 260) { bd = d; tx = e.x; ty = e.y; } }
     thrown.push({ x0: player.x, y0: player.y, x1: clamp(tx, ARENA.x + 10, AX2 - 10), y1: clamp(ty, ARENA.y + 10, AY2 - 10), t: 0 });
@@ -140,7 +142,8 @@
       addFx('ring', player.x, player.y, { col: '#5fc8ff', size: 1.8, max: 0.4 });
       return;
     }
-    dmg = Math.round(dmg);
+    dmg = Math.max(1, Math.round(dmg * (1 - (player.armor || 0))));
+    run.roomDmg += dmg;
     if (SIM.on && src) SIM.dmgBy[src] = (SIM.dmgBy[src] || 0) + dmg;
     player.hp -= dmg; player.inv = 0.9; shake = Math.max(shake, 8); hitStop = Math.max(hitStop, 0.06); hurtFlash = 0.4;
     floatText(player.x, player.y, '-' + dmg, '#ff4b4b', 15);
@@ -174,6 +177,7 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
+    if (!SIM.on) runRewards(won);
     bank += run.coins; saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
     if (reached > best) { best = reached; saveProgress(); }
@@ -183,7 +187,7 @@
     run.xp += v;
     while (run.xp >= xpNeed(run.level)) {
       run.xp -= xpNeed(run.level);
-      run.level++;
+      run.level++; questEvent('level', run.level);
       run.pendingLv++;
     }
   }
