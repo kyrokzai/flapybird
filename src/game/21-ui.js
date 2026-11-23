@@ -264,6 +264,22 @@
     });
   }
 
+  function drawRevive() {
+    overlay(0.72);
+    panel(30, 150, W - 60, 340);
+    txt(tr('revive'), W / 2, 196, fitText(tr('revive'), W - 100, 28), C.redDk, { weight: 900 });
+    txt(tr('reviveText'), W / 2, 226, 13, C.ink, { weight: 500 });
+    // countdown ring
+    const k = clamp(reviveT / REVIVE_TIME, 0, 1), cx = W / 2, cy = 300;
+    ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(42,22,12,0.15)'; ctx.beginPath(); ctx.arc(cx, cy, 40, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#e8463a'; ctx.beginPath(); ctx.arc(cx, cy, 40, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke();
+    txt(String(Math.ceil(reviveT)), cx, cy + 2, 32, C.redDk, { weight: 900 });
+    const ok = canRevive();
+    button(54, 370, W - 108, 52, ok ? tr('reviveBtn', REVIVE_COST) : tr('reviveNeed', REVIVE_COST), doRevive, { disabled: !ok, col: '#8be07a', col2: '#3d9a36', size: 17 });
+    button(54, 432, W - 108, 38, tr('reviveNo'), () => { Sound.click(); declineRevive(); }, { col: '#c9b8a0', col2: '#8a7a64', size: 14 });
+  }
+
   function drawKydyrModal() {
     overlay(0.72);
     panel(24, 120, W - 48, 400);

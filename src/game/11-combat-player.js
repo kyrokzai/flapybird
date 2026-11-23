@@ -72,7 +72,7 @@
     for (let i = 0; i < gems; i++) dropPickup(e.x, e.y, 'xp', e.xp / gems);
     const coins = Math.min(12, e.coin);
     for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', e.coin / coins);
-    if (Math.random() < (e.boss ? 1 : 0.06)) dropPickup(e.x, e.y, 'heart', 0);
+    if (Math.random() < (e.boss ? 1 : 0.09)) dropPickup(e.x, e.y, 'heart', 0);
     if (e.boss) dropBonus(e.x, e.y, randomItem()); else if (Math.random() < 0.05) dropBonus(e.x, e.y, randomItem());
     if (sk('blood')) healPlayer(player.maxHp * 0.02 * sk('blood'));
   }
@@ -132,8 +132,8 @@
     if (got > 0) floatText(player.x, player.y, '+' + got, '#7cf07a', 13);
   }
 
-  function hurtPlayer(dmg) {
-    if (player.inv > 0 || scene !== 'play' || TEST_MODE) return;
+  function hurtPlayer(dmg, src) {
+    if (player.inv > 0 || scene !== 'play' || (TEST_MODE && !SIM.on)) return;
     if (player.shield > 0) {
       player.shield--; player.inv = 0.6; Sound.shield();
       floatText(player.x, player.y, tr('blocked'), '#8fdcff', 15, 1.9);
@@ -141,15 +141,34 @@
       return;
     }
     dmg = Math.round(dmg);
+    if (SIM.on && src) SIM.dmgBy[src] = (SIM.dmgBy[src] || 0) + dmg;
     player.hp -= dmg; player.inv = 0.9; shake = Math.max(shake, 8); hitStop = Math.max(hitStop, 0.06); hurtFlash = 0.4;
     floatText(player.x, player.y, '-' + dmg, '#ff4b4b', 15);
     Sound.hurt();
     if (player.hp <= 0) {
       player.hp = 0;
       burst(player.x, player.y, '#1d4f91', 30, 180, 4);
-      endRun(false);
+      if (!run.revived && !SIM.noRevive) { modal = 'revive'; reviveT = REVIVE_TIME; joy.active = false; }
+      else endRun(false);
     }
   }
+
+  // one revive per run: pay coins (this run's first, then the saved ones), get half health back and a moment of safety
+  const canRevive = () => run && !run.revived && run.coins + bank >= REVIVE_COST;
+  function doRevive() {
+    if (!canRevive()) return;
+    const fromRun = Math.min(run.coins, REVIVE_COST);
+    run.coins -= fromRun; bank -= REVIVE_COST - fromRun; saveProgress();
+    run.revived = true; modal = null;
+    player.hp = Math.round(player.maxHp * 0.5); player.inv = 2.5;
+    bullets = [];
+    for (const e of enemies) { const a = angTo(player, e); if (!e.boss) { e.kx += Math.cos(a) * 260; e.ky += Math.sin(a) * 260; } }
+    addFx('pillar', player.x, player.y, { col: '#7cf07a', size: 1.5, max: 1.0 });
+    addFx('ring', player.x, player.y, { col: '#7cf07a', size: 5, max: 0.7 });
+    burst(player.x, player.y, '#b8ffb0', 30, 200, 3);
+    Sound.level();
+  }
+  function declineRevive() { modal = null; endRun(false); }
 
   function endRun(won) {
     if (scene !== 'play') return;

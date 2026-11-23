@@ -24,6 +24,7 @@
         if (modal === 'levelup') drawLevelUp();
         else if (modal === 'kydyr') drawKydyrModal();
         else if (modal === 'pause') drawPause();
+        else if (modal === 'revive') drawRevive();
       } else { ui = []; drawEnd(); }
     }
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }

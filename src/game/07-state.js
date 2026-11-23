@@ -1,12 +1,16 @@
   // =================================================================== state
   let scene = 'menu';       // menu | play | dead | victory
-  let modal = null;         // null | levelup | kydyr | pause
+  let modal = null;         // null | levelup | kydyr | pause | revive
   let time = 0, shake = 0;
   let fade = 0, fadeDir = 0, fadeThen = null;
   let banner = null;
   let introT = 0;
   let hitStop = 0, slowT = 0, hurtFlash = 0, lvlT = 0;
   const INTRO_T = 2.6;   // camera fly-over at the start of every room
+  const REVIVE_COST = 100, REVIVE_TIME = 7;
+  let reviveT = 0;
+  // balance simulation (test mode only): a bot drives the hero without rendering
+  const SIM = { on: false, mv: { x: 0, y: 0 }, skill: 0.6, noRevive: false, next: 0, dmgBy: {} };
   let choices = [];
   let ui = [];
   let bank = Save.data.coins, best = Save.data.best, upAtk = Save.data.upAtk, upHp = Save.data.upHp;

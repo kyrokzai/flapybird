@@ -15,6 +15,7 @@
       clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!', loading: 'Загрузка…',
       best: 'Рекорд: комната {n} / 15', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
       graphics: 'Графика', qauto: 'Авто', qlow: 'Низкая', qmedium: 'Средняя', qhigh: 'Высокая',
+      revive: 'ВОСКРЕСНУТЬ?', reviveText: 'Батыр ещё может подняться!', reviveBtn: 'ВОСКРЕСНУТЬ · {n} ₸', reviveNeed: 'Нужно {n} ₸', reviveNo: 'Отказаться',
     },
     kz: {
       subtitle: 'ДАЛА БАТЫРЫ', play: 'ОЙНАУ', room: 'БӨЛМЕ', boss: 'Босс',
@@ -30,6 +31,7 @@
       clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!', loading: 'Жүктелуде…',
       best: 'Рекорд: {n}-бөлме / 15', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
       graphics: 'Графика', qauto: 'Авто', qlow: 'Төмен', qmedium: 'Орта', qhigh: 'Жоғары',
+      revive: 'ҚАЙТА ТҰРУ?', reviveText: 'Батыр әлі де тұра алады!', reviveBtn: 'ҚАЙТА ТҰРУ · {n} ₸', reviveNeed: '{n} ₸ керек', reviveNo: 'Бас тарту',
     },
     en: {
       subtitle: 'STEPPE BATYR', play: 'PLAY', room: 'ROOM', boss: 'Boss',
@@ -45,6 +47,7 @@
       clear: 'ROOM CLEARED!', clearSub: 'Head to the gate', blocked: 'Blocked!', loading: 'Loading…',
       best: 'Best: room {n} / 15', hint: 'Drag to move · stand still to shoot',
       graphics: 'Graphics', qauto: 'Auto', qlow: 'Low', qmedium: 'Medium', qhigh: 'High',
+      revive: 'REVIVE?', reviveText: 'The batyr can still rise!', reviveBtn: 'REVIVE · {n} ₸', reviveNeed: 'Need {n} ₸', reviveNo: 'No thanks',
     },
   };
   const tr = (k, n) => { const s = STR[lang][k] || STR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };

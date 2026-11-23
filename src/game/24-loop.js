@@ -42,6 +42,8 @@
 
   // hooks for automated tests (room jumping only in #test mode)
   window.Mergen = {
+    sim(o) { return TEST_MODE ? simBatch(o || {}) : null; },
+    dieNow() { if (TEST_MODE && scene === 'play') { bank = Math.max(bank, REVIVE_COST); player.hp = 0; modal = 'revive'; reviveT = REVIVE_TIME; } },
     give(item) { if (TEST_MODE && player) dropBonus(player.x, player.y - 60, item); },
     get crates() { return crates.filter(c => !c.open).length; }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },

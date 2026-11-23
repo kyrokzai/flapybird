@@ -152,6 +152,7 @@
       clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!', loading: 'Загрузка…',
       best: 'Рекорд: комната {n} / 15', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
       graphics: 'Графика', qauto: 'Авто', qlow: 'Низкая', qmedium: 'Средняя', qhigh: 'Высокая',
+      revive: 'ВОСКРЕСНУТЬ?', reviveText: 'Батыр ещё может подняться!', reviveBtn: 'ВОСКРЕСНУТЬ · {n} ₸', reviveNeed: 'Нужно {n} ₸', reviveNo: 'Отказаться',
     },
     kz: {
       subtitle: 'ДАЛА БАТЫРЫ', play: 'ОЙНАУ', room: 'БӨЛМЕ', boss: 'Босс',
@@ -167,6 +168,7 @@
       clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!', loading: 'Жүктелуде…',
       best: 'Рекорд: {n}-бөлме / 15', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
       graphics: 'Графика', qauto: 'Авто', qlow: 'Төмен', qmedium: 'Орта', qhigh: 'Жоғары',
+      revive: 'ҚАЙТА ТҰРУ?', reviveText: 'Батыр әлі де тұра алады!', reviveBtn: 'ҚАЙТА ТҰРУ · {n} ₸', reviveNeed: '{n} ₸ керек', reviveNo: 'Бас тарту',
     },
     en: {
       subtitle: 'STEPPE BATYR', play: 'PLAY', room: 'ROOM', boss: 'Boss',
@@ -182,6 +184,7 @@
       clear: 'ROOM CLEARED!', clearSub: 'Head to the gate', blocked: 'Blocked!', loading: 'Loading…',
       best: 'Best: room {n} / 15', hint: 'Drag to move · stand still to shoot',
       graphics: 'Graphics', qauto: 'Auto', qlow: 'Low', qmedium: 'Medium', qhigh: 'High',
+      revive: 'REVIVE?', reviveText: 'The batyr can still rise!', reviveBtn: 'REVIVE · {n} ₸', reviveNeed: 'Need {n} ₸', reviveNo: 'No thanks',
     },
   };
   const tr = (k, n) => { const s = STR[lang][k] || STR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -458,12 +461,12 @@
   }
 
   const ENEMY = {
-    w: { name: { ru: 'Волк', kz: 'Қасқыр', en: 'Wolf' }, hp: 34, r: 13, speed: 70, dmg: 12, xp: 8, coin: 2, ai: 'wolf' },
+    w: { name: { ru: 'Волк', kz: 'Қасқыр', en: 'Wolf' }, hp: 34, r: 13, speed: 62, dmg: 10, xp: 8, coin: 2, ai: 'wolf' },
     s: { name: { ru: 'Тарантул', kz: 'Бүйі', en: 'Tarantula' }, hp: 16, r: 9, speed: 88, dmg: 9, xp: 4, coin: 1, ai: 'spider' },
-    j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ', en: 'Zheztyrnak' }, hp: 38, r: 12, speed: 48, dmg: 12, xp: 10, coin: 3, ai: 'shooter' },
+    j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ', en: 'Zheztyrnak' }, hp: 38, r: 12, speed: 48, dmg: 10, xp: 10, coin: 3, ai: 'shooter' },
     a: { name: { ru: 'Албасты', kz: 'Албасты', en: 'Albasty' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
     m: { name: { ru: 'Мыстан', kz: 'Мыстан', en: 'Mystan' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
-    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 480, r: 28, speed: 46, dmg: 17, xp: 70, coin: 35, ai: 'boss', boss: true,
+    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 420, r: 28, speed: 46, dmg: 15, xp: 70, coin: 35, ai: 'boss', boss: true,
          pats: ['walk', 'stomp', 'walk', 'charge', 'walk', 'boulders', 'charge'] },
     J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір', en: 'Zhalmauyz Kempir' }, hp: 750, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
          pats: ['walk', 'spiral', 'teleport', 'summon', 'walk', 'teleport', 'spiral', 'teleport'] },
@@ -478,11 +481,11 @@
       '........', '........', '..s..s..', '........', '.#....#.', '........', '..~~~~..', '..~~~~..',
       '........', '.w....w.', '........', '#..YY..#', '........', '........', '........', '........'] },
     { theme: 'park', place: { ru: 'Парк влюблённых', kz: 'Ғашықтар саябағы', en: 'Lovers\' Park' }, lm: [['khanshatyr', 0, 0, 1]], L: [
-      '........', '..j..j..', '........', '#.#..#.#', '........', '...ss...', '........', '~~....~~', '~~.Y..~~',
+      '........', '..j..j..', '........', '#.#..#.#', '........', '....s...', '........', '~~....~~', '~~.Y..~~',
       '........', '.w....w.', '........', '..#..#..', '........', '........', '........', '........', '........'] },
     { theme: 'park', place: { ru: 'Президентский парк', kz: 'Президент саябағы', en: 'Presidential Park' }, lm: [['pyramid', 0, 0, 1], ['baiterek', 12, 8, 0.8]], L: [
       '........', '.w....w.', '........', '..#..#..', '..#..#..', '....j...', '.s....s.', '........', 'Y......Y',
-      '........', '..~~~~..', '........', '.j....s.', '........', '#......#', '........', '........', '........'] },
+      '........', '..~~~~..', '........', '......s.', '........', '#......#', '........', '........', '........'] },
     { theme: 'park', place: { ru: 'Центральный парк', kz: 'Орталық саябақ', en: 'Central Park' }, lm: [['baiterek', -3, 0, 1], ['khanshatyr', 9, 6, 0.8]], L: [
       '........', '...a....', '........', '~~~..~~~', '........', '.j....j.', '........', '..#..#..', '........', '...s.s..',
       '........', '#.Y..Y.#', '........', '.w....w.', '........', '..~..~..', '........', '........', '........', '........'] },
@@ -538,13 +541,17 @@
 
   // =================================================================== state
   let scene = 'menu';       // menu | play | dead | victory
-  let modal = null;         // null | levelup | kydyr | pause
+  let modal = null;         // null | levelup | kydyr | pause | revive
   let time = 0, shake = 0;
   let fade = 0, fadeDir = 0, fadeThen = null;
   let banner = null;
   let introT = 0;
   let hitStop = 0, slowT = 0, hurtFlash = 0, lvlT = 0;
   const INTRO_T = 2.6;   // camera fly-over at the start of every room
+  const REVIVE_COST = 100, REVIVE_TIME = 7;
+  let reviveT = 0;
+  // balance simulation (test mode only): a bot drives the hero without rendering
+  const SIM = { on: false, mv: { x: 0, y: 0 }, skill: 0.6, noRevive: false, next: 0, dmgBy: {} };
   let choices = [];
   let ui = [];
   let bank = Save.data.coins, best = Save.data.best, upAtk = Save.data.upAtk, upHp = Save.data.upHp;
@@ -794,7 +801,7 @@
     for (let i = 0; i < gems; i++) dropPickup(e.x, e.y, 'xp', e.xp / gems);
     const coins = Math.min(12, e.coin);
     for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', e.coin / coins);
-    if (Math.random() < (e.boss ? 1 : 0.06)) dropPickup(e.x, e.y, 'heart', 0);
+    if (Math.random() < (e.boss ? 1 : 0.09)) dropPickup(e.x, e.y, 'heart', 0);
     if (e.boss) dropBonus(e.x, e.y, randomItem()); else if (Math.random() < 0.05) dropBonus(e.x, e.y, randomItem());
     if (sk('blood')) healPlayer(player.maxHp * 0.02 * sk('blood'));
   }
@@ -854,8 +861,8 @@
     if (got > 0) floatText(player.x, player.y, '+' + got, '#7cf07a', 13);
   }
 
-  function hurtPlayer(dmg) {
-    if (player.inv > 0 || scene !== 'play' || TEST_MODE) return;
+  function hurtPlayer(dmg, src) {
+    if (player.inv > 0 || scene !== 'play' || (TEST_MODE && !SIM.on)) return;
     if (player.shield > 0) {
       player.shield--; player.inv = 0.6; Sound.shield();
       floatText(player.x, player.y, tr('blocked'), '#8fdcff', 15, 1.9);
@@ -863,15 +870,34 @@
       return;
     }
     dmg = Math.round(dmg);
+    if (SIM.on && src) SIM.dmgBy[src] = (SIM.dmgBy[src] || 0) + dmg;
     player.hp -= dmg; player.inv = 0.9; shake = Math.max(shake, 8); hitStop = Math.max(hitStop, 0.06); hurtFlash = 0.4;
     floatText(player.x, player.y, '-' + dmg, '#ff4b4b', 15);
     Sound.hurt();
     if (player.hp <= 0) {
       player.hp = 0;
       burst(player.x, player.y, '#1d4f91', 30, 180, 4);
-      endRun(false);
+      if (!run.revived && !SIM.noRevive) { modal = 'revive'; reviveT = REVIVE_TIME; joy.active = false; }
+      else endRun(false);
     }
   }
+
+  // one revive per run: pay coins (this run's first, then the saved ones), get half health back and a moment of safety
+  const canRevive = () => run && !run.revived && run.coins + bank >= REVIVE_COST;
+  function doRevive() {
+    if (!canRevive()) return;
+    const fromRun = Math.min(run.coins, REVIVE_COST);
+    run.coins -= fromRun; bank -= REVIVE_COST - fromRun; saveProgress();
+    run.revived = true; modal = null;
+    player.hp = Math.round(player.maxHp * 0.5); player.inv = 2.5;
+    bullets = [];
+    for (const e of enemies) { const a = angTo(player, e); if (!e.boss) { e.kx += Math.cos(a) * 260; e.ky += Math.sin(a) * 260; } }
+    addFx('pillar', player.x, player.y, { col: '#7cf07a', size: 1.5, max: 1.0 });
+    addFx('ring', player.x, player.y, { col: '#7cf07a', size: 5, max: 0.7 });
+    burst(player.x, player.y, '#b8ffb0', 30, 200, 3);
+    Sound.level();
+  }
+  function declineRevive() { modal = null; endRun(false); }
 
   function endRun(won) {
     if (scene !== 'play') return;
@@ -907,7 +933,7 @@
   // =================================================================== enemy AI
   function enemyBullet(e, a, spd, kind) {
     const R = { claw: 5, magic: 6, rock: 7, boulder: 11, fire: 6, ghost: 6 }[kind] || 6;
-    bullets.push({ x: e.x + Math.cos(a) * e.r * 0.7, y: e.y + Math.sin(a) * e.r * 0.7, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: R, dmg: e.dmg * (e.boss ? 0.72 : 0.68), kind, life: 7, a });
+    bullets.push({ x: e.x + Math.cos(a) * e.r * 0.7, y: e.y + Math.sin(a) * e.r * 0.7, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: R, dmg: e.dmg * (e.boss ? 0.72 : 0.68), kind, life: 7, a, src: e.type + ':' + kind });
   }
   function ring(e, n, spd, kind, off) { for (let i = 0; i < n; i++) enemyBullet(e, (off || 0) + i * TAU / n, spd, kind); }
   function aimed(e, n, spread, spd, kind) {
@@ -921,7 +947,7 @@
     stomp(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0; }
       e.vx = e.vy = 0; e.wind = true; s.t += dt;
-      if (s.t > 0.55) { s.t = 0; ring(e, 16, 135, 'rock', s.n * 0.2); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
+      if (s.t > 0.55) { s.t = 0; ring(e, 12, 125, 'rock', s.n * 0.26); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
       return s.n >= 3;
     },
     charge(e, dt, s) {
@@ -938,8 +964,8 @@
     boulders(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0.35; }
       e.vx = e.vy = 0; s.t -= dt;
-      if (s.t <= 0) { s.t = 0.38; aimed(e, 1, 0, 215, 'boulder'); s.n++; }
-      return s.n >= 4;
+      if (s.t <= 0) { s.t = 0.5; aimed(e, 1, 0, 200, 'boulder'); s.n++; }
+      return s.n >= 3;
     },
     spiral(e, dt, s) {
       if (s.dur === undefined) { s.dur = 2.8; s.t = 0; s.a = Math.random() * TAU; }
@@ -1007,16 +1033,16 @@
         e.t -= dt; e.cd -= dt;
         if (e.st === 'chase') {
           steerPath(e, e.speed);
-          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.45; }
+          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.6; }
         } else if (e.st === 'wind') {
           e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player);
           if (e.t <= 0) { e.st = 'dash'; e.t = 0.38; e.dashA = e.face; }
         } else if (e.st === 'dash') {
-          e.vx = Math.cos(e.dashA) * 300; e.vy = Math.sin(e.dashA) * 300;
+          e.vx = Math.cos(e.dashA) * 280; e.vy = Math.sin(e.dashA) * 280;
           if (e.t <= 0) { e.st = 'rest'; e.t = 0.5; }
         } else {
           e.vx *= 0.85; e.vy *= 0.85;
-          if (e.t <= 0) { e.st = 'chase'; e.cd = rand(1.8, 2.6); }
+          if (e.t <= 0) { e.st = 'chase'; e.cd = rand(2.0, 2.8); }
         }
         break;
       case 'spider':
@@ -1026,7 +1052,7 @@
       case 'shooter':
         e.t -= dt;
         if (e.st !== 'aim') {
-          if (e.t <= 0) { e.st = 'aim'; e.t = 0.6; e.vx = e.vy = 0; }
+          if (e.t <= 0) { e.st = 'aim'; e.t = 0.75; e.vx = e.vy = 0; }
         } else {
           e.aimA = angTo(e, player);
           if (e.t <= 0) {
@@ -1068,7 +1094,16 @@
     if (e.fly) { e.hitWall = false; e.x = clamp(e.x, ARENA.x + e.r, AX2 - e.r); e.y = clamp(e.y, ARENA.y + e.r, AY2 - e.r); }
     else e.hitWall = pushOut(e, e.r, true);
 
-    if (d < e.r + player.r - 2) hurtPlayer(e.dmg);
+    if (d < e.r + player.r - 2 && player.inv <= 0) {
+      // the dash is the real threat; a plain bump while chasing hurts less
+      hurtPlayer(e.dmg * (e.ai === 'wolf' && e.st !== 'dash' ? 0.6 : 1), e.type + ':touch' + (e.ai === 'wolf' ? ':' + e.st : ''));
+      // after a touch the attacker bounces off and backs away for a moment (no "glued" repeat hits)
+      if (!e.boss) {
+        const a = angTo(player, e); e.kx += Math.cos(a) * 240; e.ky += Math.sin(a) * 240;
+        if (e.ai === 'wolf') { e.st = 'rest'; e.t = 0.8; e.cd = rand(2.0, 2.8); }
+        if (e.ai === 'spider') e.t = 0.6;
+      }
+    }
   }
 
   // =================================================================== update
@@ -1076,6 +1111,7 @@
   const joy = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
 
   function moveInput() {
+    if (SIM.on) return SIM.mv;
     let dx = 0, dy = 0;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
@@ -1112,6 +1148,7 @@
     texts = texts.filter(t => t.life > 0);
 
     if (scene === 'dead' || scene === 'victory') { endT += dt; return; }
+    if (modal === 'revive' && scene === 'play') { reviveT -= dt; if (reviveT <= 0) declineRevive(); return; }
     if (scene !== 'play' || modal) return;
     if (introT > 0) { introT -= dt; return; }
 
@@ -1304,7 +1341,7 @@
       if (b.x < ARENA.x - 10 || b.x > AX2 + 10 || b.y < ARENA.y - 10 || b.y > AY2 + 10 || b.life <= 0) { b.dead = true; continue; }
       if (solidAt(b.x, b.y, 0)) { b.dead = true; burst(b.x, b.y, '#bba98a', 4, 60, 2); continue; }
       if (Math.hypot(b.x - player.x, b.y - player.y) < b.r + player.r * 0.75) {
-        if (player.inv <= 0) { hurtPlayer(b.dmg); b.dead = true; }
+        if (player.inv <= 0) { hurtPlayer(b.dmg, b.src); b.dead = true; }
       }
     }
     bullets = bullets.filter(b => !b.dead);
@@ -3876,6 +3913,22 @@
     });
   }
 
+  function drawRevive() {
+    overlay(0.72);
+    panel(30, 150, W - 60, 340);
+    txt(tr('revive'), W / 2, 196, fitText(tr('revive'), W - 100, 28), C.redDk, { weight: 900 });
+    txt(tr('reviveText'), W / 2, 226, 13, C.ink, { weight: 500 });
+    // countdown ring
+    const k = clamp(reviveT / REVIVE_TIME, 0, 1), cx = W / 2, cy = 300;
+    ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(42,22,12,0.15)'; ctx.beginPath(); ctx.arc(cx, cy, 40, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#e8463a'; ctx.beginPath(); ctx.arc(cx, cy, 40, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke();
+    txt(String(Math.ceil(reviveT)), cx, cy + 2, 32, C.redDk, { weight: 900 });
+    const ok = canRevive();
+    button(54, 370, W - 108, 52, ok ? tr('reviveBtn', REVIVE_COST) : tr('reviveNeed', REVIVE_COST), doRevive, { disabled: !ok, col: '#8be07a', col2: '#3d9a36', size: 17 });
+    button(54, 432, W - 108, 38, tr('reviveNo'), () => { Sound.click(); declineRevive(); }, { col: '#c9b8a0', col2: '#8a7a64', size: 14 });
+  }
+
   function drawKydyrModal() {
     overlay(0.72);
     panel(24, 120, W - 48, 400);
@@ -4016,6 +4069,7 @@
         if (modal === 'levelup') drawLevelUp();
         else if (modal === 'kydyr') drawKydyrModal();
         else if (modal === 'pause') drawPause();
+        else if (modal === 'revive') drawRevive();
       } else { ui = []; drawEnd(); }
     }
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }
@@ -4105,6 +4159,8 @@
 
   // hooks for automated tests (room jumping only in #test mode)
   window.Mergen = {
+    sim(o) { return TEST_MODE ? simBatch(o || {}) : null; },
+    dieNow() { if (TEST_MODE && scene === 'play') { bank = Math.max(bank, REVIVE_COST); player.hp = 0; modal = 'revive'; reviveT = REVIVE_TIME; } },
     give(item) { if (TEST_MODE && player) dropBonus(player.x, player.y - 60, item); },
     get crates() { return crates.filter(c => !c.open).length; }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
@@ -4121,6 +4177,119 @@
       };
     },
   };
+  // =================================================================== balance simulation (test mode only)
+  // A bot plays full runs without rendering: dodges bullets it notices, keeps distance from melee enemies,
+  // stands still to shoot, throws bombs at crowds, takes random skills. `skill` sets reaction time and mistakes.
+  function botDecide() {
+    const p = player, sk2 = SIM.skill;
+    let fx = 0, fy = 0;
+    const look = 60 + 70 * sk2;
+    for (const b of bullets) {
+      if (Math.random() > 0.55 + 0.45 * sk2) continue;   // did not notice this one
+      const rx = p.x - b.x, ry = p.y - b.y, d = Math.hypot(rx, ry);
+      if (d > look) continue;
+      const sp = Math.hypot(b.vx, b.vy) || 1, ux = b.vx / sp, uy = b.vy / sp;
+      if (rx * ux + ry * uy < 0) continue;
+      const perp = rx * -uy + ry * ux;
+      if (Math.abs(perp) > b.r + p.r + 12) continue;
+      const sgn = perp >= 0 ? 1 : -1, w = (look - d) / look;
+      fx += -uy * sgn * w * 2; fy += ux * sgn * w * 2;
+    }
+    // a wolf crouching for a dash (red ring) gets side-stepped, like a bullet
+    for (const e of enemies) {
+      if (e.ai !== 'wolf' || e.st !== 'wind' || Math.random() > 0.5 + 0.5 * sk2) continue;
+      const rx = p.x - e.x, ry = p.y - e.y, d = Math.hypot(rx, ry) || 1;
+      if (d > 180) continue;
+      const s = (rx * 0.3 - ry) >= 0 ? 1 : -1; fx += -ry / d * s * 2.2; fy += rx / d * s * 2.2;
+    }
+    for (const e of enemies) {
+      if (e.spawn > 0 || e.dead) continue;
+      const rx = p.x - e.x, ry = p.y - e.y, d = Math.hypot(rx, ry) || 1;
+      const keep = e.boss ? 150 : (e.ai === 'wolf' || e.ai === 'spider' ? 105 : 75);
+      if (d < keep) { const w = (keep - d) / keep * 1.6; fx += rx / d * w; fy += ry / d * w; }
+    }
+    const m = 34;
+    if (p.x < ARENA.x + m) fx += 0.7; if (p.x > AX2 - m) fx -= 0.7; if (p.y < ARENA.y + m) fy += 0.7; if (p.y > AY2 - m) fy -= 0.7;
+    let l = Math.hypot(fx, fy);
+    // nothing to dodge but no clear shot: walk around cover toward the nearest enemy, like a player would
+    if (l <= 0.3 && !enemies.some(e => e.spawn <= 0 && !e.dead && lineOfSight(p, e))) {
+      let t = null, bd = 1e9;
+      for (const e of enemies) { if (e.spawn > 0 || e.dead) continue; const d = dist(p, e); if (d < bd) { bd = d; t = e; } }
+      if (t) { const a = pathAngleFor(p, t); fx = Math.cos(a); fy = Math.sin(a); l = 1; }
+    }
+    SIM.mv = l > 0.3 ? { x: fx / l, y: fy / l } : { x: 0, y: 0 };
+    if (run.bombs > 0) {
+      let near = 0, bossNear = false;
+      for (const e of enemies) { if (e.spawn > 0) continue; const d = dist(p, e); if (d < 130) near++; if (e.boss && d < 170) bossNear = true; }
+      if (near >= 3 || bossNear) throwBomb();
+    }
+  }
+
+  // route around cover using the grid (BFS from the target cell), falls back to a straight line
+  function pathAngleFor(a, b) {
+    const [tc, tr] = cellOf(b.x, b.y), [sc, sr] = cellOf(a.x, a.y);
+    const D = new Int16Array(COLS * ROWS).fill(-1), q = [[tc, tr]]; D[tr * COLS + tc] = 0;
+    while (q.length) {
+      const [c, r] = q.shift(), v = D[r * COLS + c];
+      for (const [dc, dr] of DIRS) { const nc = c + dc, nr = r + dr; if (cellBlocked(nc, nr) || D[nr * COLS + nc] >= 0) continue; if (dc && dr && (cellBlocked(c + dc, r) || cellBlocked(c, r + dr))) continue; D[nr * COLS + nc] = v + 1; q.push([nc, nr]); }
+    }
+    let best = null, bv = D[sr * COLS + sc] < 0 ? 9999 : D[sr * COLS + sc];
+    for (const [dc, dr] of DIRS) { const nc = sc + dc, nr = sr + dr; if (cellBlocked(nc, nr)) continue; const v = D[nr * COLS + nc]; if (v >= 0 && v < bv) { bv = v; best = [nc, nr]; } }
+    if (!best) return angTo(a, b);
+    return Math.atan2(ARENA.y + best[1] * CELL + CELL / 2 - a.y, ARENA.x + best[0] * CELL + CELL / 2 - a.x);
+  }
+
+  function simRun(skill, revive) {
+    SIM.on = true; SIM.skill = skill; SIM.noRevive = !revive; SIM.next = 0;
+    newRun();
+    const rooms = [];
+    let cur = null, steps = 0;
+    const startRoom = () => { cur = { room: run.room, t: 0, dmg: 0, maxHp: player.maxHp }; };
+    startRoom();
+    while (steps++ < 60 * 60 * 40 && scene === 'play') {
+      if (modal === 'levelup') { pickCard(Math.floor(Math.random() * choices.length)); continue; }
+      if (modal === 'kydyr') { healPlayer(player.maxHp * 0.4); modal = null; if (kydyrNext) kydyrNext(); continue; }
+      if (modal === 'revive') { if (!SIM.noRevive && canRevive()) doRevive(); else declineRevive(); continue; }
+      if (cur.room !== run.room) { rooms.push(cur); startRoom(); }
+      SIM.next -= DT;
+      if (SIM.next <= 0) { SIM.next = 0.36 - 0.22 * skill; botDecide(); }
+      if (roomClear && gateOpen >= 1 && !fadeDir) { player.x = GATE_X; player.y = ARENA.y + player.r; }
+      else if (!roomClear && introT <= 0 && !fadeDir) cur.t += DT;
+      const hp0 = player.hp;
+      update(DT); tickFx(DT); hitStop = 0; slowT = 0;
+      if (player.hp < hp0) cur.dmg += hp0 - player.hp;
+    }
+    rooms.push(cur);
+    SIM.on = false; SIM.mv = { x: 0, y: 0 };
+    const res = { won: scene === 'victory', room: run.room, level: run.level, revived: !!run.revived, rooms };
+    scene = 'menu'; modal = null;
+    return res;
+  }
+
+  function simBatch(o) {
+    const runs = o.runs || 20, skill = o.skill === undefined ? 0.6 : o.skill;
+    const keep = { bank, upAtk, upHp };
+    const out = { runs, skill, wins: 0, deaths: {}, revives: 0, time: 0, roomTime: {}, roomDmg: {}, roomN: {}, dmgBy: {} };
+    SIM.dmgBy = {};
+    for (let i = 0; i < runs; i++) {
+      bank = o.bank === undefined ? 0 : o.bank; upAtk = o.upAtk || 0; upHp = o.upHp || 0;
+      const r = simRun(skill, o.revive !== false);
+      if (r.won) out.wins++; else out.deaths[r.room] = (out.deaths[r.room] || 0) + 1;
+      if (r.revived) out.revives++;
+      for (const rm of r.rooms) {
+        out.time += rm.t;
+        out.roomTime[rm.room] = (out.roomTime[rm.room] || 0) + rm.t;
+        out.roomDmg[rm.room] = (out.roomDmg[rm.room] || 0) + rm.dmg / rm.maxHp;
+        out.roomN[rm.room] = (out.roomN[rm.room] || 0) + 1;
+      }
+    }
+    for (const k in out.roomN) { out.roomTime[k] = +(out.roomTime[k] / out.roomN[k]).toFixed(1); out.roomDmg[k] = Math.round(out.roomDmg[k] / out.roomN[k] * 100); }
+    out.time = +(out.time / runs / 60).toFixed(1);
+    const tot = Object.values(SIM.dmgBy).reduce((a, b) => a + b, 0) || 1;
+    for (const k of Object.keys(SIM.dmgBy).sort((a, b) => SIM.dmgBy[b] - SIM.dmgBy[a])) out.dmgBy[k] = Math.round(SIM.dmgBy[k] / tot * 100) + '%';
+    bank = keep.bank; upAtk = keep.upAtk; upHp = keep.upHp; saveProgress();
+    return out;
+  }
 })();
 </script>
 </body>

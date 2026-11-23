@@ -3,6 +3,7 @@
   const joy = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
 
   function moveInput() {
+    if (SIM.on) return SIM.mv;
     let dx = 0, dy = 0;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
@@ -39,6 +40,7 @@
     texts = texts.filter(t => t.life > 0);
 
     if (scene === 'dead' || scene === 'victory') { endT += dt; return; }
+    if (modal === 'revive' && scene === 'play') { reviveT -= dt; if (reviveT <= 0) declineRevive(); return; }
     if (scene !== 'play' || modal) return;
     if (introT > 0) { introT -= dt; return; }
 
@@ -231,7 +233,7 @@
       if (b.x < ARENA.x - 10 || b.x > AX2 + 10 || b.y < ARENA.y - 10 || b.y > AY2 + 10 || b.life <= 0) { b.dead = true; continue; }
       if (solidAt(b.x, b.y, 0)) { b.dead = true; burst(b.x, b.y, '#bba98a', 4, 60, 2); continue; }
       if (Math.hypot(b.x - player.x, b.y - player.y) < b.r + player.r * 0.75) {
-        if (player.inv <= 0) { hurtPlayer(b.dmg); b.dead = true; }
+        if (player.inv <= 0) { hurtPlayer(b.dmg, b.src); b.dead = true; }
       }
     }
     bullets = bullets.filter(b => !b.dead);

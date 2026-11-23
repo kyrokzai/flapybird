@@ -1,7 +1,7 @@
   // =================================================================== enemy AI
   function enemyBullet(e, a, spd, kind) {
     const R = { claw: 5, magic: 6, rock: 7, boulder: 11, fire: 6, ghost: 6 }[kind] || 6;
-    bullets.push({ x: e.x + Math.cos(a) * e.r * 0.7, y: e.y + Math.sin(a) * e.r * 0.7, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: R, dmg: e.dmg * (e.boss ? 0.72 : 0.68), kind, life: 7, a });
+    bullets.push({ x: e.x + Math.cos(a) * e.r * 0.7, y: e.y + Math.sin(a) * e.r * 0.7, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: R, dmg: e.dmg * (e.boss ? 0.72 : 0.68), kind, life: 7, a, src: e.type + ':' + kind });
   }
   function ring(e, n, spd, kind, off) { for (let i = 0; i < n; i++) enemyBullet(e, (off || 0) + i * TAU / n, spd, kind); }
   function aimed(e, n, spread, spd, kind) {
@@ -15,7 +15,7 @@
     stomp(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0; }
       e.vx = e.vy = 0; e.wind = true; s.t += dt;
-      if (s.t > 0.55) { s.t = 0; ring(e, 16, 135, 'rock', s.n * 0.2); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
+      if (s.t > 0.55) { s.t = 0; ring(e, 12, 125, 'rock', s.n * 0.26); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
       return s.n >= 3;
     },
     charge(e, dt, s) {
@@ -32,8 +32,8 @@
     boulders(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0.35; }
       e.vx = e.vy = 0; s.t -= dt;
-      if (s.t <= 0) { s.t = 0.38; aimed(e, 1, 0, 215, 'boulder'); s.n++; }
-      return s.n >= 4;
+      if (s.t <= 0) { s.t = 0.5; aimed(e, 1, 0, 200, 'boulder'); s.n++; }
+      return s.n >= 3;
     },
     spiral(e, dt, s) {
       if (s.dur === undefined) { s.dur = 2.8; s.t = 0; s.a = Math.random() * TAU; }
@@ -101,16 +101,16 @@
         e.t -= dt; e.cd -= dt;
         if (e.st === 'chase') {
           steerPath(e, e.speed);
-          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.45; }
+          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.6; }
         } else if (e.st === 'wind') {
           e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player);
           if (e.t <= 0) { e.st = 'dash'; e.t = 0.38; e.dashA = e.face; }
         } else if (e.st === 'dash') {
-          e.vx = Math.cos(e.dashA) * 300; e.vy = Math.sin(e.dashA) * 300;
+          e.vx = Math.cos(e.dashA) * 280; e.vy = Math.sin(e.dashA) * 280;
           if (e.t <= 0) { e.st = 'rest'; e.t = 0.5; }
         } else {
           e.vx *= 0.85; e.vy *= 0.85;
-          if (e.t <= 0) { e.st = 'chase'; e.cd = rand(1.8, 2.6); }
+          if (e.t <= 0) { e.st = 'chase'; e.cd = rand(2.0, 2.8); }
         }
         break;
       case 'spider':
@@ -120,7 +120,7 @@
       case 'shooter':
         e.t -= dt;
         if (e.st !== 'aim') {
-          if (e.t <= 0) { e.st = 'aim'; e.t = 0.6; e.vx = e.vy = 0; }
+          if (e.t <= 0) { e.st = 'aim'; e.t = 0.75; e.vx = e.vy = 0; }
         } else {
           e.aimA = angTo(e, player);
           if (e.t <= 0) {
@@ -162,6 +162,15 @@
     if (e.fly) { e.hitWall = false; e.x = clamp(e.x, ARENA.x + e.r, AX2 - e.r); e.y = clamp(e.y, ARENA.y + e.r, AY2 - e.r); }
     else e.hitWall = pushOut(e, e.r, true);
 
-    if (d < e.r + player.r - 2) hurtPlayer(e.dmg);
+    if (d < e.r + player.r - 2 && player.inv <= 0) {
+      // the dash is the real threat; a plain bump while chasing hurts less
+      hurtPlayer(e.dmg * (e.ai === 'wolf' && e.st !== 'dash' ? 0.6 : 1), e.type + ':touch' + (e.ai === 'wolf' ? ':' + e.st : ''));
+      // after a touch the attacker bounces off and backs away for a moment (no "glued" repeat hits)
+      if (!e.boss) {
+        const a = angTo(player, e); e.kx += Math.cos(a) * 240; e.ky += Math.sin(a) * 240;
+        if (e.ai === 'wolf') { e.st = 'rest'; e.t = 0.8; e.cd = rand(2.0, 2.8); }
+        if (e.ai === 'spider') e.t = 0.6;
+      }
+    }
   }
 
