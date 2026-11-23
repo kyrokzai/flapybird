@@ -71,8 +71,8 @@
     if (e.boss) { shake = 18; Sound.boom(); buzz([60, 40, 110]); }
     const gems = Math.ceil(e.xp / 3);
     for (let i = 0; i < gems; i++) dropPickup(e.x, e.y, 'xp', e.xp / gems);
-    const coins = Math.min(12, e.coin);
-    for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', e.coin / coins);
+    const coinV = e.coin * (isSurv() ? 1.5 : 1), coins = Math.min(12, Math.ceil(coinV));   // the arena is the place to farm coins
+    for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', coinV / coins);
     if (Math.random() < (e.boss ? 1 : 0.09)) dropPickup(e.x, e.y, 'heart', 0);
     if (e.boss) dropBonus(e.x, e.y, randomItem()); else if (Math.random() < 0.05) dropBonus(e.x, e.y, randomItem());
     if (sk('blood')) healPlayer(player.maxHp * 0.02 * sk('blood'));
@@ -177,10 +177,10 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
-    if (!SIM.on) runRewards(won);
+    if (!SIM.on) { if (isSurv()) survivalRewards(); else runRewards(won); }
     bank += run.coins; saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
-    if (reached > best) { best = reached; saveProgress(); }
+    if (!isSurv() && reached > best) { best = reached; saveProgress(); }
   }
 
   function gainXp(v) {

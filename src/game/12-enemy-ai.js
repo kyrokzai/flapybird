@@ -15,7 +15,7 @@
     stomp(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0; }
       e.vx = e.vy = 0; e.wind = true; s.t += dt;
-      if (s.t > 0.55) { s.t = 0; ring(e, 12, 125, 'rock', s.n * 0.26); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
+      if (s.t > 0.55) { s.t = 0; ring(e, 10, 125, 'rock', s.n * 0.31); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
       return s.n >= 3;
     },
     charge(e, dt, s) {
@@ -26,7 +26,7 @@
         return false;
       }
       e.vx = Math.cos(s.a) * 360; e.vy = Math.sin(s.a) * 360; s.t -= dt;
-      if (e.hitWall && s.t < 0.7) { ring(e, 10, 120, e.type === 'A' ? 'fire' : 'rock', 0); shake = Math.max(shake, 10); Sound.boom(); e.vx = e.vy = 0; return true; }
+      if (e.hitWall && s.t < 0.7) { ring(e, 8, 120, e.type === 'A' ? 'fire' : 'rock', 0); shake = Math.max(shake, 10); Sound.boom(); e.vx = e.vy = 0; return true; }
       return s.t <= 0;
     },
     boulders(e, dt, s) {
@@ -38,7 +38,7 @@
     spiral(e, dt, s) {
       if (s.dur === undefined) { s.dur = 2.8; s.t = 0; s.a = Math.random() * TAU; }
       e.vx = e.vy = 0; e.wind = true; s.dur -= dt; s.t -= dt;
-      if (s.t <= 0) { s.t = 0.085; for (let k = 0; k < 3; k++) enemyBullet(e, s.a + k * TAU / 3, 125, 'magic'); s.a += 0.24; }
+      if (s.t <= 0) { s.t = 0.105; for (let k = 0; k < 3; k++) enemyBullet(e, s.a + k * TAU / 3, 125, 'magic'); s.a += 0.28; }
       return s.dur <= 0;
     },
     summon(e, dt, s) {
@@ -67,19 +67,19 @@
         burst(e.x, e.y, '#9b6bd6', 24, 140, 3.5); Sound.magic();
       }
       e.vx = e.vy = 0; s.t -= dt;
-      if (s.st === 1 && s.t <= 0) { aimed(e, 5, 0.2, 185, 'magic'); s.st = 2; s.t = 0.5; }
+      if (s.st === 1 && s.t <= 0) { aimed(e, 4, 0.22, 175, 'magic'); s.st = 2; s.t = 0.5; }
       return s.st === 2 && s.t <= 0;
     },
     breath(e, dt, s) {
       if (s.dur === undefined) { s.dur = 1.7; s.t = 0.35; }
       e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player); s.dur -= dt; s.t -= dt;
-      if (s.t <= 0 && s.dur < 1.4) { s.t = 0.055; enemyBullet(e, e.face + rand(-0.38, 0.38), rand(190, 250), 'fire'); }
+      if (s.t <= 0 && s.dur < 1.4) { s.t = 0.07; enemyBullet(e, e.face + rand(-0.38, 0.38), rand(190, 250), 'fire'); }
       return s.dur <= 0;
     },
     rings(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0.3; }
       e.vx = e.vy = 0; s.t -= dt;
-      if (s.t <= 0) { s.t = 0.45; ring(e, 14, 150, 'fire', s.n % 2 ? Math.PI / 14 : 0); s.n++; }
+      if (s.t <= 0) { s.t = 0.55; ring(e, 12, 145, 'fire', s.n % 2 ? Math.PI / 12 : 0); s.n++; }
       return s.n >= 4;
     },
   };
@@ -124,8 +124,8 @@
         } else {
           e.aimA = angTo(e, player);
           if (e.t <= 0) {
-            for (const da of [-0.22, 0, 0.22]) enemyBullet(e, e.aimA + da, 170, 'claw');
-            e.st = 'move'; e.t = rand(1.1, 1.9);
+            for (const da of [-0.24, 0, 0.24]) enemyBullet(e, e.aimA + da, 155, 'claw');
+            e.st = 'move'; e.t = rand(1.5, 2.4);
             const a = Math.random() * TAU; e.vx = Math.cos(a) * e.speed; e.vy = Math.sin(a) * e.speed;
           }
         }
@@ -133,12 +133,12 @@
       case 'ghost':
         steer(e, player.x, player.y, e.speed);
         e.cd -= dt;
-        if (e.cd <= 0) { e.cd = 2.6; ring(e, 6, 115, 'ghost', e.rot); e.rot += 0.52; }
+        if (e.cd <= 0) { e.cd = 3.2; ring(e, 5, 110, 'ghost', e.rot); e.rot += 0.63; }
         break;
       case 'witch':
         e.vx = e.vy = 0; e.cd -= dt;
         if (e.cd <= 0) {
-          e.cd = 3.1; ring(e, 10, 95, 'magic', Math.random()); Sound.magic();
+          e.cd = 3.7; ring(e, 8, 92, 'magic', Math.random()); Sound.magic();
           e.rot++;
           if (e.rot % 2 === 0) {
             burst(e.x, e.y, '#6d4c8f', 18, 120, 3);

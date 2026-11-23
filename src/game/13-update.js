@@ -20,6 +20,7 @@
   function update(dt) {
     time += dt;
     tutTick(dt);
+    if (scene === 'play') survivalTick(dt);
     Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
     if (hurtFlash > 0) hurtFlash -= dt;
     for (const e of enemies) if (e.punch > 0) e.punch = Math.max(0, e.punch - dt * 7);
@@ -82,7 +83,7 @@
     thrown = thrown.filter(b => !b.done);
     if (player.weapon) { player.weapon.t -= dt; if (player.weapon.t <= 0) player.weapon = null; }
 
-    if (!roomClear && enemies.length === 0) {
+    if (!roomClear && enemies.length === 0 && !isSurv()) {
       roomClear = true; clearT = 0;
       questEvent('room'); if (run.roomDmg === 0) questEvent('nohit');
       if (run.S.regen > 0) healPlayer(player.maxHp * run.S.regen);

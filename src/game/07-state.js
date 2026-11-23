@@ -30,12 +30,12 @@
   const xpNeed = lvl => 12 + lvl * 8;
 
   // menu "play": costs energy (free in test mode); without enough energy the menu shows how to get more
-  function startGame() {
+  function startGame(mode) {
     if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
-    newRun();
+    newRun(mode);
   }
 
-  function newRun() {
+  function newRun(mode) {
     const S = statsTotal();   // talents + equipped gear
     const maxHp = Math.round(150 * (1 + S.hp));
     run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null };
@@ -46,7 +46,8 @@
       eagle: { x: W / 2, y: AY2 - 60, cd: 1, a: 0 }, shield: 0, weapon: null,
     };
     scene = 'play'; modal = null;
-    buildRoom(1);
+    run.mode = mode === 'survival' ? 'survival' : 'story';
+    if (run.mode === 'survival') survivalSetup(); else buildRoom(1);
     // talent "ancestral skill": start the run with random skills
     for (let i = 0; i < S.startSkill; i++) { const c = rollChoices(); if (c.length) applySkill(c[Math.floor(Math.random() * c.length)]); }
   }

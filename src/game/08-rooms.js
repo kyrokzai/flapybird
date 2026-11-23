@@ -28,7 +28,7 @@
 
   function spawnEnemy(type, x, y, spawn) {
     const d = ENEMY[type];
-    const room = run.room;
+    const room = diffLevel();
     const hpMul = d.boss ? 1 : 1 + 0.2 * (room - 1);
     const dmgMul = 1 + 0.07 * (room - 1);
     const e = {

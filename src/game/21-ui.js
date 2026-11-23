@@ -185,7 +185,8 @@
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
     txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
-    txt(`${tr('room')} ${run.room}/${TOTAL_ROOMS}`, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
+    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}` + (run.waveT > 0 && (run.wave === 0 || run.waveCleared || run.waveT < 99) ? '  ·  ' + Math.ceil(Math.max(0, run.waveT - (run.wave === 0 ? introT : 0))) + mt('sec') : '') : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
+    txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillRect(W - 34, 18, 4, 16); ctx.fillRect(W - 26, 18, 4, 16);
@@ -277,7 +278,9 @@
     const a = clamp(banner.t / 0.4, 0, 1) * clamp((banner.max - banner.t) * 4, 0, 1);
     let text, sub, color = C.gold;
     if (banner.kind === 'boss') { text = ENEMY[banner.type].name[lang].toUpperCase(); sub = tr('boss') + ' · ' + roomPlace(banner.room); color = '#ff6b5b'; }
-    else if (banner.kind === 'room') { text = roomPlace(banner.room).toUpperCase(); sub = tr('room') + ' ' + banner.room + '/' + TOTAL_ROOMS + ' · ' + biome(banner.room).zone[lang]; }
+    else if (banner.kind === 'room') { text = roomPlace(banner.room).toUpperCase(); sub = isSurv() ? mt('survival') + ' · ' + mt('survSub') : tr('room') + ' ' + banner.room + '/' + TOTAL_ROOMS + ' · ' + biome(banner.room).zone[lang]; }
+    else if (banner.kind === 'wave') { text = mt('wave').toUpperCase() + ' ' + banner.wave; sub = banner.boss ? tr('boss') + ': ' + ENEMY[banner.boss].name[lang] : mt('survival'); color = banner.boss ? '#ff6b5b' : C.gold; }
+    else if (banner.kind === 'waveClear') { text = mt('waveClear'); sub = mt('waveClearSub'); color = '#7cf07a'; }
     else if (banner.kind === 'clear') { text = tr('clear'); sub = tr('clearSub'); color = '#7cf07a'; }
     else { text = SKILL[banner.skill].name[lang]; sub = tr('blessGot') + ': ' + SKILL[banner.skill].desc[lang]; }
     ctx.save(); ctx.globalAlpha = a;
@@ -375,7 +378,8 @@
     button(60, 424, W - 120, 42, tr('graphics') + ': ' + qualityLabel(), cycleQuality, { col: '#a99bff', col2: '#5a46c8', size: 14 });
     button(60, 476, W - 120, 42, tr('toMenu'), () => {
       bank += run.coins;
-      if (run.room > best) best = run.room;
+      if (isSurv()) { if (run.wave > (Save.data.bestWave || 0)) Save.data.bestWave = run.wave; }
+      else if (run.room > best) best = run.room;
       saveProgress();
       scene = 'menu'; modal = null; Sound.click();
     }, { col: '#ff8a6a', col2: '#c2402a', size: 15 });
@@ -394,14 +398,18 @@
       txt(tr('deadText'), W / 2, 184, 13, T.text, { weight: 500 });
     }
     const ck = (endT - 0.5) / 0.9;
-    const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
+    const surv = isSurv();
+    const rows = surv
+      ? [[mt('wave'), String(run.wave)], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), mt('wave').toLowerCase() + ' ' + (Save.data.bestWave || 0)]]
+      : [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
       txt(k, 60, 214 + i * 24, 14, T.muted, { align: 'left', weight: 500 });
       txt(v, W - 60, 214 + i * 24, 15, T.text, { align: 'right', weight: 900 });
     });
     // progress through the chapter: one pip per room, bosses bigger
     const reached = won ? TOTAL_ROOMS : run.room, pw = (W - 120) / TOTAL_ROOMS;
-    for (let r = 1; r <= TOTAL_ROOMS; r++) {
+    if (surv) txt(mt('arenaName'), W / 2, 342, 12, T.muted, { weight: 600 });
+    else for (let r = 1; r <= TOTAL_ROOMS; r++) {
       const boss = r % 5 === 0, px = 60 + (r - 0.5) * pw, rad = boss ? 6 : 4;
       const lit = r <= Math.ceil(reached * easeOut((endT - 0.6) / 0.9));
       ctx.fillStyle = !lit ? 'rgba(255,236,200,0.2)' : r < reached || won ? C.gold : C.red;
@@ -417,8 +425,9 @@
       if (k > 0) { ctx.save(); ctx.translate(rx + 20, 396); ctx.scale(k, k); ctx.translate(-rx - 20, -396); if (it.r >= 2) { ctx.shadowColor = RARITY[it.r].col; ctx.shadowBlur = 14; } itemCard(it, rx, 376, 40, null); ctx.restore(); }
       rx += 46;
     });
-    if (!rw || (!rw.gems && !rw.items.length)) txt(mt('noChest'), W / 2, 396, fitText(mt('noChest'), W - 100, 12, 500), T.dim, { weight: 500 });
-    button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(); });
+    if (!rw || (!rw.gems && !rw.items.length)) txt(mt(surv ? 'noChestSurv' : 'noChest'), W / 2, 396, fitText(mt(surv ? 'noChestSurv' : 'noChest'), W - 100, 12, 500), T.dim, { weight: 500 });
+    const mode = run.mode;
+    button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(mode); });
     button(54, 478, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
   }
 

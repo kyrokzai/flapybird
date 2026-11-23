@@ -79,12 +79,12 @@
 
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 3;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 4;
   const Save = {
     data: null,
     defaults() {
       return {
-        v: SAVE_VERSION, coins: 0, gems: 0, best: 0, tut: false,
+        v: SAVE_VERSION, coins: 0, gems: 0, best: 0, bestWave: 0, tut: false,
         talents: { atk: 0, hp: 0, armor: 0, magnet: 0, regen: 0, loot: 0, start: 0 },
         // starter gear: a common bow and chapan, already equipped
         gear: { items: [{ id: 1, b: 'bow', r: 0, l: 1 }, { id: 2, b: 'shapan', r: 0, l: 1 }], eq: { weapon: 1, armor: 2 }, next: 3 },
@@ -122,6 +122,8 @@
       }
       // v2 → v3: first-run tutorial flag; players who already reached a room skip it
       if ((d.v || 0) < 3) out.tut = (d.best || 0) > 0;
+      // v3 → v4: survival arena record
+      if ((d.v || 0) < 4) out.bestWave = d.bestWave || 0;
       out.v = SAVE_VERSION;
       return out;
     },
@@ -644,12 +646,12 @@
   const xpNeed = lvl => 12 + lvl * 8;
 
   // menu "play": costs energy (free in test mode); without enough energy the menu shows how to get more
-  function startGame() {
+  function startGame(mode) {
     if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
-    newRun();
+    newRun(mode);
   }
 
-  function newRun() {
+  function newRun(mode) {
     const S = statsTotal();   // talents + equipped gear
     const maxHp = Math.round(150 * (1 + S.hp));
     run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null };
@@ -660,7 +662,8 @@
       eagle: { x: W / 2, y: AY2 - 60, cd: 1, a: 0 }, shield: 0, weapon: null,
     };
     scene = 'play'; modal = null;
-    buildRoom(1);
+    run.mode = mode === 'survival' ? 'survival' : 'story';
+    if (run.mode === 'survival') survivalSetup(); else buildRoom(1);
     // talent "ancestral skill": start the run with random skills
     for (let i = 0; i < S.startSkill; i++) { const c = rollChoices(); if (c.length) applySkill(c[Math.floor(Math.random() * c.length)]); }
   }
@@ -695,7 +698,7 @@
 
   function spawnEnemy(type, x, y, spawn) {
     const d = ENEMY[type];
-    const room = run.room;
+    const room = diffLevel();
     const hpMul = d.boss ? 1 : 1 + 0.2 * (room - 1);
     const dmgMul = 1 + 0.07 * (room - 1);
     const e = {
@@ -882,8 +885,8 @@
     if (e.boss) { shake = 18; Sound.boom(); buzz([60, 40, 110]); }
     const gems = Math.ceil(e.xp / 3);
     for (let i = 0; i < gems; i++) dropPickup(e.x, e.y, 'xp', e.xp / gems);
-    const coins = Math.min(12, e.coin);
-    for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', e.coin / coins);
+    const coinV = e.coin * (isSurv() ? 1.5 : 1), coins = Math.min(12, Math.ceil(coinV));   // the arena is the place to farm coins
+    for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', coinV / coins);
     if (Math.random() < (e.boss ? 1 : 0.09)) dropPickup(e.x, e.y, 'heart', 0);
     if (e.boss) dropBonus(e.x, e.y, randomItem()); else if (Math.random() < 0.05) dropBonus(e.x, e.y, randomItem());
     if (sk('blood')) healPlayer(player.maxHp * 0.02 * sk('blood'));
@@ -988,10 +991,10 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
-    if (!SIM.on) runRewards(won);
+    if (!SIM.on) { if (isSurv()) survivalRewards(); else runRewards(won); }
     bank += run.coins; saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
-    if (reached > best) { best = reached; saveProgress(); }
+    if (!isSurv() && reached > best) { best = reached; saveProgress(); }
   }
 
   function gainXp(v) {
@@ -1033,7 +1036,7 @@
     stomp(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0; }
       e.vx = e.vy = 0; e.wind = true; s.t += dt;
-      if (s.t > 0.55) { s.t = 0; ring(e, 12, 125, 'rock', s.n * 0.26); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
+      if (s.t > 0.55) { s.t = 0; ring(e, 10, 125, 'rock', s.n * 0.31); shake = Math.max(shake, 8); Sound.boom(); s.n++; }
       return s.n >= 3;
     },
     charge(e, dt, s) {
@@ -1044,7 +1047,7 @@
         return false;
       }
       e.vx = Math.cos(s.a) * 360; e.vy = Math.sin(s.a) * 360; s.t -= dt;
-      if (e.hitWall && s.t < 0.7) { ring(e, 10, 120, e.type === 'A' ? 'fire' : 'rock', 0); shake = Math.max(shake, 10); Sound.boom(); e.vx = e.vy = 0; return true; }
+      if (e.hitWall && s.t < 0.7) { ring(e, 8, 120, e.type === 'A' ? 'fire' : 'rock', 0); shake = Math.max(shake, 10); Sound.boom(); e.vx = e.vy = 0; return true; }
       return s.t <= 0;
     },
     boulders(e, dt, s) {
@@ -1056,7 +1059,7 @@
     spiral(e, dt, s) {
       if (s.dur === undefined) { s.dur = 2.8; s.t = 0; s.a = Math.random() * TAU; }
       e.vx = e.vy = 0; e.wind = true; s.dur -= dt; s.t -= dt;
-      if (s.t <= 0) { s.t = 0.085; for (let k = 0; k < 3; k++) enemyBullet(e, s.a + k * TAU / 3, 125, 'magic'); s.a += 0.24; }
+      if (s.t <= 0) { s.t = 0.105; for (let k = 0; k < 3; k++) enemyBullet(e, s.a + k * TAU / 3, 125, 'magic'); s.a += 0.28; }
       return s.dur <= 0;
     },
     summon(e, dt, s) {
@@ -1085,19 +1088,19 @@
         burst(e.x, e.y, '#9b6bd6', 24, 140, 3.5); Sound.magic();
       }
       e.vx = e.vy = 0; s.t -= dt;
-      if (s.st === 1 && s.t <= 0) { aimed(e, 5, 0.2, 185, 'magic'); s.st = 2; s.t = 0.5; }
+      if (s.st === 1 && s.t <= 0) { aimed(e, 4, 0.22, 175, 'magic'); s.st = 2; s.t = 0.5; }
       return s.st === 2 && s.t <= 0;
     },
     breath(e, dt, s) {
       if (s.dur === undefined) { s.dur = 1.7; s.t = 0.35; }
       e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player); s.dur -= dt; s.t -= dt;
-      if (s.t <= 0 && s.dur < 1.4) { s.t = 0.055; enemyBullet(e, e.face + rand(-0.38, 0.38), rand(190, 250), 'fire'); }
+      if (s.t <= 0 && s.dur < 1.4) { s.t = 0.07; enemyBullet(e, e.face + rand(-0.38, 0.38), rand(190, 250), 'fire'); }
       return s.dur <= 0;
     },
     rings(e, dt, s) {
       if (s.n === undefined) { s.n = 0; s.t = 0.3; }
       e.vx = e.vy = 0; s.t -= dt;
-      if (s.t <= 0) { s.t = 0.45; ring(e, 14, 150, 'fire', s.n % 2 ? Math.PI / 14 : 0); s.n++; }
+      if (s.t <= 0) { s.t = 0.55; ring(e, 12, 145, 'fire', s.n % 2 ? Math.PI / 12 : 0); s.n++; }
       return s.n >= 4;
     },
   };
@@ -1142,8 +1145,8 @@
         } else {
           e.aimA = angTo(e, player);
           if (e.t <= 0) {
-            for (const da of [-0.22, 0, 0.22]) enemyBullet(e, e.aimA + da, 170, 'claw');
-            e.st = 'move'; e.t = rand(1.1, 1.9);
+            for (const da of [-0.24, 0, 0.24]) enemyBullet(e, e.aimA + da, 155, 'claw');
+            e.st = 'move'; e.t = rand(1.5, 2.4);
             const a = Math.random() * TAU; e.vx = Math.cos(a) * e.speed; e.vy = Math.sin(a) * e.speed;
           }
         }
@@ -1151,12 +1154,12 @@
       case 'ghost':
         steer(e, player.x, player.y, e.speed);
         e.cd -= dt;
-        if (e.cd <= 0) { e.cd = 2.6; ring(e, 6, 115, 'ghost', e.rot); e.rot += 0.52; }
+        if (e.cd <= 0) { e.cd = 3.2; ring(e, 5, 110, 'ghost', e.rot); e.rot += 0.63; }
         break;
       case 'witch':
         e.vx = e.vy = 0; e.cd -= dt;
         if (e.cd <= 0) {
-          e.cd = 3.1; ring(e, 10, 95, 'magic', Math.random()); Sound.magic();
+          e.cd = 3.7; ring(e, 8, 92, 'magic', Math.random()); Sound.magic();
           e.rot++;
           if (e.rot % 2 === 0) {
             burst(e.x, e.y, '#6d4c8f', 18, 120, 3);
@@ -1214,6 +1217,7 @@
   function update(dt) {
     time += dt;
     tutTick(dt);
+    if (scene === 'play') survivalTick(dt);
     Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
     if (hurtFlash > 0) hurtFlash -= dt;
     for (const e of enemies) if (e.punch > 0) e.punch = Math.max(0, e.punch - dt * 7);
@@ -1276,7 +1280,7 @@
     thrown = thrown.filter(b => !b.done);
     if (player.weapon) { player.weapon.t -= dt; if (player.weapon.t <= 0) player.weapon = null; }
 
-    if (!roomClear && enemies.length === 0) {
+    if (!roomClear && enemies.length === 0 && !isSurv()) {
       roomClear = true; clearT = 0;
       questEvent('room'); if (run.roomDmg === 0) questEvent('nohit');
       if (run.S.regen > 0) healPlayer(player.maxHp * run.S.regen);
@@ -2354,7 +2358,7 @@
 
     const outer = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), mat(th.outer, { r: 1 }));
     outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.01, zN - 20); outer.receiveShadow = true; R.add(outer);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: def.arena ? pitchTex(ROWS) : themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
 
     if (theme === 'park') {
@@ -2372,10 +2376,11 @@
     }
 
     themeWalls(R, theme, zN, zS);
-    for (const o of obstacles) R.add(themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
+    for (const o of obstacles) R.add(def.arena ? arenaProp(o) : themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
 
     // scenery beside the arena
-    for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+    if (def.arena) buildArenaScenery(R, zN, zS);
+    else for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
       if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
       else if (theme === 'street') { const p = mesh(G3.geo.cyl, mat('#2f3338', { m: 0.7 }), s * 4.7, 1.0, z, 0.04, 2.0, 0.04); R.add(p); const l = mesh(G3.geo.sphere, mat('#fff6d8', { e: '#ffe9a0', ei: 1.2 }), s * 4.55, 2.0, z, 0.1); R.add(l); }
@@ -4011,7 +4016,8 @@
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
     txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
-    txt(`${tr('room')} ${run.room}/${TOTAL_ROOMS}`, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
+    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}` + (run.waveT > 0 && (run.wave === 0 || run.waveCleared || run.waveT < 99) ? '  ·  ' + Math.ceil(Math.max(0, run.waveT - (run.wave === 0 ? introT : 0))) + mt('sec') : '') : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
+    txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillRect(W - 34, 18, 4, 16); ctx.fillRect(W - 26, 18, 4, 16);
@@ -4103,7 +4109,9 @@
     const a = clamp(banner.t / 0.4, 0, 1) * clamp((banner.max - banner.t) * 4, 0, 1);
     let text, sub, color = C.gold;
     if (banner.kind === 'boss') { text = ENEMY[banner.type].name[lang].toUpperCase(); sub = tr('boss') + ' · ' + roomPlace(banner.room); color = '#ff6b5b'; }
-    else if (banner.kind === 'room') { text = roomPlace(banner.room).toUpperCase(); sub = tr('room') + ' ' + banner.room + '/' + TOTAL_ROOMS + ' · ' + biome(banner.room).zone[lang]; }
+    else if (banner.kind === 'room') { text = roomPlace(banner.room).toUpperCase(); sub = isSurv() ? mt('survival') + ' · ' + mt('survSub') : tr('room') + ' ' + banner.room + '/' + TOTAL_ROOMS + ' · ' + biome(banner.room).zone[lang]; }
+    else if (banner.kind === 'wave') { text = mt('wave').toUpperCase() + ' ' + banner.wave; sub = banner.boss ? tr('boss') + ': ' + ENEMY[banner.boss].name[lang] : mt('survival'); color = banner.boss ? '#ff6b5b' : C.gold; }
+    else if (banner.kind === 'waveClear') { text = mt('waveClear'); sub = mt('waveClearSub'); color = '#7cf07a'; }
     else if (banner.kind === 'clear') { text = tr('clear'); sub = tr('clearSub'); color = '#7cf07a'; }
     else { text = SKILL[banner.skill].name[lang]; sub = tr('blessGot') + ': ' + SKILL[banner.skill].desc[lang]; }
     ctx.save(); ctx.globalAlpha = a;
@@ -4201,7 +4209,8 @@
     button(60, 424, W - 120, 42, tr('graphics') + ': ' + qualityLabel(), cycleQuality, { col: '#a99bff', col2: '#5a46c8', size: 14 });
     button(60, 476, W - 120, 42, tr('toMenu'), () => {
       bank += run.coins;
-      if (run.room > best) best = run.room;
+      if (isSurv()) { if (run.wave > (Save.data.bestWave || 0)) Save.data.bestWave = run.wave; }
+      else if (run.room > best) best = run.room;
       saveProgress();
       scene = 'menu'; modal = null; Sound.click();
     }, { col: '#ff8a6a', col2: '#c2402a', size: 15 });
@@ -4220,14 +4229,18 @@
       txt(tr('deadText'), W / 2, 184, 13, T.text, { weight: 500 });
     }
     const ck = (endT - 0.5) / 0.9;
-    const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
+    const surv = isSurv();
+    const rows = surv
+      ? [[mt('wave'), String(run.wave)], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), mt('wave').toLowerCase() + ' ' + (Save.data.bestWave || 0)]]
+      : [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
       txt(k, 60, 214 + i * 24, 14, T.muted, { align: 'left', weight: 500 });
       txt(v, W - 60, 214 + i * 24, 15, T.text, { align: 'right', weight: 900 });
     });
     // progress through the chapter: one pip per room, bosses bigger
     const reached = won ? TOTAL_ROOMS : run.room, pw = (W - 120) / TOTAL_ROOMS;
-    for (let r = 1; r <= TOTAL_ROOMS; r++) {
+    if (surv) txt(mt('arenaName'), W / 2, 342, 12, T.muted, { weight: 600 });
+    else for (let r = 1; r <= TOTAL_ROOMS; r++) {
       const boss = r % 5 === 0, px = 60 + (r - 0.5) * pw, rad = boss ? 6 : 4;
       const lit = r <= Math.ceil(reached * easeOut((endT - 0.6) / 0.9));
       ctx.fillStyle = !lit ? 'rgba(255,236,200,0.2)' : r < reached || won ? C.gold : C.red;
@@ -4243,8 +4256,9 @@
       if (k > 0) { ctx.save(); ctx.translate(rx + 20, 396); ctx.scale(k, k); ctx.translate(-rx - 20, -396); if (it.r >= 2) { ctx.shadowColor = RARITY[it.r].col; ctx.shadowBlur = 14; } itemCard(it, rx, 376, 40, null); ctx.restore(); }
       rx += 46;
     });
-    if (!rw || (!rw.gems && !rw.items.length)) txt(mt('noChest'), W / 2, 396, fitText(mt('noChest'), W - 100, 12, 500), T.dim, { weight: 500 });
-    button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(); });
+    if (!rw || (!rw.gems && !rw.items.length)) txt(mt(surv ? 'noChestSurv' : 'noChest'), W / 2, 396, fitText(mt(surv ? 'noChestSurv' : 'noChest'), W - 100, 12, 500), T.dim, { weight: 500 });
+    const mode = run.mode;
+    button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(mode); });
     button(54, 478, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
   }
 
@@ -4375,6 +4389,7 @@
     dieNow() { if (TEST_MODE && scene === 'play') { bank = Math.max(bank, REVIVE_COST); player.hp = 0; modal = 'revive'; reviveT = REVIVE_TIME; } },
     give(item) { if (TEST_MODE && player) dropBonus(player.x, player.y - 60, item); },
     get crates() { return crates.filter(c => !c.open).length; }, get crateList() { return crates.filter(c => !c.open).map(c => ({ x: c.x, y: c.y })); },
+    survival() { if (TEST_MODE) newRun('survival'); }, get wave() { return run && run.wave; },
     tp(x, y) { if (TEST_MODE && player) { player.x = x; player.y = y; } }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
@@ -4723,21 +4738,21 @@
       equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
       daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
       shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
-      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Легенды вышли на улицы', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Легенды вышли на улицы', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
     },
     kz: {
       tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
       equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
       daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
       shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
-      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Аңыздар көшеге шықты', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Аңыздар көшеге шықты', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
     },
     en: {
       tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
       equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
       daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
       shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
-      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Legends unleashed', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Legends unleashed', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
     },
   };
   const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -5323,6 +5338,13 @@
     ctx.beginPath(); ctx.arc(0, -10, 6, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -10, 9.5, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
     ctx.restore();
   }
+  function icoArena(x, y, s, c) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, -6, 12, 4, 0, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-12, -6); ctx.lineTo(-12, 8); ctx.ellipse(0, 8, 12, 4, 0, Math.PI, 0, true); ctx.lineTo(12, -6); ctx.stroke();
+    for (const px of [-7, 0, 7]) { ctx.beginPath(); ctx.moveTo(px, -1); ctx.lineTo(px, 10); ctx.stroke(); }
+    ctx.restore();
+  }
   function icoTrophy(x, y, s, c) {
     ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20); ctx.fillStyle = c; ctx.strokeStyle = c; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(8, -10); ctx.lineTo(7, -1); ctx.quadraticCurveTo(0, 7, -7, -1); ctx.closePath(); ctx.fill();
@@ -5516,7 +5538,7 @@
     const extra = clamp((H - SAFE.t - SAFE.b - 640) / 200, 0, 1);   // tall phones: a bigger logo a little lower
     drawLogo(W / 2, top + 170 + extra * 22 + (1 - k) * 14 + float, 0.84 + extra * 0.18, k);
     // PLAY: gold plate with pointed ends, soft breathing glow
-    const pw = 300, ph = 58, px = (W - pw) / 2, py = TAB_Y - 150;
+    const pw = 300, ph = 56, px = (W - pw) / 2, py = TAB_Y - 180;
     if (!REDUCED_MOTION) {
       const gl = 0.35 + 0.25 * Math.sin(pNow / 600);
       ctx.save(); ctx.shadowColor = `rgba(255,196,90,${gl})`; ctx.shadowBlur = 26; hexPath(px, py, pw, ph, ph * 0.42); ctx.fillStyle = 'rgba(255,200,90,0.01)'; ctx.fill(); ctx.restore();
@@ -5534,16 +5556,20 @@
         ctx.fillStyle = sg; ctx.fillRect(px, py, pw, ph); ctx.restore();
       }
     }
+    // survival arena: the bonus mode for coins and levels
+    const aw = 236, ax = (W - aw) / 2, ay = TAB_Y - 114;
+    button(ax, ay, aw, 40, mt('survival'), () => { Sound.init(); Sound.click(); startGame('survival'); },
+      { col: '#7a2a24', col2: '#3a1210', size: 14, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '⚡' + RUN_COST });
     // hint and record
-    const hy = TAB_Y - 72;
+    const hy = TAB_Y - 58;
     const hs = fitText(tr('hint'), W - 70, 12, 600); ctx.font = `600 ${hs}px ${FONT}`; const hw = ctx.measureText(tr('hint')).width;
     icoHand(W / 2 - (hw + 22) / 2 + 7, hy, 14, T.gold);
     txt(tr('hint'), W / 2 + 11, hy + 1, hs, T.text, { weight: 600, shadow: 'rgba(0,0,0,0.9)', blur: 6, dy: 0 });
-    const ry = TAB_Y - 46, rl = tr('best', best);
+    const ry = TAB_Y - 36, rl = tr('best', best) + (Save.data.bestWave ? '  ·  ' + mt('arenaRec', Save.data.bestWave) : '');
     ctx.font = `700 12px ${FONT}`; const rw = ctx.measureText(rl).width;
     icoTrophy(W / 2 - rw / 2 - 10, ry, 13, T.gold);
-    txt(rl, W / 2 + 6, ry + 1, 12, T.text, { weight: 700, shadow: 'rgba(0,0,0,0.9)', blur: 6, dy: 0 });
-    const bx = 60, bw = W - 120, by = ry + 13;
+    txt(rl, W / 2 + 6, ry + 1, fitText(rl, W - 60, 12, 700), T.text, { weight: 700, shadow: 'rgba(0,0,0,0.9)', blur: 6, dy: 0 });
+    const bx = 60, bw = W - 120, by = ry + 12;
     rr(ctx, bx, by, bw, 5, 2.5); ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill(); ctx.strokeStyle = 'rgba(220,183,94,0.3)'; ctx.lineWidth = 1; ctx.stroke();
     const fk = clamp(best / TOTAL_ROOMS, 0, 1);
     if (fk > 0) {
@@ -5596,6 +5622,189 @@
     else if (menuPopup === 'energy') withPop(drawEnergyPopup, true);
     else if (menuPopup === 'daily') withPop(drawDailyPopup, true);
     else if (menuPopup === 'settings') withPop(drawSettingsPopup, true);
+  }
+  // =================================================================== survival: endless waves on the Astana Arena pitch (bonus mode for coins and levels)
+  // the stadium is one more room definition after the 15 story rooms; it has no gate run and no fixed enemies
+  const SURV_ROOM = ROOM_DEFS.length + 1;
+  ROOM_DEFS.push({
+    theme: 'street', arena: true, place: { ru: 'Астана Арена', kz: 'Астана Арена', en: 'Astana Arena' },
+    lm: [['towers', -9, 4, 1], ['baiterek', 9, 8, 0.8]],
+    L: (() => {
+      const rows = [];
+      for (let r = 0; r < 26; r++) rows.push('........');
+      const put = (r, s) => { rows[r] = s; };
+      put(3, '.#....#.'); put(7, '...##...'); put(11, '.#....#.'); put(15, '.#....#.'); put(19, '...##...');
+      return rows;
+    })(),
+  });
+  const SURV_POOL = [['s', 1], ['w', 1], ['j', 3], ['a', 5], ['m', 7]];   // [type, first wave]
+  const SURV_BOSS = ['D', 'J', 'A'];
+  const isSurv = () => !!(run && run.mode === 'survival');
+  // difficulty level used for enemy HP and damage: story = room number, survival grows with the wave
+  const diffLevel = () => isSurv() ? 1 + Math.max(0, run.wave - 1) * 0.55 : run.room;
+
+  function survivalSetup() {
+    run.mode = 'survival'; run.wave = 0; run.waveT = INTRO_T + 2.2; run.supplyT = 16; run.waveCleared = true;
+    run.room = SURV_ROOM; buildRoom(SURV_ROOM);
+    crates = [];   // supplies arrive during the fight
+  }
+
+  function survivalTick(dt) {
+    if (!isSurv() || scene !== 'play' || introT > 0 || modal) return;
+    const alive = enemies.filter(e => !e.dead).length;
+    run.waveT -= dt;
+    if (alive === 0 && !run.waveCleared && run.wave > 0) waveCleared();
+    if (alive === 0 && run.waveT > 4) run.waveT = 4;   // no long waits on an empty pitch
+    if (run.waveT <= 0 && alive < 14) nextWave();
+    // supply crates keep arriving (at most two on the field)
+    run.supplyT -= dt;
+    if (run.supplyT <= 0) {
+      run.supplyT = 17;
+      if (crates.filter(c => !c.open).length < 2) {
+        const sp = freeSpotAwayFromPlayer(120); crates.push({ x: sp.x, y: sp.y });
+        addFx('ring', sp.x, sp.y, { col: '#ffd24a', size: 3, max: 0.8 });
+      }
+    }
+  }
+
+  function nextWave() {
+    run.wave++; run.waveCleared = false;
+    const w = run.wave, bossWave = w % 5 === 0;
+    const n = Math.min(16, Math.round((bossWave ? 2 : 5) + w * (bossWave ? 0.6 : 1.5)));
+    const pool = SURV_POOL.filter(p => w >= p[1]).map(p => p[0]);
+    for (let i = 0; i < n; i++) {
+      const t = pool[Math.floor(Math.random() * pool.length)], sp = freeSpotAwayFromPlayer(170);
+      spawnEnemy(t, sp.x, sp.y, 0.9 + i * 0.08);
+    }
+    if (bossWave) {
+      const type = SURV_BOSS[(w / 5 - 1) % 3], sp = freeSpotAwayFromPlayer(220);
+      const b = spawnEnemy(type, sp.x, sp.y, 1.2);
+      const k = 1 + Math.floor((w - 5) / 15) * 0.6;   // later laps of the boss cycle are tougher
+      b.hp *= k; b.maxHp *= k;
+      Sound.roar();
+      banner = { kind: 'wave', wave: w, boss: type, t: 2.6 };
+    } else banner = { kind: 'wave', wave: w, t: 2.0 };
+    run.waveT = 26 + w * 1.2;
+  }
+
+  // a cleared wave pays out: a shower of coins around the batyr, a supply drop every second wave, a breather heal
+  function waveCleared() {
+    run.waveCleared = true;
+    const w = run.wave;
+    for (let i = 0; i < 6 + w * 2; i++) {
+      const a = Math.random() * TAU, r = 30 + Math.random() * 70;
+      pickups.push({ x: clamp(player.x + Math.cos(a) * r, ARENA.x + 12, AX2 - 12), y: clamp(player.y + Math.sin(a) * r, ARENA.y + 12, AY2 - 12), vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, kind: 'coin', v: 1 + Math.floor(w / 4), t: 0 });
+    }
+    if (w % 2 === 0) dropBonus(player.x + rand(-50, 50), player.y - 60, randomItem());
+    healPlayer(player.maxHp * (0.08 + (run.S.regen || 0)));
+    Sound.clear(); slowT = 0.4;
+    addFx('ring', player.x, player.y, { col: '#ffd24a', size: 5, max: 0.9 });
+    banner = { kind: 'waveClear', wave: w, t: 1.8 };
+  }
+
+  // rewards for the end of a survival run: a chest for every 5 waves (up to 3), gems for waves
+  function survivalRewards() {
+    const w = run.wave, chests = [];
+    for (let i = 0; i < Math.min(3, Math.floor(w / 5)); i++) chests.push(i === 2 || w >= 15 && i === 0 ? 1 : 0);
+    const items = [];
+    for (const minR of chests) { const it = addItem(rollItem(minR)); if (it) items.push(it); }
+    const gems = run.gems + Math.floor(w / 3);
+    Save.data.gems += gems;
+    if (w > (Save.data.bestWave || 0)) Save.data.bestWave = w;
+    run.rewards = { items, gems };
+  }
+
+  // ---- the stadium: striped pitch with markings, stands with a crowd, advertising boards, floodlights
+  function pitchTex(rows) {
+    return canvasTex(256, Math.round(256 * rows / COLS), (g, w, h) => {
+      const stripe = h / 13;
+      for (let i = 0; i * stripe < h; i++) { g.fillStyle = i % 2 ? '#3f8a35' : '#4a9a3c'; g.fillRect(0, i * stripe, w, stripe + 1); }
+      // fine grass noise
+      for (let i = 0; i < 4000; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(20,60,15,0.18)' : 'rgba(170,220,120,0.14)'; g.fillRect(Math.random() * w, Math.random() * h, 1.5, 3); }
+      g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 3;
+      const m = 10; g.strokeRect(m, m, w - m * 2, h - m * 2);
+      g.beginPath(); g.moveTo(m, h / 2); g.lineTo(w - m, h / 2); g.stroke();
+      g.beginPath(); g.arc(w / 2, h / 2, w * 0.17, 0, TAU); g.stroke();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(w / 2, h / 2, 4, 0, TAU); g.fill();
+      for (const top of [true, false]) {
+        const y0 = top ? m : h - m, s = top ? 1 : -1;
+        g.strokeRect(w * 0.2, top ? y0 : y0 - h * 0.13, w * 0.6, h * 0.13);
+        g.strokeRect(w * 0.36, top ? y0 : y0 - h * 0.05, w * 0.28, h * 0.05);
+        g.beginPath(); g.arc(w / 2, y0 + s * h * 0.13, w * 0.1, top ? 0 : Math.PI, top ? Math.PI : TAU); g.stroke();
+        g.beginPath(); g.arc(w / 2, y0 + s * h * 0.095, 3, 0, TAU); g.fill();
+      }
+      for (const [x, y] of [[m, m], [w - m, m], [m, h - m], [w - m, h - m]]) { g.beginPath(); g.arc(x, y, 10, 0, TAU); g.stroke(); }
+    });
+  }
+  function crowdTex() {
+    if (G3.crowdTex) return G3.crowdTex;
+    const pal = ['#d63a3a', '#f0c040', '#3a8fd6', '#ffffff', '#2fb5a8', '#1e2a44', '#e98a2e', '#8a5ad0'];
+    G3.crowdTex = canvasTex(256, 64, (g, w, h) => {
+      g.fillStyle = '#1b2232'; g.fillRect(0, 0, w, h);
+      for (let y = 4; y < h; y += 10) for (let x = 3; x < w; x += 7) {
+        g.fillStyle = pal[(Math.random() * pal.length) | 0]; g.fillRect(x + Math.random() * 2, y, 4, 4);
+        g.fillStyle = '#e8c9a8'; g.fillRect(x + 1, y - 3, 2.5, 2.5);
+      }
+    }, true);
+    return G3.crowdTex;
+  }
+  function boardTex() {
+    if (G3.boardTex) return G3.boardTex;
+    G3.boardTex = canvasTex(512, 32, (g, w, h) => {
+      const cols = ['#0e3b5c', '#b3262e', '#0e3b5c', '#d9a42a'];
+      for (let i = 0; i < 4; i++) { g.fillStyle = cols[i]; g.fillRect(i * w / 4, 0, w / 4, h); }
+      g.font = `800 14px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
+      ['BATIR01', 'ASTANA ARENA', 'BATIR01', 'QAZAQSTAN'].forEach((t, i) => g.fillText(t, i * w / 4 + w / 8, h / 2 + 1));
+    }, true);
+    return G3.boardTex;
+  }
+  // obstacles on the pitch: padded advertising cubes instead of street props
+  function arenaProp(o) {
+    const g = new THREE.Group(), t = boardTex().clone(); t.needsUpdate = true; t.repeat.set(0.25, 1); t.offset.x = (o.seed % 4) * 0.25;
+    const side = mat('#ffffff', { map: t, e: '#222', ei: 0.35, r: 0.6 }), top = mat('#1b2232', { r: 0.7 });
+    const b = new THREE.Mesh(G3.geo.box, [side, side, top, top, side, side]); b.scale.set(0.9, 0.7, 0.9); b.position.y = 0.35; b.castShadow = b.receiveShadow = true; g.add(b);
+    g.position.set(X3(o.x + o.w / 2), 0, Z3(o.y + o.h / 2));
+    return g;
+  }
+  function buildArenaScenery(R, zN, zS) {
+    const len = zS - zN, zc = (zN + zS) / 2;
+    // advertising boards right outside the touchlines
+    const bt = boardTex(); bt.repeat.set(len / 8, 1);
+    for (const s of [-1, 1]) {
+      const b = mesh(G3.geo.box, mat('#ffffff', { map: bt, e: '#222', ei: 0.4, r: 0.6 }), s * 4.55, 0.22, zc, 0.06, 0.44, len, false);
+      R.add(b);
+    }
+    // stands: four tiers of seats with the crowd, rising away from the pitch
+    const ct = crowdTex(); ct.repeat.set(len / 4, 1);
+    const crowd = mat('#ffffff', { map: ct, r: 0.9 }), concrete = mat('#9aa0aa', { r: 0.9 });
+    for (const s of [-1, 1]) for (let t = 0; t < 4; t++) {
+      const x = s * (5.4 + t * 0.9), y = 0.35 + t * 0.55;
+      R.add(mesh(G3.geo.box, concrete, x, y / 2, zc, 0.9, y, len + 4, false));
+      const face = mesh(G3.geo.box, crowd, x - s * 0.44, y + 0.18, zc, 0.04, 0.36, len + 4, false); R.add(face);
+    }
+    // end stands behind both goals
+    const ctN = crowdTex().clone(); ctN.needsUpdate = true; ctN.repeat.set(3, 1);
+    const endCrowd = mat('#ffffff', { map: ctN, r: 0.9 });
+    for (const [z0, s] of [[zN - 1.6, -1], [zS + 1.3, 1]]) for (let t = 0; t < 4; t++) {
+      const z = z0 + s * t * 0.9, y = 0.35 + t * 0.55;
+      R.add(mesh(G3.geo.box, concrete, 0, y / 2, z, 9 + t * 1.8, y, 0.9, false));
+      R.add(mesh(G3.geo.box, endCrowd, 0, y + 0.18, z - s * 0.44, 9 + t * 1.8, 0.36, 0.04, false));
+    }
+    // goals at both ends
+    const net = mat('#ffffff', { r: 0.5 });
+    for (const [z, s] of [[zN + 0.05, -1], [zS - 0.05, 1]]) {
+      for (const sx of [-1, 1]) R.add(mesh(G3.geo.cyl, net, sx * 0.9, 0.35, z + s * 0.25, 0.035, 0.7, 0.035, false));
+      R.add(mesh(G3.geo.box, net, 0, 0.7, z + s * 0.25, 1.84, 0.06, 0.06, false));
+    }
+    // roof rim and floodlight masts at the corners
+    const steel = mat('#d8dde4', { m: 0.8, r: 0.35 });
+    for (const s of [-1, 1]) R.add(mesh(G3.geo.box, steel, s * 8.6, 3.4, zc, 0.5, 0.2, len + 6, false));
+    for (const [sx, z] of [[-1, zN - 2], [1, zN - 2], [-1, zS + 1], [1, zS + 1]]) {
+      const x = sx * 7.4;
+      R.add(mesh(G3.geo.cyl, steel, x, 3.2, z, 0.12, 6.4, 0.12, false));
+      R.add(mesh(G3.geo.box, mat('#fffbe8', { e: '#fff6d0', ei: 2.2 }), x, 6.5, z, 1.4, 0.7, 0.2, false));
+      const gl = glow('#fff4d0', 5.5, 0.85); gl.position.set(x, 6.5, z); R.add(gl);
+    }
   }
 })();
 </script>

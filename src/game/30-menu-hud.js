@@ -89,6 +89,13 @@
     ctx.beginPath(); ctx.arc(0, -10, 6, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -10, 9.5, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
     ctx.restore();
   }
+  function icoArena(x, y, s, c) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, -6, 12, 4, 0, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-12, -6); ctx.lineTo(-12, 8); ctx.ellipse(0, 8, 12, 4, 0, Math.PI, 0, true); ctx.lineTo(12, -6); ctx.stroke();
+    for (const px of [-7, 0, 7]) { ctx.beginPath(); ctx.moveTo(px, -1); ctx.lineTo(px, 10); ctx.stroke(); }
+    ctx.restore();
+  }
   function icoTrophy(x, y, s, c) {
     ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20); ctx.fillStyle = c; ctx.strokeStyle = c; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(8, -10); ctx.lineTo(7, -1); ctx.quadraticCurveTo(0, 7, -7, -1); ctx.closePath(); ctx.fill();
@@ -282,7 +289,7 @@
     const extra = clamp((H - SAFE.t - SAFE.b - 640) / 200, 0, 1);   // tall phones: a bigger logo a little lower
     drawLogo(W / 2, top + 170 + extra * 22 + (1 - k) * 14 + float, 0.84 + extra * 0.18, k);
     // PLAY: gold plate with pointed ends, soft breathing glow
-    const pw = 300, ph = 58, px = (W - pw) / 2, py = TAB_Y - 150;
+    const pw = 300, ph = 56, px = (W - pw) / 2, py = TAB_Y - 180;
     if (!REDUCED_MOTION) {
       const gl = 0.35 + 0.25 * Math.sin(pNow / 600);
       ctx.save(); ctx.shadowColor = `rgba(255,196,90,${gl})`; ctx.shadowBlur = 26; hexPath(px, py, pw, ph, ph * 0.42); ctx.fillStyle = 'rgba(255,200,90,0.01)'; ctx.fill(); ctx.restore();
@@ -300,16 +307,20 @@
         ctx.fillStyle = sg; ctx.fillRect(px, py, pw, ph); ctx.restore();
       }
     }
+    // survival arena: the bonus mode for coins and levels
+    const aw = 236, ax = (W - aw) / 2, ay = TAB_Y - 114;
+    button(ax, ay, aw, 40, mt('survival'), () => { Sound.init(); Sound.click(); startGame('survival'); },
+      { col: '#7a2a24', col2: '#3a1210', size: 14, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '⚡' + RUN_COST });
     // hint and record
-    const hy = TAB_Y - 72;
+    const hy = TAB_Y - 58;
     const hs = fitText(tr('hint'), W - 70, 12, 600); ctx.font = `600 ${hs}px ${FONT}`; const hw = ctx.measureText(tr('hint')).width;
     icoHand(W / 2 - (hw + 22) / 2 + 7, hy, 14, T.gold);
     txt(tr('hint'), W / 2 + 11, hy + 1, hs, T.text, { weight: 600, shadow: 'rgba(0,0,0,0.9)', blur: 6, dy: 0 });
-    const ry = TAB_Y - 46, rl = tr('best', best);
+    const ry = TAB_Y - 36, rl = tr('best', best) + (Save.data.bestWave ? '  ·  ' + mt('arenaRec', Save.data.bestWave) : '');
     ctx.font = `700 12px ${FONT}`; const rw = ctx.measureText(rl).width;
     icoTrophy(W / 2 - rw / 2 - 10, ry, 13, T.gold);
-    txt(rl, W / 2 + 6, ry + 1, 12, T.text, { weight: 700, shadow: 'rgba(0,0,0,0.9)', blur: 6, dy: 0 });
-    const bx = 60, bw = W - 120, by = ry + 13;
+    txt(rl, W / 2 + 6, ry + 1, fitText(rl, W - 60, 12, 700), T.text, { weight: 700, shadow: 'rgba(0,0,0,0.9)', blur: 6, dy: 0 });
+    const bx = 60, bw = W - 120, by = ry + 12;
     rr(ctx, bx, by, bw, 5, 2.5); ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill(); ctx.strokeStyle = 'rgba(220,183,94,0.3)'; ctx.lineWidth = 1; ctx.stroke();
     const fk = clamp(best / TOTAL_ROOMS, 0, 1);
     if (fk > 0) {

@@ -500,7 +500,7 @@
 
     const outer = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), mat(th.outer, { r: 1 }));
     outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.01, zN - 20); outer.receiveShadow = true; R.add(outer);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: def.arena ? pitchTex(ROWS) : themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
 
     if (theme === 'park') {
@@ -518,10 +518,11 @@
     }
 
     themeWalls(R, theme, zN, zS);
-    for (const o of obstacles) R.add(themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
+    for (const o of obstacles) R.add(def.arena ? arenaProp(o) : themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
 
     // scenery beside the arena
-    for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+    if (def.arena) buildArenaScenery(R, zN, zS);
+    else for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
       if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
       else if (theme === 'street') { const p = mesh(G3.geo.cyl, mat('#2f3338', { m: 0.7 }), s * 4.7, 1.0, z, 0.04, 2.0, 0.04); R.add(p); const l = mesh(G3.geo.sphere, mat('#fff6d8', { e: '#ffe9a0', ei: 1.2 }), s * 4.55, 2.0, z, 0.1); R.add(l); }
