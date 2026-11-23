@@ -123,7 +123,7 @@
     ctx.beginPath(); ctx.moveTo(-70, -12); ctx.lineTo(-44, -22); ctx.lineTo(-30, -16); ctx.lineTo(-10, -38); ctx.lineTo(4, -26); ctx.lineTo(14, -33); ctx.lineTo(40, -14); ctx.lineTo(70, -12); ctx.stroke();
     ctx.fillStyle = 'rgba(220,183,94,0.18)'; ctx.beginPath(); ctx.moveTo(-10, -38); ctx.lineTo(-3, -30); ctx.lineTo(-14, -30); ctx.closePath(); ctx.fill();
     // eagle
-    ctx.save(); ctx.translate(2, -52); ctx.scale(0.78, 0.78);
+    ctx.save(); ctx.translate(2, -56); ctx.scale(1.0, 1.0);
     ctx.shadowColor = 'rgba(255,200,90,0.55)'; ctx.shadowBlur = 10;
     eaglePath(); ctx.fillStyle = goldGrad(-32, 50); ctx.fill('evenodd');
     ctx.restore();
@@ -328,8 +328,10 @@
     TAB_Y = H - SAFE.b - 72;
     if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     // cinematic grade over the 3D scene: dark top and bottom so the gold chrome reads
-    const tg = ctx.createLinearGradient(0, 0, 0, 240 + SAFE.t); tg.addColorStop(0, 'rgba(8,11,18,0.92)'); tg.addColorStop(0.45, 'rgba(8,11,18,0.55)'); tg.addColorStop(1, 'rgba(8,11,18,0)');
-    ctx.fillStyle = tg; ctx.fillRect(0, 0, W, 240 + SAFE.t);
+    // dusk grade: deep navy sky fading into the amber horizon (the concept's palette)
+    const sky = H * 0.62;
+    const tg = ctx.createLinearGradient(0, 0, 0, sky); tg.addColorStop(0, 'rgba(8,12,22,0.95)'); tg.addColorStop(0.35, 'rgba(14,24,44,0.72)'); tg.addColorStop(0.75, 'rgba(20,30,52,0.32)'); tg.addColorStop(1, 'rgba(20,30,52,0)');
+    ctx.fillStyle = tg; ctx.fillRect(0, 0, W, sky);
     const bgr = ctx.createLinearGradient(0, TAB_Y - 210, 0, TAB_Y); bgr.addColorStop(0, 'rgba(8,11,18,0)'); bgr.addColorStop(1, 'rgba(8,11,18,0.75)');
     ctx.fillStyle = bgr; ctx.fillRect(0, TAB_Y - 210, W, 210);
     drawEmbers();
