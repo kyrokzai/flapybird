@@ -41,6 +41,9 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<link rel="preload" href="assets/sky_menu.js" as="script">
+<link rel="preload" href="assets/batyr.js" as="script">
+<link rel="preload" href="assets/horse.js" as="script">
 <script>
 (() => {
   'use strict';
@@ -103,7 +106,7 @@
       sRoom: 'Комната', sLevel: 'Уровень', sKills: 'Убито врагов', sCoins: 'Монеты', sBest: 'Рекорд', roomWord: 'комната',
       again: 'ЕЩЁ РАЗ', menu: 'В меню',
       upAtk: 'Сила', upAtkD: 'Атака +8%', upHp: 'Здоровье', upHpD: 'Здоровье +10%', lvl: 'ур.', max: 'МАКС',
-      clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!',
+      clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!', loading: 'Загрузка…',
       best: 'Рекорд: комната {n} / 15', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
     },
     kz: {
@@ -117,7 +120,7 @@
       sRoom: 'Бөлме', sLevel: 'Деңгей', sKills: 'Жеңілген жау', sCoins: 'Тиын', sBest: 'Рекорд', roomWord: 'бөлме',
       again: 'ТАҒЫ ДА', menu: 'Мәзір',
       upAtk: 'Күш', upAtkD: 'Шабуыл +8%', upHp: 'Денсаулық', upHpD: 'Денсаулық +10%', lvl: 'дең.', max: 'МАКС',
-      clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!',
+      clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!', loading: 'Жүктелуде…',
       best: 'Рекорд: {n}-бөлме / 15', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
     },
   };
@@ -1941,7 +1944,7 @@
     }
     G3.pano.visible = !!tex; G3.sky.visible = !tex;
     if (!tex) return false;
-    G3.pano.material.map = tex; G3.pano.material.color.setScalar(name === 'menu' ? 1.15 : 1.35); G3.pano.material.needsUpdate = true;
+    G3.pano.material.map = tex; G3.pano.material.color.setScalar(name === 'menu' ? 0.62 : 1.35); G3.pano.material.needsUpdate = true;
     G3.pano.rotation.y = yaw || 0;
     const rt = G3.pmrem.fromEquirectangular(tex);
     if (G3.envRT) G3.envRT.dispose();
@@ -2078,7 +2081,7 @@
     G3.gateBeam.scale.y = 6; G3.gateBeam.position.set(0, 3, zN - 0.2); R.add(G3.gateBeam);
   }
 
-  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2 };   // image centre faces the gate
+  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2 + 0.55, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2 };   // image centre faces the gate
   function grassMaterial() { const m = new THREE.MeshStandardMaterial({ roughness: 1 }); windMaterial(m, WIND_GRASS); return m; }
   function build3D() {
     const menu = scene === 'menu';
@@ -3242,7 +3245,7 @@
       for (let i = 0; i < (menu ? 6 : 9); i++) {
         const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: col(cols[i % cols.length]), side: THREE.DoubleSide });
         const wings = [];
-        for (const s of [-1, 1]) { const pv = new THREE.Group(); const w = new THREE.Mesh(G3.geo.plane, m); w.scale.set(0.2, 0.16, 1); w.position.z = s * 0.1; w.rotation.x = -Math.PI / 2; pv.add(w); g.add(pv); wings.push({ pv, s }); }
+        for (const s of [-1, 1]) { const pv = new THREE.Group(); const w = new THREE.Mesh(G3.geo.plane, m); w.scale.set(menu ? 0.07 : 0.2, menu ? 0.055 : 0.16, 1); w.position.z = s * (menu ? 0.035 : 0.1); w.rotation.x = -Math.PI / 2; pv.add(w); g.add(pv); wings.push({ pv, s }); }
         R.add(g);
         const ox = (rnd() - 0.5) * (menu ? 6 : 7), oz = menu ? 1 + rnd() * 3 : zN + rnd() * len, ph = rnd() * 10, sp = 0.4 + rnd() * 0.4;
         life.upd.push(t => {
@@ -3428,7 +3431,7 @@
     if (G3.heroRing.visible) { G3.heroRing.position.set(X3(player.x), 0.025, Z3(player.y)); G3.heroRing.rotation.z = time * 0.8; }
     const hm = G3.hero;
     if (menu) {
-      hm.g.visible = true; hm.g.position.set(0, 0.2, 1.4); hm.g.scale.setScalar(1);
+      hm.g.visible = !!G3.heroSpear; hm.g.position.set(0, 0.2, 1.4); hm.g.scale.setScalar(1);
       hm.g.rotation.y = -(Math.PI / 2 - 0.15);
       (hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0 });
     } else {
@@ -3526,7 +3529,7 @@
     pos.needsUpdate = true; pc.needsUpdate = true;
 
     if (G3.composer) {
-      G3.grade.uniforms.exposure.value = menu ? 1.2 : 0.8;
+      G3.grade.uniforms.exposure.value = menu ? (G3.skyTex.menu ? 1.0 : 1.2) : 0.8;
       G3.grade.uniforms.sat.value = menu ? 1.1 : 1.18;
       G3.bloom.threshold = menu ? 0.97 : 1.5;
       G3.composer.render();
@@ -3888,6 +3891,12 @@
       const c = upCost(lv), maxed = lv >= 10;
       button(W - 142, y - 14, 104, 36, maxed ? tr('max') : c + ' ₸', fn, { disabled: maxed || bank < c, size: 15, col: '#8be07a', col2: '#3d9a36' });
     });
+    if ((G3.loadDone || 0) < (G3.loadTotal || 1)) {
+      const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 180, bx = (W - bw) / 2, by = G3.heroSpear ? 636 : 300;
+      if (!G3.heroSpear) txt(tr('loading'), W / 2, by - 16, 15, '#fff', { stroke: C.ink, lw: 4, weight: 900 });
+      rr(ctx, bx, by - 3, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
+      rr(ctx, bx, by - 3, Math.max(6, bw * k), 6, 3); ctx.fillStyle = C.gold; ctx.fill();
+    }
     txt(tr('best', best), W / 2, 620, 12, C.cream, { stroke: C.ink, lw: 3, weight: 700 });
     // language + sound toggles
     const tg = (x, w, on, label, fn) => {
@@ -3990,9 +3999,15 @@
   // load one model after another, most needed first
   const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
-  loadSky('menu', () => loadSky('park', () => loadSky('street', () => loadSky('office', () => loadSky('beach', () => { /* all panoramas ready */
-    (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
-  })))));
+  // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
+  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_bow'],
+    ['sky', 'park'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_bow', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
+  G3.loadTotal = LOAD_ALL.length; G3.loadDone = 0;
+  (function next(i) {
+    if (i >= LOAD_ALL.length) return;
+    const [k, n] = LOAD_ALL[i], go = () => { G3.loadDone = i + 1; next(i + 1); };
+    if (k === 'sky') loadSky(n, go); else loadModel(n, go);
+  })(0);
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
