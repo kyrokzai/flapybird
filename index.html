@@ -74,10 +74,53 @@
   const MODEL_H = { w: 0.95, s: 0.66, j: 1.28, a: 1.65, m: 1.52, D: 2.7, J: 2.5, A: 2.1 };
 
   // =================================================================== helpers
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem('mergen.' + k); return v === null ? d : v; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('mergen.' + k, String(v)); } catch (e) { /* ignore */ } },
+  // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 1;
+  const Save = {
+    data: null,
+    defaults() { return { v: SAVE_VERSION, coins: 0, best: 0, upAtk: 0, upHp: 0, settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null } }; },
+    load() {
+      let d = null;
+      try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { d = null; }
+      this.data = this.upgrade(d && typeof d === 'object' ? d : this.fromOldKeys());
+      this.write();
+    },
+    fromOldKeys() {   // saves made before version 1 (separate mergen.* keys)
+      const d = this.defaults(), g = k => { try { return localStorage.getItem('mergen.' + k); } catch (e) { return null; } };
+      for (const k of ['coins', 'best', 'upAtk', 'upHp']) if (g(k) !== null) d[k] = parseInt(g(k), 10) || 0;
+      if (g('lang')) d.settings.lang = g('lang');
+      if (g('music') !== null) d.settings.music = g('music') === '1';
+      if (g('sfx') !== null) d.settings.sfx = g('sfx') === '1';
+      if (g('hq') === '0') d.settings.quality = 'medium';
+      return d;
+    },
+    upgrade(d) {
+      const out = Object.assign(this.defaults(), d);
+      out.settings = Object.assign(this.defaults().settings, d.settings || {});
+      // future format changes go here: if (out.v < 2) { ...; }
+      out.v = SAVE_VERSION;
+      return out;
+    },
+    write() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: progress lives for this session only */ } },
   };
+  Save.load();
+
+  // graphics quality: auto picks by device and drops a step if the frame rate stays low
+  const QUALITY = {
+    low: { post: false, shadows: false, pr: 1, grass: 0.35, fx: 0.5 },
+    medium: { post: false, shadows: true, pr: 1.5, grass: 0.7, fx: 0.8 },
+    high: { post: true, shadows: true, pr: 2, grass: 1, fx: 1 },
+  };
+  const Q_ORDER = ['auto', 'low', 'medium', 'high'];
+  function guessQuality() {
+    const mob = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const mem = navigator.deviceMemory || 8, cores = navigator.hardwareConcurrency || 8;
+    if (mem <= 2 || cores <= 2) return 'low';
+    if (mob) return mem <= 4 || cores <= 4 ? 'low' : 'medium';
+    return cores <= 4 ? 'medium' : 'high';
+  }
+  const effectiveQuality = () => { const p = Save.data.settings.quality; return p === 'auto' ? (Save.data.settings.autoQuality || guessQuality()) : (QUALITY[p] ? p : 'medium'); };
+  let QL = effectiveQuality(), Q = QUALITY[QL];
   function mulberry32(a) {
     return function () {
       a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -93,7 +136,7 @@
   const TAU = Math.PI * 2;
 
   // =================================================================== language
-  let lang = store.get('lang', 'ru') === 'kz' ? 'kz' : 'ru';
+  let lang = ['ru', 'kz', 'en'].includes(Save.data.settings.lang) ? Save.data.settings.lang : 'ru';
   const STR = {
     ru: {
       subtitle: 'СТЕПНОЙ БАТЫР', play: 'ИГРАТЬ', room: 'КОМНАТА', boss: 'Босс',
@@ -108,6 +151,7 @@
       upAtk: 'Сила', upAtkD: 'Атака +8%', upHp: 'Здоровье', upHpD: 'Здоровье +10%', lvl: 'ур.', max: 'МАКС',
       clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!', loading: 'Загрузка…',
       best: 'Рекорд: комната {n} / 15', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
+      graphics: 'Графика', qauto: 'Авто', qlow: 'Низкая', qmedium: 'Средняя', qhigh: 'Высокая',
     },
     kz: {
       subtitle: 'ДАЛА БАТЫРЫ', play: 'ОЙНАУ', room: 'БӨЛМЕ', boss: 'Босс',
@@ -122,10 +166,26 @@
       upAtk: 'Күш', upAtkD: 'Шабуыл +8%', upHp: 'Денсаулық', upHpD: 'Денсаулық +10%', lvl: 'дең.', max: 'МАКС',
       clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!', loading: 'Жүктелуде…',
       best: 'Рекорд: {n}-бөлме / 15', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
+      graphics: 'Графика', qauto: 'Авто', qlow: 'Төмен', qmedium: 'Орта', qhigh: 'Жоғары',
+    },
+    en: {
+      subtitle: 'STEPPE BATYR', play: 'PLAY', room: 'ROOM', boss: 'Boss',
+      levelUp: 'LEVEL UP!', choose: 'Level {n} — choose a skill',
+      kydyr: 'KYDYR ATA', kydyrText: 'The elder Kydyr meets the batyr on the steppe and offers a gift',
+      heal: 'HEALING · +40% health', bless: 'BLESSING · random skill', blessGot: 'Blessing',
+      pause: 'PAUSE', noSkills: 'No skills yet', resume: 'RESUME', music: 'Music', sfx: 'Sounds',
+      on: 'on', off: 'off', toMenu: 'MAIN MENU',
+      victory: 'VICTORY!', victoryText: 'The steppe is free of monsters', dead: 'THE BATYR HAS FALLEN', deadText: 'Try again',
+      sRoom: 'Room', sLevel: 'Level', sKills: 'Enemies defeated', sCoins: 'Coins', sBest: 'Best', roomWord: 'room',
+      again: 'PLAY AGAIN', menu: 'Menu',
+      upAtk: 'Might', upAtkD: 'Attack +8%', upHp: 'Health', upHpD: 'Health +10%', lvl: 'lv.', max: 'MAX',
+      clear: 'ROOM CLEARED!', clearSub: 'Head to the gate', blocked: 'Blocked!', loading: 'Loading…',
+      best: 'Best: room {n} / 15', hint: 'Drag to move · stand still to shoot',
+      graphics: 'Graphics', qauto: 'Auto', qlow: 'Low', qmedium: 'Medium', qhigh: 'High',
     },
   };
   const tr = (k, n) => { const s = STR[lang][k] || STR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
-  function setLang(l) { lang = l; store.set('lang', l); document.documentElement.lang = l === 'kz' ? 'kk' : 'ru'; document.title = 'БАТЫР01'; }
+  function setLang(l) { lang = l; Save.data.settings.lang = l; Save.write(); document.documentElement.lang = l === 'kz' ? 'kk' : l; document.title = 'БАТЫР01'; }
   setLang(lang);
 
   // =================================================================== canvases
@@ -144,7 +204,7 @@
     canvas.height = Math.round(H * scale * dpr);
     K = canvas.width / W;
     if (G3.r) {
-      const pr = G3.composer ? Math.min(dpr, 1.6) : dpr;
+      const pr = G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
       G3.r.setPixelRatio(pr); G3.r.setSize(cssW, cssH, false);
       if (G3.composer) {
         G3.composer.setPixelRatio(pr); G3.composer.setSize(cssW, cssH);
@@ -193,7 +253,7 @@
   // =================================================================== audio
   const Sound = {
     ac: null, noise: null, master: null, musicGain: null, sfxGain: null,
-    music: store.get('music', '1') === '1', sfx: store.get('sfx', '1') === '1',
+    music: Save.data.settings.music, sfx: Save.data.settings.sfx,
     plucks: {}, nextNote: 0, step: 0, timer: null, lastPick: 0,
     init() {
       if (!this.ac) {
@@ -256,8 +316,8 @@
         this.step++;
       }
     },
-    setMusic(on) { this.music = on; store.set('music', on ? 1 : 0); if (this.musicGain) this.musicGain.gain.value = on ? 0.32 : 0; },
-    setSfx(on) { this.sfx = on; store.set('sfx', on ? 1 : 0); if (this.sfxGain) this.sfxGain.gain.value = on ? 1 : 0; if (this.ambGain) this.ambGain.gain.value = on ? 1 : 0; },
+    setMusic(on) { this.music = on; Save.data.settings.music = on; Save.write(); if (this.musicGain) this.musicGain.gain.value = on ? 0.32 : 0; },
+    setSfx(on) { this.sfx = on; Save.data.settings.sfx = on; Save.write(); if (this.sfxGain) this.sfxGain.gain.value = on ? 1 : 0; if (this.ambGain) this.ambGain.gain.value = on ? 1 : 0; },
     ok() { return this.ac && this.sfx; },
     tone(type, f0, f1, t0, dur, vol) {
       const ac = this.ac, t = ac.currentTime + t0;
@@ -359,35 +419,35 @@
 
   // =================================================================== data
   const SKILLS = [
-    { id: 'multi', max: 3, col: '#f4c430', name: { ru: 'Мультивыстрел', kz: 'Қос жебе' }, desc: { ru: '+1 стрела очередью', kz: 'Қатарынан +1 жебе' } },
-    { id: 'front', max: 3, col: '#f4c430', name: { ru: 'Стрела вперёд', kz: 'Алдыңғы жебе' }, desc: { ru: '+1 стрела вперёд', kz: 'Алға +1 жебе' } },
-    { id: 'diag', max: 2, col: '#f4c430', name: { ru: 'Диагональные стрелы', kz: 'Қиғаш жебелер' }, desc: { ru: '+2 стрелы по диагонали', kz: 'Қиғаш +2 жебе' } },
-    { id: 'side', max: 2, col: '#f4c430', name: { ru: 'Боковые стрелы', kz: 'Бүйір жебелер' }, desc: { ru: 'Стрелы влево и вправо', kz: 'Солға және оңға жебелер' } },
-    { id: 'rear', max: 1, col: '#f4c430', name: { ru: 'Стрела назад', kz: 'Артқы жебе' }, desc: { ru: 'Стрела летит назад', kz: 'Артқа жебе' } },
-    { id: 'pierce', max: 2, col: '#7fd6e8', name: { ru: 'Пробивание', kz: 'Тесіп өту' }, desc: { ru: 'Стрелы пробивают врагов', kz: 'Жебелер жауды тесіп өтеді' } },
-    { id: 'rico', max: 3, col: '#7fd6e8', name: { ru: 'Рикошет', kz: 'Рикошет' }, desc: { ru: 'Стрела перелетает к другому врагу', kz: 'Жебе басқа жауға секіреді' } },
-    { id: 'wall', max: 2, col: '#7fd6e8', name: { ru: 'Отскок от стен', kz: 'Қабырға секірісі' }, desc: { ru: 'Стрелы отскакивают от стен', kz: 'Жебелер қабырғадан серпіледі' } },
-    { id: 'atk', max: 6, col: '#ff7b54', name: { ru: 'Сила батыра', kz: 'Батыр күші' }, desc: { ru: 'Урон +25%', kz: 'Шабуыл +25%' } },
-    { id: 'spd', max: 5, col: '#ff7b54', name: { ru: 'Быстрые руки', kz: 'Шапшаңдық' }, desc: { ru: 'Скорость атаки +20%', kz: 'Ату жылдамдығы +20%' } },
-    { id: 'crit', max: 4, col: '#ff7b54', name: { ru: 'Глаз мергена', kz: 'Мерген көз' }, desc: { ru: 'Шанс крита +10%, сила крита +25%', kz: 'Сыни соққы +10%, күші +25%' } },
-    { id: 'hp', max: 6, col: '#8be07a', name: { ru: 'Кумыс', kz: 'Қымыз' }, desc: { ru: 'Макс. здоровье +20% и лечение', kz: 'Денсаулық +20% және емделу' } },
-    { id: 'blood', max: 3, col: '#8be07a', name: { ru: 'Жажда крови', kz: 'Қанішер' }, desc: { ru: 'Лечение за каждое убийство', kz: 'Әр жеңіс үшін емделу' } },
-    { id: 'fire', max: 2, col: '#ff9a3c', name: { ru: 'Огненные стрелы', kz: 'От жебе' }, desc: { ru: 'Стрелы поджигают врагов', kz: 'Жебелер жауды өртейді' } },
-    { id: 'ice', max: 2, col: '#9fd9ff', name: { ru: 'Ледяные стрелы', kz: 'Мұз жебе' }, desc: { ru: 'Стрелы замедляют врагов', kz: 'Жебелер жауды баяулатады' } },
-    { id: 'orbit', max: 3, col: '#c99bff', name: { ru: 'Тумар-оберег', kz: 'Тұмар' }, desc: { ru: 'Вращающийся оберег жалит врагов', kz: 'Айналатын тұмар жауды шағады' } },
-    { id: 'eagle', max: 3, col: '#c99bff', name: { ru: 'Беркут', kz: 'Бүркіт' }, desc: { ru: 'Беркут-помощник бьёт врагов', kz: 'Бүркіт-көмекші жауға шабуылдайды' } },
-    { id: 'speed', max: 2, col: '#8be07a', name: { ru: 'Тулпар', kz: 'Тұлпар' }, desc: { ru: 'Скорость бега +15%', kz: 'Жүгіру жылдамдығы +15%' } },
+    { id: 'multi', max: 3, col: '#f4c430', name: { ru: 'Мультивыстрел', kz: 'Қос жебе', en: 'Multishot' }, desc: { ru: '+1 стрела очередью', kz: 'Қатарынан +1 жебе', en: '+1 arrow per volley' } },
+    { id: 'front', max: 3, col: '#f4c430', name: { ru: 'Стрела вперёд', kz: 'Алдыңғы жебе', en: 'Front Arrow' }, desc: { ru: '+1 стрела вперёд', kz: 'Алға +1 жебе', en: '+1 arrow forward' } },
+    { id: 'diag', max: 2, col: '#f4c430', name: { ru: 'Диагональные стрелы', kz: 'Қиғаш жебелер', en: 'Diagonal Arrows' }, desc: { ru: '+2 стрелы по диагонали', kz: 'Қиғаш +2 жебе', en: '+2 diagonal arrows' } },
+    { id: 'side', max: 2, col: '#f4c430', name: { ru: 'Боковые стрелы', kz: 'Бүйір жебелер', en: 'Side Arrows' }, desc: { ru: 'Стрелы влево и вправо', kz: 'Солға және оңға жебелер', en: 'Arrows to the left and right' } },
+    { id: 'rear', max: 1, col: '#f4c430', name: { ru: 'Стрела назад', kz: 'Артқы жебе', en: 'Rear Arrow' }, desc: { ru: 'Стрела летит назад', kz: 'Артқа жебе', en: 'An arrow flies backwards' } },
+    { id: 'pierce', max: 2, col: '#7fd6e8', name: { ru: 'Пробивание', kz: 'Тесіп өту', en: 'Piercing' }, desc: { ru: 'Стрелы пробивают врагов', kz: 'Жебелер жауды тесіп өтеді', en: 'Arrows pierce through enemies' } },
+    { id: 'rico', max: 3, col: '#7fd6e8', name: { ru: 'Рикошет', kz: 'Рикошет', en: 'Ricochet' }, desc: { ru: 'Стрела перелетает к другому врагу', kz: 'Жебе басқа жауға секіреді', en: 'Arrows bounce to another enemy' } },
+    { id: 'wall', max: 2, col: '#7fd6e8', name: { ru: 'Отскок от стен', kz: 'Қабырға секірісі', en: 'Wall Bounce' }, desc: { ru: 'Стрелы отскакивают от стен', kz: 'Жебелер қабырғадан серпіледі', en: 'Arrows bounce off walls' } },
+    { id: 'atk', max: 6, col: '#ff7b54', name: { ru: 'Сила батыра', kz: 'Батыр күші', en: 'Batyr\'s Might' }, desc: { ru: 'Урон +25%', kz: 'Шабуыл +25%', en: 'Damage +25%' } },
+    { id: 'spd', max: 5, col: '#ff7b54', name: { ru: 'Быстрые руки', kz: 'Шапшаңдық', en: 'Quick Hands' }, desc: { ru: 'Скорость атаки +20%', kz: 'Ату жылдамдығы +20%', en: 'Attack speed +20%' } },
+    { id: 'crit', max: 4, col: '#ff7b54', name: { ru: 'Глаз мергена', kz: 'Мерген көз', en: 'Marksman\'s Eye' }, desc: { ru: 'Шанс крита +10%, сила крита +25%', kz: 'Сыни соққы +10%, күші +25%', en: 'Crit chance +10%, crit damage +25%' } },
+    { id: 'hp', max: 6, col: '#8be07a', name: { ru: 'Кумыс', kz: 'Қымыз', en: 'Kumis' }, desc: { ru: 'Макс. здоровье +20% и лечение', kz: 'Денсаулық +20% және емделу', en: 'Max health +20% and heal' } },
+    { id: 'blood', max: 3, col: '#8be07a', name: { ru: 'Жажда крови', kz: 'Қанішер', en: 'Bloodthirst' }, desc: { ru: 'Лечение за каждое убийство', kz: 'Әр жеңіс үшін емделу', en: 'Heal on every kill' } },
+    { id: 'fire', max: 2, col: '#ff9a3c', name: { ru: 'Огненные стрелы', kz: 'От жебе', en: 'Fire Arrows' }, desc: { ru: 'Стрелы поджигают врагов', kz: 'Жебелер жауды өртейді', en: 'Arrows set enemies on fire' } },
+    { id: 'ice', max: 2, col: '#9fd9ff', name: { ru: 'Ледяные стрелы', kz: 'Мұз жебе', en: 'Ice Arrows' }, desc: { ru: 'Стрелы замедляют врагов', kz: 'Жебелер жауды баяулатады', en: 'Arrows slow enemies' } },
+    { id: 'orbit', max: 3, col: '#c99bff', name: { ru: 'Тумар-оберег', kz: 'Тұмар', en: 'Tumar Charm' }, desc: { ru: 'Вращающийся оберег жалит врагов', kz: 'Айналатын тұмар жауды шағады', en: 'A spinning charm stings enemies' } },
+    { id: 'eagle', max: 3, col: '#c99bff', name: { ru: 'Беркут', kz: 'Бүркіт', en: 'Golden Eagle' }, desc: { ru: 'Беркут-помощник бьёт врагов', kz: 'Бүркіт-көмекші жауға шабуылдайды', en: 'An eagle companion strikes enemies' } },
+    { id: 'speed', max: 2, col: '#8be07a', name: { ru: 'Тулпар', kz: 'Тұлпар', en: 'Tulpar' }, desc: { ru: 'Скорость бега +15%', kz: 'Жүгіру жылдамдығы +15%', en: 'Move speed +15%' } },
   ];
   const SKILL = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 
   // bonuses found in crates or dropped by enemies
   const ITEMS = {
-    medkit: { w: 34, col: '#ff4a55', name: { ru: 'Аптечка', kz: 'Дәрі қобдишасы' } },
-    bomb: { w: 26, col: '#ff9a2a', name: { ru: 'Бомба', kz: 'Бомба' } },
-    shield: { w: 14, col: '#5fc8ff', name: { ru: 'Щит', kz: 'Қалқан' } },
-    w_triple: { w: 9, col: '#ffd23a', name: { ru: 'Тройной лук', kz: 'Үш жебелі садақ' }, weapon: true },
-    w_heavy: { w: 8, col: '#ff5a3a', name: { ru: 'Тяжёлые стрелы', kz: 'Ауыр жебелер' }, weapon: true },
-    w_rapid: { w: 9, col: '#3ae0ff', name: { ru: 'Скорострельный лук', kz: 'Шапшаң садақ' }, weapon: true },
+    medkit: { w: 34, col: '#ff4a55', name: { ru: 'Аптечка', kz: 'Дәрі қобдишасы', en: 'Medkit' } },
+    bomb: { w: 26, col: '#ff9a2a', name: { ru: 'Бомба', kz: 'Бомба', en: 'Bomb' } },
+    shield: { w: 14, col: '#5fc8ff', name: { ru: 'Щит', kz: 'Қалқан', en: 'Shield' } },
+    w_triple: { w: 9, col: '#ffd23a', name: { ru: 'Тройной лук', kz: 'Үш жебелі садақ', en: 'Triple Bow' }, weapon: true },
+    w_heavy: { w: 8, col: '#ff5a3a', name: { ru: 'Тяжёлые стрелы', kz: 'Ауыр жебелер', en: 'Heavy Arrows' }, weapon: true },
+    w_rapid: { w: 9, col: '#3ae0ff', name: { ru: 'Скорострельный лук', kz: 'Шапшаң садақ', en: 'Rapid Bow' }, weapon: true },
   };
   const WEAPON_TIME = 15;
   function randomItem() {
@@ -398,78 +458,78 @@
   }
 
   const ENEMY = {
-    w: { name: { ru: 'Волк', kz: 'Қасқыр' }, hp: 34, r: 13, speed: 70, dmg: 12, xp: 8, coin: 2, ai: 'wolf' },
-    s: { name: { ru: 'Тарантул', kz: 'Бүйі' }, hp: 16, r: 9, speed: 88, dmg: 9, xp: 4, coin: 1, ai: 'spider' },
-    j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ' }, hp: 38, r: 12, speed: 48, dmg: 12, xp: 10, coin: 3, ai: 'shooter' },
-    a: { name: { ru: 'Албасты', kz: 'Албасты' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
-    m: { name: { ru: 'Мыстан', kz: 'Мыстан' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
-    D: { name: { ru: 'Дэу-великан', kz: 'Дәу' }, hp: 480, r: 28, speed: 46, dmg: 17, xp: 70, coin: 35, ai: 'boss', boss: true,
+    w: { name: { ru: 'Волк', kz: 'Қасқыр', en: 'Wolf' }, hp: 34, r: 13, speed: 70, dmg: 12, xp: 8, coin: 2, ai: 'wolf' },
+    s: { name: { ru: 'Тарантул', kz: 'Бүйі', en: 'Tarantula' }, hp: 16, r: 9, speed: 88, dmg: 9, xp: 4, coin: 1, ai: 'spider' },
+    j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ', en: 'Zheztyrnak' }, hp: 38, r: 12, speed: 48, dmg: 12, xp: 10, coin: 3, ai: 'shooter' },
+    a: { name: { ru: 'Албасты', kz: 'Албасты', en: 'Albasty' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
+    m: { name: { ru: 'Мыстан', kz: 'Мыстан', en: 'Mystan' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
+    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 480, r: 28, speed: 46, dmg: 17, xp: 70, coin: 35, ai: 'boss', boss: true,
          pats: ['walk', 'stomp', 'walk', 'charge', 'walk', 'boulders', 'charge'] },
-    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір' }, hp: 750, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
+    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір', en: 'Zhalmauyz Kempir' }, hp: 750, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
          pats: ['walk', 'spiral', 'teleport', 'summon', 'walk', 'teleport', 'spiral', 'teleport'] },
-    A: { name: { ru: 'Айдахар', kz: 'Айдаһар' }, hp: 1150, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
+    A: { name: { ru: 'Айдахар', kz: 'Айдаһар', en: 'Aydahar' }, hp: 1150, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
          pats: ['walk', 'breath', 'charge', 'rings', 'walk', 'wolves', 'breath', 'charge'] },
   };
 
   // Rooms: real places of Astana. Layout legend: '#' small solid prop, 'Y' big solid prop, '~' low prop (blocks walking, not arrows),
   // enemies w s j a m, bosses D J A. Each theme decides what the props look like.
   const ROOM_DEFS = [
-    { theme: 'park', place: { ru: 'Набережная Есиля', kz: 'Есіл жағалауы' }, lm: [['baiterek', 2, 0, 1], ['towers', -9, 6, 0.9]], L: [
+    { theme: 'park', place: { ru: 'Набережная Есиля', kz: 'Есіл жағалауы', en: 'Esil Embankment' }, lm: [['baiterek', 2, 0, 1], ['towers', -9, 6, 0.9]], L: [
       '........', '........', '..s..s..', '........', '.#....#.', '........', '..~~~~..', '..~~~~..',
       '........', '.w....w.', '........', '#..YY..#', '........', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Парк влюблённых', kz: 'Ғашықтар саябағы' }, lm: [['khanshatyr', 0, 0, 1]], L: [
+    { theme: 'park', place: { ru: 'Парк влюблённых', kz: 'Ғашықтар саябағы', en: 'Lovers\' Park' }, lm: [['khanshatyr', 0, 0, 1]], L: [
       '........', '..j..j..', '........', '#.#..#.#', '........', '...ss...', '........', '~~....~~', '~~.Y..~~',
       '........', '.w....w.', '........', '..#..#..', '........', '........', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Президентский парк', kz: 'Президент саябағы' }, lm: [['pyramid', 0, 0, 1], ['baiterek', 12, 8, 0.8]], L: [
+    { theme: 'park', place: { ru: 'Президентский парк', kz: 'Президент саябағы', en: 'Presidential Park' }, lm: [['pyramid', 0, 0, 1], ['baiterek', 12, 8, 0.8]], L: [
       '........', '.w....w.', '........', '..#..#..', '..#..#..', '....j...', '.s....s.', '........', 'Y......Y',
       '........', '..~~~~..', '........', '.j....s.', '........', '#......#', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Центральный парк', kz: 'Орталық саябақ' }, lm: [['baiterek', -3, 0, 1], ['khanshatyr', 9, 6, 0.8]], L: [
+    { theme: 'park', place: { ru: 'Центральный парк', kz: 'Орталық саябақ', en: 'Central Park' }, lm: [['baiterek', -3, 0, 1], ['khanshatyr', 9, 6, 0.8]], L: [
       '........', '...a....', '........', '~~~..~~~', '........', '.j....j.', '........', '..#..#..', '........', '...s.s..',
       '........', '#.Y..Y.#', '........', '.w....w.', '........', '..~..~..', '........', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Площадь у Байтерека', kz: 'Бәйтерек алаңы' }, lm: [['baiterek', 0, -4, 1.25]], L: [
+    { theme: 'park', place: { ru: 'Площадь у Байтерека', kz: 'Бәйтерек алаңы', en: 'Baiterek Square' }, lm: [['baiterek', 0, -4, 1.25]], L: [
       '........', '........', '........', '...D....', '........', '........', '#......#', '........',
       '..~..~..', '........', '#......#', '........', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Проспект Мангилик Ел', kz: 'Мәңгілік Ел даңғылы' }, lm: [['khanshatyr', 0, 0, 1], ['towers', -10, 4, 1]], L: [
+    { theme: 'street', place: { ru: 'Проспект Мангилик Ел', kz: 'Мәңгілік Ел даңғылы', en: 'Mangilik El Avenue' }, lm: [['khanshatyr', 0, 0, 1], ['towers', -10, 4, 1]], L: [
       '........', '.m....m.', '........', '..#..#..', '........', 'w..ss..w', '........', '.#....#.', '........',
       '~~....~~', '........', '..j..j..', '........', '#.Y..Y.#', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Вокзал «Нурлы жол»', kz: '«Нұрлы жол» вокзалы' }, lm: [['station', 0, 0, 1], ['towers', 11, 6, 0.9]], L: [
+    { theme: 'street', place: { ru: 'Вокзал «Нурлы жол»', kz: '«Нұрлы жол» вокзалы', en: 'Nurly Zhol Station' }, lm: [['station', 0, 0, 1], ['towers', 11, 6, 0.9]], L: [
       '........', '..a..a..', '........', '#.#..#.#', '........', '..j..j..', '........', '~~~..~~~', '........', '..w..w..',
       '........', '.Y....Y.', '........', '.s.ss.s.', '........', '#......#', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Площадь у Акорды', kz: 'Ақорда алаңы' }, lm: [['akorda', 0, 0, 1]], L: [
+    { theme: 'street', place: { ru: 'Площадь у Акорды', kz: 'Ақорда алаңы', en: 'Akorda Square' }, lm: [['akorda', 0, 0, 1]], L: [
       '........', 'm......m', '..####..', '........', '.s.ss.s.', '........', '..Y..Y..', '........', '..j..j..', '........',
       '~~....~~', '........', '.w.ww.w.', '........', '#..##..#', '........', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Мечеть Хазрет Султан', kz: 'Әзірет Сұлтан мешіті' }, lm: [['mosque', 0, 0, 1]], L: [
+    { theme: 'street', place: { ru: 'Мечеть Хазрет Султан', kz: 'Әзірет Сұлтан мешіті', en: 'Hazrat Sultan Mosque' }, lm: [['mosque', 0, 0, 1]], L: [
       '........', '...aa...', '........', '.~~..~~.', '.~~..~~.', '..w..w..', '........', '#..m...#', '........', '.ss..ss.', '........',
       '..#..#..', '........', 'j......j', '........', 'Y......Y', '........', '..a..a..', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'ЭКСПО, «Нұр Әлем»', kz: 'ЭКСПО, «Нұр Әлем»' }, lm: [['nuralem', 0, -2, 1.1]], L: [
+    { theme: 'street', place: { ru: 'ЭКСПО, «Нұр Әлем»', kz: 'ЭКСПО, «Нұр Әлем»', en: 'EXPO, Nur Alem' }, lm: [['nuralem', 0, -2, 1.1]], L: [
       '........', '........', '...J....', '........', '..#..#..', '........', '........', '..#..#..', '........',
       '~~....~~', '........', '........', '#......#', '........', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'Изумрудный квартал, 24 этаж', kz: 'Изумруд кварталы, 24-қабат' }, lm: [['towers', 0, 0, 1.2]], L: [
+    { theme: 'office', place: { ru: 'Изумрудный квартал, 24 этаж', kz: 'Изумруд кварталы, 24-қабат', en: 'Emerald Quarter, 24th floor' }, lm: [['towers', 0, 0, 1.2]], L: [
       '........', '.j.mm.j.', '........', '##.##.##', '........', '.w.ww.w.', '........', '##.##.##', '........', '..~~~~..',
       '........', '.s....s.', '........', 'Y.#..#.Y', '........', '........', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'Опенспейс IT-компании', kz: 'IT-компанияның ашық кеңсесі' }, lm: [['baiterek', 0, 0, 1], ['towers', -10, 2, 0.9]], L: [
+    { theme: 'office', place: { ru: 'Опенспейс IT-компании', kz: 'IT-компанияның ашық кеңсесі', en: 'IT company open space' }, lm: [['baiterek', 0, 0, 1], ['towers', -10, 2, 0.9]], L: [
       '........', 'a..a..a.', '........', '#.##.##.', '........', 'j......j', '...ss...', '.##..##.', '........', '.m....m.', '........',
       '~~.~~.~~', '........', '.w.ww.w.', '........', '#.#..#.#', '........', '..s..s..', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'Переговорные и серверная', kz: 'Келіссөз бөлмелері мен серверлік' }, lm: [['nuralem', 6, 4, 0.9], ['towers', -7, 0, 1]], L: [
+    { theme: 'office', place: { ru: 'Переговорные и серверная', kz: 'Келіссөз бөлмелері мен серверлік', en: 'Meeting rooms & server room' }, lm: [['nuralem', 6, 4, 0.9], ['towers', -7, 0, 1]], L: [
       '........', '..w..w..', '.Y.ww.Y.', '........', 'm.~~~~.m', '........', '..j..j..', '........', 'Y..aa..Y', '........', '##.##.##',
       '........', '.s.ss.s.', '........', '..Y..Y..', '........', 'j......j', '........', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'ТРЦ «Хан Шатыр»', kz: '«Хан Шатыр» СОО' }, lm: [['khanshatyr', 0, -2, 1.1]], L: [
+    { theme: 'office', place: { ru: 'ТРЦ «Хан Шатыр»', kz: '«Хан Шатыр» СОО', en: 'Khan Shatyr Mall' }, lm: [['khanshatyr', 0, -2, 1.1]], L: [
       '........', '.a.aa.a.', '........', '#.j..j.#', '........', '..Y..Y..', '.s.ss.s.', '........', '..m..m..', '........', '~~....~~',
       '........', '.w.ww.w.', '........', '#.#..#.#', '........', '..j..j..', '........', 'Y......Y', '........', '........', '........'] },
-    { theme: 'beach', place: { ru: 'Пляж «Хан Шатыра»', kz: '«Хан Шатыр» жағажайы' }, lm: [['khanshatyr', 0, -3, 1.2]], L: [
+    { theme: 'beach', place: { ru: 'Пляж «Хан Шатыра»', kz: '«Хан Шатыр» жағажайы', en: 'Khan Shatyr Beach' }, lm: [['khanshatyr', 0, -3, 1.2]], L: [
       '........', '........', '...A....', '........', '........', '#......#', '........', '........', '~~....~~', '~~....~~',
       '........', '........', '#.Y..Y.#', '........', '........', '........', '........', '........', '........', '........'] },
   ];
   const MENU_ROOM = ['Y......Y', '..Y.....', '........', '......#.', '........', '........', '........', '........', '........', '........', '........', '........', '........'];
 
   const THEMES = {
-    park: { zone: { ru: 'Парки Астаны', kz: 'Астана саябақтары' }, sky: ['#4f8fd0', '#d8ecf6'], sun: '#fff1dc', sunPos: [-5, 14, 6], sunI: 1.75,
+    park: { zone: { ru: 'Парки Астаны', kz: 'Астана саябақтары', en: 'Parks of Astana' }, sky: ['#4f8fd0', '#d8ecf6'], sun: '#fff1dc', sunPos: [-5, 14, 6], sunI: 1.75,
             hemi: ['#e4f4ff', '#6b7a3a', 0.45], outer: '#5f7f3a', tuft: ['#5f8a32', '#9cc25a'] },
-    street: { zone: { ru: 'Улицы столицы', kz: 'Елорда көшелері' }, sky: ['#5a76b5', '#f6d9a8'], sun: '#ffdcae', sunPos: [-8, 11, 4], sunI: 1.9,
+    street: { zone: { ru: 'Улицы столицы', kz: 'Елорда көшелері', en: 'Streets of the capital' }, sky: ['#5a76b5', '#f6d9a8'], sun: '#ffdcae', sunPos: [-8, 11, 4], sunI: 1.9,
               hemi: ['#ffe9cc', '#5a5550', 0.45], outer: '#8f8c86', tuft: ['#6d8a3a', '#a5c25a'] },
-    office: { zone: { ru: 'Бизнес-центр', kz: 'Бизнес-орталық' }, sky: ['#4f8fd0', '#d6e6f2'], sun: '#ffffff', sunPos: [-3, 14, 3], sunI: 1.25,
+    office: { zone: { ru: 'Бизнес-центр', kz: 'Бизнес-орталық', en: 'Business center' }, sky: ['#4f8fd0', '#d6e6f2'], sun: '#ffffff', sunPos: [-3, 14, 3], sunI: 1.25,
               hemi: ['#f4f8ff', '#8a8680', 0.8], outer: '#2c2f36', tuft: ['#5f8a32', '#9cc25a'] },
-    beach: { zone: { ru: 'Хан Шатыр', kz: 'Хан Шатыр' }, sky: ['#6b8fc4', '#ffe2b3'], sun: '#ffe0b0', sunPos: [-4, 14, 5], sunI: 1.8,
+    beach: { zone: { ru: 'Хан Шатыр', kz: 'Хан Шатыр', en: 'Khan Shatyr' }, sky: ['#6b8fc4', '#ffe2b3'], sun: '#ffe0b0', sunPos: [-4, 14, 5], sunI: 1.8,
              hemi: ['#fff0d8', '#8a6a44', 0.5], outer: '#d9b97c', tuft: ['#7a9a3a', '#b5cc5a'] },
   };
   const biome = n => THEMES[ROOM_DEFS[Math.max(0, n - 1)].theme];
@@ -487,10 +547,8 @@
   const INTRO_T = 2.6;   // camera fly-over at the start of every room
   let choices = [];
   let ui = [];
-  let bank = parseInt(store.get('coins', '0'), 10) || 0;
-  let best = parseInt(store.get('best', '0'), 10) || 0;
-  let upAtk = parseInt(store.get('upAtk', '0'), 10) || 0;
-  let upHp = parseInt(store.get('upHp', '0'), 10) || 0;
+  let bank = Save.data.coins, best = Save.data.best, upAtk = Save.data.upAtk, upHp = Save.data.upHp;
+  function saveProgress() { Object.assign(Save.data, { coins: bank, best, upAtk, upHp }); Save.write(); }
 
   let run = null, player = null;
   let crates = [], thrown = [];
@@ -819,9 +877,9 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
-    bank += run.coins; store.set('coins', bank);
+    bank += run.coins; saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
-    if (reached > best) { best = reached; store.set('best', best); }
+    if (reached > best) { best = reached; saveProgress(); }
   }
 
   function gainXp(v) {
@@ -1374,16 +1432,31 @@
     for (const m of G3.metalMats) { if (!m.envMap) m.needsUpdate = true; m.envMap = rt.texture; }
   }
 
+  function applyQuality(level) {
+    QL = level; Q = QUALITY[level];
+    const r = G3.r; if (!r) return;
+    G3.usePost = Q.post && !!G3.composer;
+    if (G3.usePost) { r.outputEncoding = THREE.LinearEncoding; r.toneMapping = THREE.NoToneMapping; }
+    else { r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0; }
+    r.shadowMap.enabled = Q.shadows; if (G3.sun) G3.sun.castShadow = Q.shadows;
+    if (G3.scene) G3.scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) m.needsUpdate = true; });
+    resize(); G3.dirty = true;
+  }
+  function cycleQuality() {
+    const p = Save.data.settings.quality, next = Q_ORDER[(Q_ORDER.indexOf(p) + 1) % Q_ORDER.length];
+    Save.data.settings.quality = next; Save.write();
+    applyQuality(effectiveQuality()); Sound.click();
+  }
+  const qualityLabel = () => tr('q' + Save.data.settings.quality) + (Save.data.settings.quality === 'auto' ? ' · ' + tr('q' + QL) : '');
+
   function initGL() {
     let r;
     try {
-      r = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: 'high-performance' });
+      r = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: QL !== 'low', powerPreference: 'high-performance' });
     } catch (e) { return false; }
     G3.r = r;
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
-    G3.hq = store.get('hq', '1') === '1' && !!THREE.EffectComposer && !!THREE.UnrealBloomPass;
-    if (G3.hq) { r.outputEncoding = THREE.LinearEncoding; r.toneMapping = THREE.NoToneMapping; }
-    else { r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0; }
+    G3.canPost = !!THREE.EffectComposer && !!THREE.UnrealBloomPass;
     const sc = G3.scene = new THREE.Scene();
     G3.cam = new THREE.PerspectiveCamera(30, W / H, 0.5, 140);
     G3.hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7); sc.add(G3.hemi);
@@ -1442,7 +1515,7 @@
     }, true);
     G3.waterMat = mat('#ffffff', { map: G3.waterTex, r: 0.12, m: 0.25, op: 0.9 });
 
-    if (G3.hq) {
+    if (G3.canPost) {
       const rt = new THREE.WebGLRenderTarget(W, H, { type: r.capabilities.isWebGL2 ? THREE.HalfFloatType : THREE.UnsignedByteType });
       const comp = G3.composer = new THREE.EffectComposer(r, rt);
       comp.addPass(new THREE.RenderPass(sc, G3.cam));
@@ -1452,6 +1525,7 @@
       G3.fxaa = new THREE.ShaderPass(THREE.FXAAShader); comp.addPass(G3.fxaa);
     }
     G3.room = new THREE.Group(); G3.dyn = new THREE.Group();
+    applyQuality(QL);
     sc.add(G3.room, G3.dyn);
 
     // particles
@@ -2099,7 +2173,7 @@
       G3.sun.position.set(-7, 5.5, -12); G3.sun.target.position.set(0, 0, 0); G3.sun.color = col('#ffc27a'); G3.sun.intensity = 2.3;
       G3.fill.intensity = 1.6; G3.hemi.intensity = 0.35; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
       const outer = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), mat('#6a8338', { r: 1 })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.01; outer.receiveShadow = true; R.add(outer);
-      const nb = 520, grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
+      const nb = Math.round(520 * Q.grass), grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
       const dm = new THREE.Object3D(); let k = 0;
       for (let i = 0; i < nb * 3 && k < nb; i++) {
         const x = (rnd() - 0.5) * 10, z = (rnd() - 0.5) * 14;
@@ -2143,7 +2217,7 @@
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
 
     if (theme === 'park') {
-      const nb = 380, grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
+      const nb = Math.round(380 * Q.grass), grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
       const dm = new THREE.Object3D(); let k = 0;
       for (let i = 0; i < nb * 3 && k < nb; i++) {
         const x = (rnd() - 0.5) * 7.8, z = zN + rnd() * ROWS;
@@ -3272,7 +3346,7 @@
     }
     // floating pollen / dust in the light
     {
-      const N = 140, geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), seeds = [];
+      const N = Math.round(140 * Q.fx), geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), seeds = [];
       for (let i = 0; i < N; i++) seeds.push([(rnd() - 0.5) * 9, rnd() * 2.6, menu ? rnd() * 8 - 2 : zN + rnd() * len, rnd() * 10]);
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       const pc = { park: '#fff3b0', street: '#ffd9a0', office: '#ffffff', beach: '#fff0c8' }[theme] || '#ffd9a0';
@@ -3528,7 +3602,7 @@
     G3.pts.geometry.setDrawRange(0, nP);
     pos.needsUpdate = true; pc.needsUpdate = true;
 
-    if (G3.composer) {
+    if (G3.usePost) {
       G3.grade.uniforms.exposure.value = menu ? (G3.skyTex.menu ? 1.0 : 1.2) : 0.8;
       G3.grade.uniforms.sat.value = menu ? 1.1 : 1.18;
       G3.bloom.threshold = menu ? 0.97 : 1.5;
@@ -3835,11 +3909,14 @@
     } else txt(tr('noSkills'), W / 2, 210, 13, '#7a6a55', { weight: 500 });
     const onoff = v => v ? tr('on') : tr('off');
     button(60, 318, W - 120, 46, tr('resume'), () => { modal = null; Sound.click(); });
-    button(60, 374, W - 120, 42, tr('music') + ': ' + onoff(Sound.music), () => { Sound.init(); Sound.setMusic(!Sound.music); }, { col: '#5fc8de', col2: '#1d7f99', size: 15 });
-    button(60, 424, W - 120, 42, tr('sfx') + ': ' + onoff(Sound.sfx), () => { Sound.init(); Sound.setSfx(!Sound.sfx); }, { col: '#5fc8de', col2: '#1d7f99', size: 15 });
+    const half = (W - 130) / 2;
+    button(60, 374, half, 42, tr('music') + ': ' + onoff(Sound.music), () => { Sound.init(); Sound.setMusic(!Sound.music); }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
+    button(70 + half, 374, half, 42, tr('sfx') + ': ' + onoff(Sound.sfx), () => { Sound.init(); Sound.setSfx(!Sound.sfx); }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
+    button(60, 424, W - 120, 42, tr('graphics') + ': ' + qualityLabel(), cycleQuality, { col: '#a99bff', col2: '#5a46c8', size: 14 });
     button(60, 476, W - 120, 42, tr('toMenu'), () => {
-      bank += run.coins; store.set('coins', bank);
-      if (run.room > best) { best = run.room; store.set('best', best); }
+      bank += run.coins;
+      if (run.room > best) best = run.room;
+      saveProgress();
       scene = 'menu'; modal = null; Sound.click();
     }, { col: '#ff8a6a', col2: '#c2402a', size: 15 });
   }
@@ -3881,8 +3958,8 @@
     txt('₸', W / 2 - 34, 481.5, 10, C.goldDk, { weight: 900 });
     txt(String(bank), W / 2 - 20, 481, 17, C.ink, { align: 'left', weight: 900 });
     const rowsU = [
-      [tr('upAtk'), tr('upAtkD'), upAtk, () => { const c = upCost(upAtk); if (bank >= c && upAtk < 10) { bank -= c; upAtk++; store.set('coins', bank); store.set('upAtk', upAtk); Sound.level(); } }],
-      [tr('upHp'), tr('upHpD'), upHp, () => { const c = upCost(upHp); if (bank >= c && upHp < 10) { bank -= c; upHp++; store.set('coins', bank); store.set('upHp', upHp); Sound.level(); } }],
+      [tr('upAtk'), tr('upAtkD'), upAtk, () => { const c = upCost(upAtk); if (bank >= c && upAtk < 10) { bank -= c; upAtk++; saveProgress(); Sound.level(); } }],
+      [tr('upHp'), tr('upHpD'), upHp, () => { const c = upCost(upHp); if (bank >= c && upHp < 10) { bank -= c; upHp++; saveProgress(); Sound.level(); } }],
     ];
     rowsU.forEach(([name, desc, lv, fn], i) => {
       const y = 505 + i * 45;
@@ -3907,7 +3984,8 @@
     };
     tg(10, 44, lang === 'ru', 'RU', () => { setLang('ru'); Sound.click(); });
     tg(58, 54, lang === 'kz', 'ҚАЗ', () => { setLang('kz'); Sound.click(); });
-    tg(W - 140, 40, !!G3.hq, 'HD', () => { store.set('hq', G3.hq ? '0' : '1'); location.reload(); });
+    tg(116, 44, lang === 'en', 'EN', () => { setLang('en'); Sound.click(); });
+    tg(W - 172, 72, true, '⚙ ' + tr('q' + Save.data.settings.quality), cycleQuality);
     tg(W - 96, 40, Sound.music, '♪', () => { Sound.init(); Sound.setMusic(!Sound.music); });
     tg(W - 52, 40, Sound.sfx, '♫', () => { Sound.init(); Sound.setSfx(!Sound.sfx); });
   }
@@ -3918,7 +3996,7 @@
     ui = [];
     ctx.setTransform(K, 0, 0, K, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    if (!G3.composer) vignette();
+    if (!G3.usePost) vignette();
     if (scene === 'menu') drawMenu();
     else {
       drawWorldOverlay();
@@ -3985,12 +4063,27 @@
 
   // =================================================================== loop
   let last = performance.now(), acc = 0;
+  const perf = { t: 0, frames: 0, checks: 0, done: false };
+  function watchPerf(rdt) {
+    if (perf.done || Save.data.settings.quality !== 'auto' || document.hidden) return;
+    const busy = (G3.loadDone || 0) < (G3.loadTotal || 1) && scene === 'menu';   // model parsing stutters: do not judge yet
+    if (busy || rdt >= 100) return;
+    perf.t += rdt; perf.frames++;
+    if (perf.t < 4000) return;
+    const fps = perf.frames * 1000 / perf.t;
+    perf.t = 0; perf.frames = 0; perf.checks++;
+    if (fps < 32 && QL !== 'low') {
+      const lower = QL === 'high' ? 'medium' : 'low';
+      Save.data.settings.autoQuality = lower; Save.write(); applyQuality(lower);
+    } else if (perf.checks >= 4) perf.done = true;
+  }
   function frame(now) {
     const rdt = Math.min(now - last, 100); last = now;
     if (hitStop > 0) hitStop -= rdt / 1000;
     else { if (slowT > 0) slowT -= rdt / 1000; acc += rdt * (slowT > 0 ? 0.3 : 1); }
     while (acc >= DT * 1000) { update(DT); acc -= DT * 1000; }
     render();
+    watchPerf(rdt);
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
