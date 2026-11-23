@@ -103,7 +103,7 @@
       sRoom: 'Комната', sLevel: 'Уровень', sKills: 'Убито врагов', sCoins: 'Монеты', sBest: 'Рекорд', roomWord: 'комната',
       again: 'ЕЩЁ РАЗ', menu: 'В меню',
       upAtk: 'Сила', upAtkD: 'Атака +8%', upHp: 'Здоровье', upHpD: 'Здоровье +10%', lvl: 'ур.', max: 'МАКС',
-      clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам',
+      clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!',
       best: 'Рекорд: комната {n} / 15', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
     },
     kz: {
@@ -117,7 +117,7 @@
       sRoom: 'Бөлме', sLevel: 'Деңгей', sKills: 'Жеңілген жау', sCoins: 'Тиын', sBest: 'Рекорд', roomWord: 'бөлме',
       again: 'ТАҒЫ ДА', menu: 'Мәзір',
       upAtk: 'Күш', upAtkD: 'Шабуыл +8%', upHp: 'Денсаулық', upHpD: 'Денсаулық +10%', lvl: 'дең.', max: 'МАКС',
-      clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз',
+      clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!',
       best: 'Рекорд: {n}-бөлме / 15', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
     },
   };
@@ -282,6 +282,8 @@
       this.tone('sine', 1250 + Math.random() * 300, 1600, 0, 0.06, 0.04);
     },
     level() { if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
+    crate() { if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
+    shield() { if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
     clear() { if (this.ok()) [523, 659, 784, 1047].forEach((f, i) => { this.tone('triangle', f, f, i * 0.09, 0.35, 0.08); this.tone('sine', f * 2, f * 2, i * 0.09, 0.2, 0.02); }); },
     // looping background ambience per location + occasional events (birds, horns, keyboards, gulls, wind)
     setAmbience(kind) {
@@ -375,17 +377,34 @@
   ];
   const SKILL = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 
+  // bonuses found in crates or dropped by enemies
+  const ITEMS = {
+    medkit: { w: 34, col: '#ff4a55', name: { ru: 'Аптечка', kz: 'Дәрі қобдишасы' } },
+    bomb: { w: 26, col: '#ff9a2a', name: { ru: 'Бомба', kz: 'Бомба' } },
+    shield: { w: 14, col: '#5fc8ff', name: { ru: 'Щит', kz: 'Қалқан' } },
+    w_triple: { w: 9, col: '#ffd23a', name: { ru: 'Тройной лук', kz: 'Үш жебелі садақ' }, weapon: true },
+    w_heavy: { w: 8, col: '#ff5a3a', name: { ru: 'Тяжёлые стрелы', kz: 'Ауыр жебелер' }, weapon: true },
+    w_rapid: { w: 9, col: '#3ae0ff', name: { ru: 'Скорострельный лук', kz: 'Шапшаң садақ' }, weapon: true },
+  };
+  const WEAPON_TIME = 15;
+  function randomItem() {
+    let tot = 0; for (const k in ITEMS) tot += ITEMS[k].w;
+    let r = Math.random() * tot;
+    for (const k in ITEMS) { r -= ITEMS[k].w; if (r <= 0) return k; }
+    return 'medkit';
+  }
+
   const ENEMY = {
     w: { name: { ru: 'Волк', kz: 'Қасқыр' }, hp: 34, r: 13, speed: 70, dmg: 12, xp: 8, coin: 2, ai: 'wolf' },
     s: { name: { ru: 'Тарантул', kz: 'Бүйі' }, hp: 16, r: 9, speed: 88, dmg: 9, xp: 4, coin: 1, ai: 'spider' },
     j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ' }, hp: 38, r: 12, speed: 48, dmg: 12, xp: 10, coin: 3, ai: 'shooter' },
     a: { name: { ru: 'Албасты', kz: 'Албасты' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
     m: { name: { ru: 'Мыстан', kz: 'Мыстан' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
-    D: { name: { ru: 'Дэу-великан', kz: 'Дәу' }, hp: 560, r: 28, speed: 46, dmg: 20, xp: 70, coin: 35, ai: 'boss', boss: true,
+    D: { name: { ru: 'Дэу-великан', kz: 'Дәу' }, hp: 480, r: 28, speed: 46, dmg: 17, xp: 70, coin: 35, ai: 'boss', boss: true,
          pats: ['walk', 'stomp', 'walk', 'charge', 'walk', 'boulders', 'charge'] },
-    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір' }, hp: 880, r: 22, speed: 55, dmg: 18, xp: 90, coin: 45, ai: 'boss', boss: true,
+    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір' }, hp: 750, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
          pats: ['walk', 'spiral', 'teleport', 'summon', 'walk', 'teleport', 'spiral', 'teleport'] },
-    A: { name: { ru: 'Айдахар', kz: 'Айдаһар' }, hp: 1360, r: 30, speed: 42, dmg: 22, xp: 120, coin: 70, ai: 'boss', boss: true,
+    A: { name: { ru: 'Айдахар', kz: 'Айдаһар' }, hp: 1150, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
          pats: ['walk', 'breath', 'charge', 'rings', 'walk', 'wolves', 'breath', 'charge'] },
   };
 
@@ -471,25 +490,26 @@
   let upHp = parseInt(store.get('upHp', '0'), 10) || 0;
 
   let run = null, player = null;
+  let crates = [], thrown = [];
   let obstacles = [], enemies = [], arrows = [], bullets = [], pickups = [], particles = [], texts = [];
   let roomClear = false, gateOpen = 0, clearT = 0, endT = 0;
 
   const sk = id => (run && run.sk[id]) || 0;
   const baseAtk = () => 10 * (1 + 0.08 * upAtk);
   const atk = () => baseAtk() * (1 + 0.25 * sk('atk'));
-  const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd'));
+  const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd')) / (player && player.weapon && player.weapon.kind === 'w_rapid' ? 1.9 : 1);
   const moveSpeed = () => 140 * (1 + 0.15 * sk('speed'));
   const upCost = lvl => Math.round(40 * Math.pow(lvl + 1, 1.45) / 10) * 10;
   const xpNeed = lvl => 12 + lvl * 8;
 
   function newRun() {
     const maxHp = Math.round(150 * (1 + 0.1 * upHp));
-    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, sk: {}, pendingLv: 0 };
+    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, sk: {}, pendingLv: 0, bombs: 1 };
     player = {
       x: W / 2, y: AY2 - 30, r: 11, hp: maxHp, maxHp, inv: 0, face: -Math.PI / 2,
       fireCd: 0.3, volleys: [], atkAnim: 0, moving: false, walk: 0,
       crit: 0.05, critMul: 2, orbitA: 0, orbitHits: new Map(),
-      eagle: { x: W / 2, y: AY2 - 60, cd: 1, a: 0 },
+      eagle: { x: W / 2, y: AY2 - 60, cd: 1, a: 0 }, shield: 0, weapon: null,
     };
     scene = 'play'; modal = null;
     buildRoom(1);
@@ -501,7 +521,7 @@
     ROWS = L.length; ARENA.h = ROWS * CELL; AY2 = ARENA.y + ARENA.h;
     flow = new Int16Array(COLS * ROWS);
     introT = INTRO_T;
-    obstacles = []; enemies = []; arrows = []; bullets = []; pickups = []; particles = []; texts = [];
+    obstacles = []; enemies = []; arrows = []; bullets = []; pickups = []; particles = []; texts = []; crates = []; thrown = [];
     roomClear = false; gateOpen = 0; clearT = 0;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -514,6 +534,8 @@
       }
     }
     player.x = W / 2; player.y = AY2 - 30; player.volleys = []; player.fireCd = 0.4;
+    // supply crates: one per room, two in the long ones (boss rooms always have one)
+    for (let i = 0; i < (ROWS >= 20 ? 2 : 1); i++) { const sp = freeSpotAwayFromPlayer(110); crates.push({ x: sp.x, y: sp.y }); }
     player.eagle.x = player.x - 20; player.eagle.y = player.y - 30;
     G3.dirty = true; flowT = 0;
     const boss = enemies.find(e => e.boss);
@@ -649,16 +671,17 @@
     return bestE;
   }
 
+  const heavyOn = () => !!(player && player.weapon && player.weapon.kind === 'w_heavy');
   function spawnArrow(x, y, ang, dmg, kind) {
     arrows.push({
       x, y, vx: Math.cos(ang) * 560, vy: Math.sin(ang) * 560, ang, dmg, kind: kind || 'arrow',
-      pierce: sk('pierce'), rico: sk('rico'), wall: sk('wall') * 2, hit: new Set(), life: 1.6,
-      fire: sk('fire') > 0, ice: sk('ice') > 0,
+      pierce: sk('pierce') + (heavyOn() ? 2 : 0), rico: sk('rico'), wall: sk('wall') * 2, hit: new Set(), life: 1.6,
+      fire: sk('fire') > 0, ice: sk('ice') > 0, heavy: heavyOn(),
     });
   }
 
   function fireVolley(ang) {
-    const dmg = atk() * Math.pow(0.9, sk('multi')) * Math.pow(0.9, sk('front'));
+    const dmg = atk() * Math.pow(0.9, sk('multi')) * Math.pow(0.9, sk('front')) * (heavyOn() ? 1.8 : 1);
     const nf = 1 + sk('front');
     const px = -Math.sin(ang), py = Math.cos(ang);
     for (let i = 0; i < nf; i++) {
@@ -666,6 +689,7 @@
       spawnArrow(player.x + px * off, player.y + py * off, ang, dmg);
     }
     const extra = [];
+    if (player.weapon && player.weapon.kind === 'w_triple') extra.push(0.24, -0.24);
     if (sk('diag') >= 1) extra.push(0.7, -0.7);
     if (sk('diag') >= 2) extra.push(0.35, -0.35);
     if (sk('side') >= 1) extra.push(Math.PI / 2, -Math.PI / 2);
@@ -710,7 +734,51 @@
     const coins = Math.min(12, e.coin);
     for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', e.coin / coins);
     if (Math.random() < (e.boss ? 1 : 0.06)) dropPickup(e.x, e.y, 'heart', 0);
+    if (e.boss) dropBonus(e.x, e.y, randomItem()); else if (Math.random() < 0.05) dropBonus(e.x, e.y, randomItem());
     if (sk('blood')) healPlayer(player.maxHp * 0.02 * sk('blood'));
+  }
+
+  function dropBonus(x, y, item) { const a = Math.random() * TAU; pickups.push({ x, y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, kind: 'bonus', item, v: 0, t: 0 }); }
+  function openCrate(c) {
+    if (c.open) return;
+    c.open = true; Sound.crate();
+    burst(c.x, c.y, '#b07a3e', 18, 160, 3); burst(c.x, c.y, '#ffe08a', 8, 120, 2.5);
+    addFx('ring', c.x, c.y, { col: '#ffd24a', size: 1.6, max: 0.45 });
+    dropBonus(c.x, c.y, randomItem());
+    for (let i = 0; i < 4; i++) dropPickup(c.x, c.y, 'coin', 1);
+  }
+  function applyBonus(item) {
+    const it = ITEMS[item];
+    floatText(player.x, player.y, it.name[lang], it.col, 15, 2.1);
+    addFx('ring', player.x, player.y, { col: it.col, size: 2, max: 0.5 });
+    if (item === 'medkit') healPlayer(player.maxHp * 0.35);
+    else if (item === 'bomb') run.bombs = Math.min(3, run.bombs + 1);
+    else if (item === 'shield') player.shield = 2;
+    else player.weapon = { kind: item, t: WEAPON_TIME };
+    Sound.level();
+  }
+  // bomb: thrown at the nearest enemy (or straight ahead), explodes after a short arc
+  function throwBomb() {
+    if (scene !== 'play' || modal || introT > 0 || !run || run.bombs <= 0) return;
+    run.bombs--;
+    let tx = player.x + Math.cos(player.face) * 120, ty = player.y + Math.sin(player.face) * 120, bd = 1e9;
+    for (const e of enemies) { if (e.dead || e.spawn > 0) continue; const d = dist(player, e); if (d < bd && d < 260) { bd = d; tx = e.x; ty = e.y; } }
+    thrown.push({ x0: player.x, y0: player.y, x1: clamp(tx, ARENA.x + 10, AX2 - 10), y1: clamp(ty, ARENA.y + 10, AY2 - 10), t: 0 });
+    Sound.shoot();
+  }
+  function explode(x, y) {
+    const R = 115;
+    shake = Math.max(shake, 14); hitStop = Math.max(hitStop, 0.08); Sound.boom();
+    burst(x, y, '#ff8a2a', 40, 260, 4); burst(x, y, '#ffe08a', 24, 200, 3); burst(x, y, '#3a3028', 20, 140, 4);
+    addFx('ring', x, y, { col: '#ff8a2a', size: 6, max: 0.6 });
+    addFx('pillar', x, y, { col: '#ff9a3a', size: 2.4, max: 0.5 });
+    for (const e of enemies) {
+      if (e.dead || e.spawn > 0) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d < R + e.r) hitEnemy(e, atk() * (e.boss ? 5 : 7), { noCrit: true, kb: Math.atan2(e.y - y, e.x - x), col: '#ffb040' });
+    }
+    for (const c of crates) if (!c.open && Math.hypot(c.x - x, c.y - y) < R) openCrate(c);
+    bullets = bullets.filter(b => Math.hypot(b.x - x, b.y - y) > R);
   }
 
   function dropPickup(x, y, kind, v) {
@@ -727,6 +795,12 @@
 
   function hurtPlayer(dmg) {
     if (player.inv > 0 || scene !== 'play' || TEST_MODE) return;
+    if (player.shield > 0) {
+      player.shield--; player.inv = 0.6; Sound.shield();
+      floatText(player.x, player.y, tr('blocked'), '#8fdcff', 15, 1.9);
+      addFx('ring', player.x, player.y, { col: '#5fc8ff', size: 1.8, max: 0.4 });
+      return;
+    }
     dmg = Math.round(dmg);
     player.hp -= dmg; player.inv = 0.9; shake = Math.max(shake, 8); hitStop = Math.max(hitStop, 0.06); hurtFlash = 0.4;
     floatText(player.x, player.y, '-' + dmg, '#ff4b4b', 15);
@@ -772,7 +846,7 @@
   // =================================================================== enemy AI
   function enemyBullet(e, a, spd, kind) {
     const R = { claw: 5, magic: 6, rock: 7, boulder: 11, fire: 6, ghost: 6 }[kind] || 6;
-    bullets.push({ x: e.x + Math.cos(a) * e.r * 0.7, y: e.y + Math.sin(a) * e.r * 0.7, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: R, dmg: e.dmg * 0.85, kind, life: 7, a });
+    bullets.push({ x: e.x + Math.cos(a) * e.r * 0.7, y: e.y + Math.sin(a) * e.r * 0.7, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: R, dmg: e.dmg * (e.boss ? 0.72 : 0.68), kind, life: 7, a });
   }
   function ring(e, n, spd, kind, off) { for (let i = 0; i < n; i++) enemyBullet(e, (off || 0) + i * TAU / n, spd, kind); }
   function aimed(e, n, spread, spd, kind) {
@@ -1011,6 +1085,10 @@
     updateArrows(dt);
     updateBullets(dt);
     updatePickups(dt);
+    for (const c of crates) if (!c.open && Math.hypot(c.x - player.x, c.y - player.y) < 24) openCrate(c);
+    for (const b of thrown) { b.t += dt / 0.5; if (b.t >= 1) { b.done = true; explode(b.x1, b.y1); } }
+    thrown = thrown.filter(b => !b.done);
+    if (player.weapon) { player.weapon.t -= dt; if (player.weapon.t <= 0) player.weapon = null; }
 
     if (!roomClear && enemies.length === 0) {
       roomClear = true; clearT = 0;
@@ -1134,6 +1212,8 @@
       }
       a.ang = Math.atan2(a.vy, a.vx);
       if (a.dead) continue;
+      for (const c of crates) if (!c.open && Math.hypot(c.x - a.x, c.y - a.y) < 16) { openCrate(c); a.dead = true; }
+      if (a.dead) continue;
       for (const e of enemies) {
         if (e.dead || e.spawn > 0 || a.hit.has(e)) continue;
         if (Math.hypot(e.x - a.x, e.y - a.y) < e.r + 4) {
@@ -1185,6 +1265,7 @@
         p.dead = true;
         if (p.kind === 'xp') gainXp(p.v);
         else if (p.kind === 'coin') run.coins += Math.max(1, Math.round(p.v));
+        else if (p.kind === 'bonus') applyBonus(p.item);
         else healPlayer(player.maxHp * 0.15);
         Sound.pick();
       }
@@ -2942,9 +3023,9 @@
       const tp = mesh(G3.geo.cone, G3.pm.tip, 0.28, 0, 0, 0.032, 0.09, 0.032); tp.rotation.z = -Math.PI / 2; g.add(tp);
       for (const s of [-1, 1]) g.add(mesh(G3.geo.box, G3.pm.fletch, -0.22, 0, s * 0.022, 0.1, 0.04, 0.008, false));
       const tr2 = glow('#fff2c0', 0.35, 0.45); tr2.position.x = -0.05; g.add(tr2);
-      const trail = new THREE.Mesh(G3.geo.plane, G3.pm['trail' + (a.fire ? 'F' : a.ice ? 'I' : '')] || (G3.pm['trail' + (a.fire ? 'F' : a.ice ? 'I' : '')] = new THREE.MeshBasicMaterial({ map: lifeTextures().trail, color: col(a.fire ? '#ffa040' : a.ice ? '#a0e8ff' : '#fff0c0'), transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending })));
+      const trail = new THREE.Mesh(G3.geo.plane, G3.pm['trail' + (a.heavy ? 'H' : a.fire ? 'F' : a.ice ? 'I' : '')] || (G3.pm['trail' + (a.heavy ? 'H' : a.fire ? 'F' : a.ice ? 'I' : '')] = new THREE.MeshBasicMaterial({ map: lifeTextures().trail, color: col(a.heavy ? '#ff5030' : a.fire ? '#ffa040' : a.ice ? '#a0e8ff' : '#fff0c0'), transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending })));
       trail.rotation.x = -Math.PI / 2; trail.scale.set(0.9, 0.09, 1); trail.position.x = -0.62; g.add(trail);
-      g.scale.setScalar(1.35);
+      g.scale.setScalar(a.heavy ? 1.75 : 1.35);
       if (a.fire) { const gl = glow('#ff8a20', 0.6, 0.9); gl.position.x = 0.1; g.add(gl); }
       if (a.ice) { const gl = glow('#8fe0ff', 0.55, 0.9); gl.position.x = 0.1; g.add(gl); }
     }
@@ -2963,7 +3044,49 @@
     }
     return { g };
   }
+  function makeBonusModel(item) {
+    const g = new THREE.Group(), it = ITEMS[item];
+    const ring = decal(G3.ringTex, it.col, 0.75, 0.7); ring.material.blending = THREE.AdditiveBlending; ring.userData.ground = true; g.add(ring);
+    const body = new THREE.Group(); g.add(body); g.userData.body = body;
+    if (item === 'medkit') {
+      body.add(mesh(G3.geo.box, mat('#f4f4f0', { r: 0.4 }), 0, 0, 0, 0.26, 0.17, 0.2));
+      const red = mat('#e8262e', { e: '#600', ei: 0.4 });
+      body.add(mesh(G3.geo.box, red, 0, 0.087, 0, 0.16, 0.01, 0.05)); body.add(mesh(G3.geo.box, red, 0, 0.087, 0, 0.05, 0.01, 0.16));
+      body.add(mesh(G3.geo.box, red, 0.131, 0, 0, 0.01, 0.1, 0.035)); body.add(mesh(G3.geo.box, red, 0.131, 0, 0, 0.01, 0.035, 0.1));
+      body.add(mesh(G3.geo.box, mat('#c8c8c4'), 0, 0.1, 0, 0.08, 0.03, 0.03));
+    } else if (item === 'bomb') {
+      body.add(mesh(G3.geo.sphere, mat('#1e1e22', { m: 0.6, r: 0.3 }), 0, 0, 0, 0.13));
+      body.add(mesh(G3.geo.cyl, mat('#8a6a44'), 0.06, 0.14, 0, 0.015, 0.08, 0.015));
+      const sp = glow('#ffb040', 0.3, 0.9); sp.position.set(0.07, 0.19, 0); body.add(sp); g.userData.spark = sp;
+    } else if (item === 'shield') {
+      const d = mesh(G3.geo.cyl, mat('#2f7fd0', { m: 0.6, r: 0.3 }), 0, 0, 0, 0.17, 0.035, 0.17); d.rotation.x = Math.PI / 2; body.add(d);
+      const rim = mesh(G3.geo.ring, mat('#f0c040', { m: 0.9, r: 0.25 }), 0, 0, 0, 0.17, 0.17, 0.17); body.add(rim);
+      body.add(mesh(G3.geo.sphere, mat('#f0c040', { m: 0.9, r: 0.25 }), 0, 0, 0.025, 0.04));
+    } else {
+      const bow = mesh(G3.geo.bow, mat('#c89a40', { m: 0.7, r: 0.3, e: it.col, ei: 0.35 }), 0, 0, 0, 0.7, 0.7, 0.7); bow.rotation.z = -1.15; body.add(bow);
+      const ar = mesh(G3.geo.cyl, mat(it.col, { e: it.col, ei: 0.8 }), 0.05, 0, 0, 0.012, 0.46, 0.012); ar.rotation.z = Math.PI / 2; body.add(ar);
+    }
+    const gl = glow(it.col, 0.9, 0.5); g.add(gl);
+    return g;
+  }
+  function makeCrateModel() {
+    if (!G3.crateTex) G3.crateTex = canvasTex(128, 128, (g, w, h) => {
+      g.fillStyle = '#8a5a2e'; g.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 32) { g.fillStyle = y % 64 ? '#9a6a38' : '#7e5028'; g.fillRect(4, y + 3, w - 8, 26); }
+      g.strokeStyle = '#4a2e14'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+      g.beginPath(); g.moveTo(8, 8); g.lineTo(w - 8, h - 8); g.stroke();
+      koshkar(g, w / 2, h / 2 + 4, 36, '#f0c040', 4);
+    });
+    const g = new THREE.Group();
+    g.add(mesh(G3.geo.box, mat('#ffffff', { map: G3.crateTex, r: 0.8 }), 0, 0.22, 0, 0.44, 0.44, 0.44));
+    const gold = mat('#f0c040', { m: 0.9, r: 0.3 });
+    for (const y of [0.04, 0.4]) g.add(mesh(G3.geo.box, gold, 0, y, 0, 0.46, 0.04, 0.46));
+    const gl = glow('#ffd24a', 1.0, 0.35); gl.position.y = 0.3; g.add(gl); g.userData.glow = gl;
+    return { g };
+  }
+
   function makePickupModel(p) {
+    if (p.kind === 'bonus') return { g: makeBonusModel(p.item), bonus: true };
     const g = new THREE.Group();
     if (p.kind === 'xp') { g.add(mesh(G3.geo.octa, G3.pm.xp, 0, 0, 0, 0.08, 0.12, 0.08)); g.add(glow('#5fe8ff', 0.4, 0.55)); }
     else if (p.kind === 'coin') { const c = mesh(G3.geo.cyl, G3.pm.coin, 0, 0, 0, 0.09, 0.025, 0.09); c.rotation.x = Math.PI / 2; g.add(c); }
@@ -3097,7 +3220,7 @@
     const zc = (zN + zS) / 2, len = zS - zN;
 
     // birds circling high above: their shadows sweep across the arena
-    if (outdoor) for (let f = 0; f < (menu ? 1 : 2); f++) {
+    if (menu) for (let f = 0; f < 1; f++) {
       const flock = [];
       const n = 5 + Math.floor(rnd() * 3), cx = (rnd() - 0.5) * 4, cz = menu ? -6 : zc + (rnd() - 0.5) * len * 0.5;
       const rad = menu ? 7 : 2.6 + rnd() * 2.6, y = menu ? 3.4 + f : 5 + rnd() * 2, sp = (0.12 + rnd() * 0.06) * (rnd() < 0.5 ? -1 : 1), ph = rnd() * TAU;
@@ -3322,8 +3445,29 @@
       if (b.kind === 'claw') m.g.rotation.y = -Math.atan2(b.vy, b.vx); else { m.g.rotation.y += 0.15; m.g.rotation.x += 0.1; }
     });
     syncList(menu ? [] : pickups, G3.pickM, makePickupModel, (p, m) => {
+      if (m.bonus) {
+        m.g.position.set(X3(p.x), 0, Z3(p.y));
+        const b = m.g.userData.body; b.position.y = 0.36 + Math.sin(G3.rt * 3 + p.x) * 0.06; b.rotation.y = G3.rt * 1.6;
+        m.g.children[0].rotation.z = G3.rt; m.g.children[0].position.y = 0.03;
+        if (m.g.userData.spark) m.g.userData.spark.material.opacity = 0.6 + Math.random() * 0.4;
+        m.g.children[2].position.y = 0.36;
+        return;
+      }
       m.g.position.set(X3(p.x), 0.22 + Math.sin(time * 5 + p.x) * 0.05, Z3(p.y)); m.g.rotation.y = time * 3 + p.x;
     });
+    syncList(menu ? [] : crates.filter(c => !c.open), G3.crateM || (G3.crateM = new Map()), makeCrateModel, (c, m) => {
+      m.g.position.set(X3(c.x), 0, Z3(c.y)); m.g.userData.glow.material.opacity = 0.25 + Math.sin(G3.rt * 3) * 0.12;
+    });
+    syncList(menu ? [] : thrown, G3.bombM || (G3.bombM = new Map()), () => ({ g: makeBonusModel('bomb').children[1].parent }), (b, m) => {
+      const k = b.t; m.g.position.set(X3(b.x0 + (b.x1 - b.x0) * k), 0, Z3(b.y0 + (b.y1 - b.y0) * k));
+      m.g.userData.body.position.y = 0.4 + 4 * k * (1 - k) * 1.6; m.g.userData.body.rotation.z = k * 8; m.g.children[0].visible = false;
+    });
+    if (!G3.shieldBubble) {
+      G3.shieldBubble = new THREE.Mesh(G3.geo.sphere, new THREE.MeshBasicMaterial({ color: col('#5fc8ff'), transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));
+      G3.dyn.add(G3.shieldBubble);
+    }
+    G3.shieldBubble.visible = !menu && scene === 'play' && player.shield > 0;
+    if (G3.shieldBubble.visible) { G3.shieldBubble.position.set(X3(player.x), 0.75, Z3(player.y)); G3.shieldBubble.scale.setScalar(0.85 + Math.sin(G3.rt * 4) * 0.03); G3.shieldBubble.material.opacity = 0.16 + player.shield * 0.06; }
     const aims = menu ? [] : enemies.filter(e => e.type === 'j' && e.st === 'aim' && e.spawn <= 0);
     syncList(aims, G3.aimM, () => { const pl = new THREE.Mesh(G3.geo.plane, G3.pm.aim); pl.rotation.x = -Math.PI / 2; const g = new THREE.Group(); pl.position.x = 1.5; pl.scale.set(3, 0.06, 1); g.add(pl); return { g }; },
       (e, m) => { m.g.position.set(X3(e.x), 0.04, Z3(e.y)); m.g.rotation.y = -e.aimA; });
@@ -3525,6 +3669,33 @@
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillRect(W - 34, 18, 4, 16); ctx.fillRect(W - 26, 18, 4, 16);
     ui.push({ x: W - 50, y: 4, w: 46, h: 46, fn: () => { if (scene === 'play' && !modal) { modal = 'pause'; Sound.click(); } } });
+    // bomb button (bottom right) — tap or E/B
+    if (scene === 'play' && introT <= 0) {
+      const bx = W - 52, by = H - 86, has = run.bombs > 0;
+      ctx.save(); ctx.globalAlpha = has ? 1 : 0.45;
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(bx, by + 3, 30, 0, TAU); ctx.fill();
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(bx, by, 30, 0, TAU); ctx.fill();
+      const gr = ctx.createLinearGradient(0, by - 27, 0, by + 27); gr.addColorStop(0, '#ffb04a'); gr.addColorStop(1, '#d0561a');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(bx, by, 26, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#1e1e22'; ctx.beginPath(); ctx.arc(bx - 2, by + 3, 11, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#8a6a44'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx + 5, by - 6); ctx.quadraticCurveTo(bx + 9, by - 13, bx + 13, by - 12); ctx.stroke();
+      ctx.fillStyle = '#fff2a0'; ctx.beginPath(); ctx.arc(bx + 13, by - 12, 3 + Math.random() * 1.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(bx + 20, by + 18, 11, 0, TAU); ctx.fill();
+      txt(String(run.bombs), bx + 20, by + 19, 13, '#fff', { weight: 900 });
+      ctx.restore();
+      ui.push({ x: bx - 32, y: by - 32, w: 64, h: 64, fn: throwBomb });
+      // active weapon and shield
+      let sx = 12; const cy = enemies.some(e => e.boss && e.spawn <= 0) ? 112 : 80;
+      const chip = (label, color, frac) => {
+        ctx.font = `900 11px ${FONT}`; const w = ctx.measureText(label).width + 16;
+        rr(ctx, sx, cy, w, 20, 10); ctx.fillStyle = 'rgba(7,30,38,0.85)'; ctx.fill();
+        if (frac !== undefined) { rr(ctx, sx, cy, Math.max(10, w * frac), 20, 10); ctx.fillStyle = color + '55'; ctx.fill(); }
+        rr(ctx, sx, cy, w, 20, 10); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+        txt(label, sx + w / 2, cy + 10.5, 11, '#fff', { weight: 900 }); sx += w + 6;
+      };
+      if (player.weapon) chip(ITEMS[player.weapon.kind].name[lang] + ' ' + Math.ceil(player.weapon.t), ITEMS[player.weapon.kind].col, player.weapon.t / WEAPON_TIME);
+      if (player.shield > 0) chip(ITEMS.shield.name[lang] + ' ×' + player.shield, '#5fc8ff');
+    }
     const boss = enemies.find(e => e.boss && e.spawn <= 0);
     if (boss) {
       const x = 40, w = W - 80, y = 80;
@@ -3793,6 +3964,7 @@
     keys.add(e.code);
     Sound.init();
     if ((e.code === 'Escape' || e.code === 'KeyP') && scene === 'play') { modal = modal === 'pause' ? null : (modal || 'pause'); }
+    if (e.code === 'KeyE' || e.code === 'KeyB') throwBomb();
     if (e.code === 'Enter' || e.code === 'Space') {
       if (scene === 'menu') newRun();
       else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) newRun();
@@ -3825,6 +3997,8 @@
 
   // hooks for automated tests (room jumping only in #test mode)
   window.Mergen = {
+    give(item) { if (TEST_MODE && player) dropBonus(player.x, player.y - 60, item); },
+    get crates() { return crates.filter(c => !c.open).length; }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
