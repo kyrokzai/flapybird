@@ -324,18 +324,46 @@
     schedule() {
       this.ambEvents();
       if (!this.ac || !this.music) { if (this.ac) this.nextNote = this.ac.currentTime + 0.1; return; }
-      const EIGHTH = 0.165;
+      // three themes: calm dombra in the menu, faster dombra with a dauylpaz drum in battle, minor kobyz drone and heavy drums for bosses
+      const mode = this.mode || 'menu', mel = mode === 'boss' ? MELODY_BOSS : mode === 'battle' ? MELODY_BATTLE : MELODY;
+      const EIGHTH = mode === 'boss' ? 0.118 : mode === 'battle' ? 0.132 : 0.165;
       while (this.nextNote < this.ac.currentTime + 0.25) {
-        const i = this.step % MELODY.length;
+        const i = this.step % mel.length;
         const t = this.nextNote;
-        const m = MELODY[i];
+        const m = mel[i];
         const down = i % 3 === 0;
         this.pluck(NOTE_FREQ[0], t, down ? 0.16 : 0.09);           // open low string (drone)
         if (m >= 0) this.pluck(NOTE_FREQ[m], t + 0.012, down ? 0.26 : 0.18);
         else this.pluck(NOTE_FREQ[3], t + 0.012, 0.08);
+        if (mode !== 'menu') {
+          const beat = i % 6;
+          if (beat === 0 || (mode === 'boss' && beat === 3)) this.drum(t, mode === 'boss' ? 0.5 : 0.34, 120);
+          else if (beat === 4) this.drum(t, 0.16, 190);
+          if (mode === 'boss' && i % 12 === 0) this.bow(NOTE_FREQ[m >= 0 ? m % 5 : 0] / 2, t, EIGHTH * 12);
+        }
         this.nextNote += EIGHTH;
         this.step++;
       }
+    },
+    setMode(m) { if (m !== this.mode) { this.mode = m; this.step = 0; } },
+    // dauylpaz-like frame drum: pitched thump plus a short skin noise
+    drum(t, vol, f) {
+      const ac = this.ac, o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.38, t + 0.16);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      o.connect(g); g.connect(this.musicGain); o.start(t); o.stop(t + 0.25);
+      const n = ac.createBufferSource(); n.buffer = this.noise;
+      const bf = ac.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 900; bf.Q.value = 0.8;
+      const ng = ac.createGain(); ng.gain.setValueAtTime(vol * 0.35, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      n.connect(bf); bf.connect(ng); ng.connect(this.musicGain); n.start(t); n.stop(t + 0.08);
+    },
+    // kobyz-like bowed drone: two detuned saws through a moving low-pass
+    bow(f, t, dur) {
+      const ac = this.ac, g = ac.createGain(), lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.Q.value = 4; lp.frequency.setValueAtTime(400, t); lp.frequency.linearRampToValueAtTime(1100, t + dur * 0.5); lp.frequency.linearRampToValueAtTime(500, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.06, t + 0.25); g.gain.setValueAtTime(0.06, t + dur - 0.3); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      for (const d of [-4, 5]) { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; o.connect(lp); o.start(t); o.stop(t + dur + 0.05); }
+      lp.connect(g); g.connect(this.musicGain);
     },
     setMusic(on) { this.music = on; Save.data.settings.music = on; Save.write(); if (this.musicGain) this.musicGain.gain.value = on ? 0.32 : 0; },
     setSfx(on) { this.sfx = on; Save.data.settings.sfx = on; Save.write(); if (this.sfxGain) this.sfxGain.gain.value = on ? 1 : 0; if (this.ambGain) this.ambGain.gain.value = on ? 1 : 0; },
@@ -436,6 +464,20 @@
     4, 4, 6, 7, 6, 4, 5, 4, 3, 4, -1, 4,
     9, 9, 10, 11, 10, 9, 8, 9, 7, 6, 7, 7,
     4, 6, 7, 5, 4, 3, 2, 3, 1, 0, -1, 0,
+  ];
+  // battle: driving galloping figure (kүй style), D Dorian
+  const MELODY_BATTLE = [
+    7, 4, 7, 8, 7, 4, 9, 7, 9, 10, 9, 7,
+    8, 7, 6, 7, 4, 7, 6, 4, 3, 4, 3, 1,
+    7, 4, 7, 8, 7, 4, 10, 9, 10, 11, 10, 9,
+    8, 7, 8, 9, 7, 6, 4, 6, 3, 4, -1, 4,
+  ];
+  // boss: low, insistent, leaning on the minor sixth
+  const MELODY_BOSS = [
+    4, 4, 2, 4, 6, 4, 2, 1, 2, 4, -1, 4,
+    4, 4, 2, 4, 7, 6, 4, 2, 4, 1, 0, -1,
+    9, 7, 6, 7, 9, 7, 6, 4, 6, 7, 6, 4,
+    4, 2, 1, 2, 4, 2, 1, 0, 1, 0, -1, 0,
   ];
 
   // =================================================================== data
@@ -1158,6 +1200,7 @@
 
   function update(dt) {
     time += dt;
+    Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
     if (hurtFlash > 0) hurtFlash -= dt;
     for (const e of enemies) if (e.punch > 0) e.punch = Math.max(0, e.punch - dt * 7);
     if (shake > 0) shake = Math.max(0, shake - dt * 40);
@@ -2544,7 +2587,7 @@
     'transformed.y += uAim * 0.05 * aimW;',
   ].join('\n');
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
     prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
@@ -2556,7 +2599,7 @@
         const bin = Uint8Array.from(atob(window[key]), c => c.charCodeAt(0)).buffer;
         window[key] = null;
         new THREE.GLTFLoader().parse(bin, '', gltf => {
-          G3.models[name] = gltf.scene;
+          G3.models[name] = gltf.scene; gltf.scene.userData.clips = gltf.animations;
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
           if (name === 'batyr') G3.batyrScene = gltf.scene;
           if (name === 'kydyr') makeKydyrPortrait();
@@ -2862,6 +2905,40 @@
     });
     up.add(model);
     return { g, up, uni, batyr: true, bow, mats: [] };
+  }
+  // archer batyr with a real skeleton (auto-rigged): idle, run, aim loop (part of the archery clip), hit, death
+  function makeBatyrRig(model) {
+    const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.81);
+    model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+    up.add(model);
+    const clips = model.userData.clips || [], mixer = new THREE.AnimationMixer(model), act = {};
+    for (const c of clips) act[c.name] = mixer.clipAction(c);
+    const shot = clips.find(c => c.name === 'shot');
+    if (shot) act.aim = mixer.clipAction(THREE.AnimationUtils.subclip(shot, 'aim', 60, 111, 30));
+    for (const k of ['hit', 'death']) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
+    if (act.aim) act.aim.timeScale = 1.5;
+    if (act.idle) act.idle.play();
+    return { g, up, rig: true, mixer, act, cur: 'idle', hitT: 0, lastHp: null };
+  }
+  function animateRig(m, o) {
+    const dt = Math.min(0.05, o.dt || 1 / 60);
+    if (o.hp !== undefined) {
+      if (m.lastHp !== null && o.hp < m.lastHp - 0.5 && o.hp > 0 && !o.moving) m.hitT = 0.5;
+      m.lastHp = o.hp;
+    }
+    if (m.hitT > 0) m.hitT -= dt;
+    const aim = !o.menu && enemies.some(e => e.spawn <= 0);
+    let want = o.dead ? 'death' : o.moving ? 'run' : m.hitT > 0 ? 'hit' : aim ? 'aim' : 'idle';
+    if (!m.act[want]) want = 'idle';
+    if (want !== m.cur && m.act[want]) {
+      const from = m.act[m.cur], to = m.act[want];
+      to.reset(); to.setEffectiveWeight(1); to.play();
+      if (from) from.crossFadeTo(to, want === 'hit' ? 0.08 : want === 'death' ? 0.12 : 0.2, false);
+      m.cur = want;
+    }
+    if (m.act.run) m.act.run.timeScale = o.runK || 1.15;
+    m.mixer.update(dt);
   }
   function animateBatyr(m, o) {
     m.uni.uSwing.value = o.moving ? Math.sin(o.walk) * 0.55 : 0;
@@ -3567,6 +3644,7 @@
     // hero
     // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
     if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
+    if (G3.models.batyr_rig && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.batyr_rig); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_bow && !G3.heroBow) { G3.heroBow = makeBatyr(G3.models.batyr_bow, true); G3.dyn.add(G3.heroBow.g); }
     if (!G3.heroProc) { G3.heroProc = makeHero(); G3.dyn.add(G3.heroProc.g); G3.heroRing = decal(G3.ringTex, '#5fd3ff', 0.95, 0.55); G3.dyn.add(G3.heroRing); }
     G3.hero = menu ? (G3.heroSpear || G3.heroBow || G3.heroProc) : (G3.heroBow || G3.heroSpear || G3.heroProc);
@@ -3577,12 +3655,12 @@
     if (menu) {
       hm.g.visible = !!G3.heroSpear; hm.g.position.set(0, 0.2, 1.4); hm.g.scale.setScalar(1);
       hm.g.rotation.y = -(Math.PI / 2 - 0.15);
-      (hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0 });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0, dt: fdt });
     } else {
-      hm.g.visible = scene !== 'dead' && !(player.inv > 0 && Math.floor(time * 20) % 2 === 0);
+      hm.g.visible = (hm.rig || scene !== 'dead') && !(player.inv > 0 && player.hp > 0 && Math.floor(time * 20) % 2 === 0);
       hm.g.position.set(X3(player.x), 0, Z3(player.y)); hm.g.scale.setScalar(1.18);
       hm.g.rotation.y = -player.face;
-      (hm.batyr ? animateBatyr : animateHero)(hm, { moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
     }
     const ens = menu ? [] : enemies;
     syncEnemies(ens, fdt);
@@ -4143,11 +4221,11 @@
   if (document.fonts && document.fonts.load) document.fonts.load(`900 20px "Rubik"`).catch(() => {});
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+  const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
-  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_bow'],
-    ['sky', 'park'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_bow', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
+  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'],
+    ['sky', 'park'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
   G3.loadTotal = LOAD_ALL.length; G3.loadDone = 0;
   (function next(i) {
     if (i >= LOAD_ALL.length) return;
@@ -4165,7 +4243,7 @@
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
-    get save() { return TEST_MODE ? Save.data : null; },
+    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },

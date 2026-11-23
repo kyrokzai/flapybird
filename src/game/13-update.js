@@ -19,6 +19,7 @@
 
   function update(dt) {
     time += dt;
+    Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
     if (hurtFlash > 0) hurtFlash -= dt;
     for (const e of enemies) if (e.punch > 0) e.punch = Math.max(0, e.punch - dt * 7);
     if (shake > 0) shake = Math.max(0, shake - dt * 40);

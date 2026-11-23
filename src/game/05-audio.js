@@ -51,18 +51,46 @@
     schedule() {
       this.ambEvents();
       if (!this.ac || !this.music) { if (this.ac) this.nextNote = this.ac.currentTime + 0.1; return; }
-      const EIGHTH = 0.165;
+      // three themes: calm dombra in the menu, faster dombra with a dauylpaz drum in battle, minor kobyz drone and heavy drums for bosses
+      const mode = this.mode || 'menu', mel = mode === 'boss' ? MELODY_BOSS : mode === 'battle' ? MELODY_BATTLE : MELODY;
+      const EIGHTH = mode === 'boss' ? 0.118 : mode === 'battle' ? 0.132 : 0.165;
       while (this.nextNote < this.ac.currentTime + 0.25) {
-        const i = this.step % MELODY.length;
+        const i = this.step % mel.length;
         const t = this.nextNote;
-        const m = MELODY[i];
+        const m = mel[i];
         const down = i % 3 === 0;
         this.pluck(NOTE_FREQ[0], t, down ? 0.16 : 0.09);           // open low string (drone)
         if (m >= 0) this.pluck(NOTE_FREQ[m], t + 0.012, down ? 0.26 : 0.18);
         else this.pluck(NOTE_FREQ[3], t + 0.012, 0.08);
+        if (mode !== 'menu') {
+          const beat = i % 6;
+          if (beat === 0 || (mode === 'boss' && beat === 3)) this.drum(t, mode === 'boss' ? 0.5 : 0.34, 120);
+          else if (beat === 4) this.drum(t, 0.16, 190);
+          if (mode === 'boss' && i % 12 === 0) this.bow(NOTE_FREQ[m >= 0 ? m % 5 : 0] / 2, t, EIGHTH * 12);
+        }
         this.nextNote += EIGHTH;
         this.step++;
       }
+    },
+    setMode(m) { if (m !== this.mode) { this.mode = m; this.step = 0; } },
+    // dauylpaz-like frame drum: pitched thump plus a short skin noise
+    drum(t, vol, f) {
+      const ac = this.ac, o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.38, t + 0.16);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      o.connect(g); g.connect(this.musicGain); o.start(t); o.stop(t + 0.25);
+      const n = ac.createBufferSource(); n.buffer = this.noise;
+      const bf = ac.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 900; bf.Q.value = 0.8;
+      const ng = ac.createGain(); ng.gain.setValueAtTime(vol * 0.35, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      n.connect(bf); bf.connect(ng); ng.connect(this.musicGain); n.start(t); n.stop(t + 0.08);
+    },
+    // kobyz-like bowed drone: two detuned saws through a moving low-pass
+    bow(f, t, dur) {
+      const ac = this.ac, g = ac.createGain(), lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.Q.value = 4; lp.frequency.setValueAtTime(400, t); lp.frequency.linearRampToValueAtTime(1100, t + dur * 0.5); lp.frequency.linearRampToValueAtTime(500, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.06, t + 0.25); g.gain.setValueAtTime(0.06, t + dur - 0.3); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      for (const d of [-4, 5]) { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; o.connect(lp); o.start(t); o.stop(t + dur + 0.05); }
+      lp.connect(g); g.connect(this.musicGain);
     },
     setMusic(on) { this.music = on; Save.data.settings.music = on; Save.write(); if (this.musicGain) this.musicGain.gain.value = on ? 0.32 : 0; },
     setSfx(on) { this.sfx = on; Save.data.settings.sfx = on; Save.write(); if (this.sfxGain) this.sfxGain.gain.value = on ? 1 : 0; if (this.ambGain) this.ambGain.gain.value = on ? 1 : 0; },
@@ -163,5 +191,19 @@
     4, 4, 6, 7, 6, 4, 5, 4, 3, 4, -1, 4,
     9, 9, 10, 11, 10, 9, 8, 9, 7, 6, 7, 7,
     4, 6, 7, 5, 4, 3, 2, 3, 1, 0, -1, 0,
+  ];
+  // battle: driving galloping figure (kүй style), D Dorian
+  const MELODY_BATTLE = [
+    7, 4, 7, 8, 7, 4, 9, 7, 9, 10, 9, 7,
+    8, 7, 6, 7, 4, 7, 6, 4, 3, 4, 3, 1,
+    7, 4, 7, 8, 7, 4, 10, 9, 10, 11, 10, 9,
+    8, 7, 8, 9, 7, 6, 4, 6, 3, 4, -1, 4,
+  ];
+  // boss: low, insistent, leaning on the minor sixth
+  const MELODY_BOSS = [
+    4, 4, 2, 4, 6, 4, 2, 1, 2, 4, -1, 4,
+    4, 4, 2, 4, 7, 6, 4, 2, 4, 1, 0, -1,
+    9, 7, 6, 7, 9, 7, 6, 4, 6, 7, 6, 4,
+    4, 2, 1, 2, 4, 2, 1, 0, 1, 0, -1, 0,
   ];
 

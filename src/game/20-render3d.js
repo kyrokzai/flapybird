@@ -39,6 +39,7 @@
     // hero
     // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
     if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
+    if (G3.models.batyr_rig && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.batyr_rig); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_bow && !G3.heroBow) { G3.heroBow = makeBatyr(G3.models.batyr_bow, true); G3.dyn.add(G3.heroBow.g); }
     if (!G3.heroProc) { G3.heroProc = makeHero(); G3.dyn.add(G3.heroProc.g); G3.heroRing = decal(G3.ringTex, '#5fd3ff', 0.95, 0.55); G3.dyn.add(G3.heroRing); }
     G3.hero = menu ? (G3.heroSpear || G3.heroBow || G3.heroProc) : (G3.heroBow || G3.heroSpear || G3.heroProc);
@@ -49,12 +50,12 @@
     if (menu) {
       hm.g.visible = !!G3.heroSpear; hm.g.position.set(0, 0.2, 1.4); hm.g.scale.setScalar(1);
       hm.g.rotation.y = -(Math.PI / 2 - 0.15);
-      (hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0 });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0, dt: fdt });
     } else {
-      hm.g.visible = scene !== 'dead' && !(player.inv > 0 && Math.floor(time * 20) % 2 === 0);
+      hm.g.visible = (hm.rig || scene !== 'dead') && !(player.inv > 0 && player.hp > 0 && Math.floor(time * 20) % 2 === 0);
       hm.g.position.set(X3(player.x), 0, Z3(player.y)); hm.g.scale.setScalar(1.18);
       hm.g.rotation.y = -player.face;
-      (hm.batyr ? animateBatyr : animateHero)(hm, { moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
     }
     const ens = menu ? [] : enemies;
     syncEnemies(ens, fdt);

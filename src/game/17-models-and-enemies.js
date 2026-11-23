@@ -1,5 +1,5 @@
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
     prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
@@ -11,7 +11,7 @@
         const bin = Uint8Array.from(atob(window[key]), c => c.charCodeAt(0)).buffer;
         window[key] = null;
         new THREE.GLTFLoader().parse(bin, '', gltf => {
-          G3.models[name] = gltf.scene;
+          G3.models[name] = gltf.scene; gltf.scene.userData.clips = gltf.animations;
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
           if (name === 'batyr') G3.batyrScene = gltf.scene;
           if (name === 'kydyr') makeKydyrPortrait();
@@ -317,6 +317,40 @@
     });
     up.add(model);
     return { g, up, uni, batyr: true, bow, mats: [] };
+  }
+  // archer batyr with a real skeleton (auto-rigged): idle, run, aim loop (part of the archery clip), hit, death
+  function makeBatyrRig(model) {
+    const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.81);
+    model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+    up.add(model);
+    const clips = model.userData.clips || [], mixer = new THREE.AnimationMixer(model), act = {};
+    for (const c of clips) act[c.name] = mixer.clipAction(c);
+    const shot = clips.find(c => c.name === 'shot');
+    if (shot) act.aim = mixer.clipAction(THREE.AnimationUtils.subclip(shot, 'aim', 60, 111, 30));
+    for (const k of ['hit', 'death']) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
+    if (act.aim) act.aim.timeScale = 1.5;
+    if (act.idle) act.idle.play();
+    return { g, up, rig: true, mixer, act, cur: 'idle', hitT: 0, lastHp: null };
+  }
+  function animateRig(m, o) {
+    const dt = Math.min(0.05, o.dt || 1 / 60);
+    if (o.hp !== undefined) {
+      if (m.lastHp !== null && o.hp < m.lastHp - 0.5 && o.hp > 0 && !o.moving) m.hitT = 0.5;
+      m.lastHp = o.hp;
+    }
+    if (m.hitT > 0) m.hitT -= dt;
+    const aim = !o.menu && enemies.some(e => e.spawn <= 0);
+    let want = o.dead ? 'death' : o.moving ? 'run' : m.hitT > 0 ? 'hit' : aim ? 'aim' : 'idle';
+    if (!m.act[want]) want = 'idle';
+    if (want !== m.cur && m.act[want]) {
+      const from = m.act[m.cur], to = m.act[want];
+      to.reset(); to.setEffectiveWeight(1); to.play();
+      if (from) from.crossFadeTo(to, want === 'hit' ? 0.08 : want === 'death' ? 0.12 : 0.2, false);
+      m.cur = want;
+    }
+    if (m.act.run) m.act.run.timeScale = o.runK || 1.15;
+    m.mixer.update(dt);
   }
   function animateBatyr(m, o) {
     m.uni.uSwing.value = o.moving ? Math.sin(o.walk) * 0.55 : 0;
