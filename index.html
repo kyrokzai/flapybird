@@ -1752,7 +1752,7 @@
   }
 
   // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
-  const SKY_KEYS = { menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH' };
+  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH' };
   function loadSky(name, done) {
     const key = SKY_KEYS[name];
     const go = () => {
@@ -1909,7 +1909,7 @@
     G3.gateGlow = glow('#ffe7a0', 2.4, 0); G3.gateGlow.position.set(0, 0.6, zN - 0.25); R.add(G3.gateGlow);
   }
 
-  const PANO_YAW = { menu: -Math.PI / 2, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2 };   // image centre faces the gate
+  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2 };   // image centre faces the gate
   function build3D() {
     const menu = scene === 'menu';
     const key = menu ? 'menu' : 'room' + run.room;
@@ -1956,7 +1956,7 @@
     const zN = Z3(ARENA.y), zS = Z3(AY2), zc = (zN + zS) / 2, rnd = mulberry32(n * 71 + 9);
     G3.scene.background = null;
     setSky(th.sky[0], th.sky[1], th.outer, new THREE.Vector3(-0.4, 0.55, 0.45), th.sun);
-    const pano = setPano(theme === 'park' ? null : theme, PANO_YAW[theme]);
+    const pano = setPano(theme, PANO_YAW[theme]);
     G3.sun.color = col(th.sun); G3.sun.intensity = th.sunI; G3.fill.intensity = 0;
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
     G3.themeSun = th.sunPos;
@@ -3432,9 +3432,9 @@
   // load one model after another, most needed first
   const LOAD_ORDER = ['batyr', 'batyr_bow', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
-  loadSky('menu', () => loadSky('street', () => loadSky('office', () => loadSky('beach', () => {
+  loadSky('menu', () => loadSky('park', () => loadSky('street', () => loadSky('office', () => loadSky('beach', () => { /* all panoramas ready */
     (function next(i) { if (i < LOAD_ORDER.length) loadModel(LOAD_ORDER[i], () => next(i + 1)); })(0);
-  }))));
+  })))));
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
