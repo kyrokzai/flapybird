@@ -153,10 +153,18 @@
       }
     }
     // divider
-    const dy = 38;
-    const lg = ctx.createLinearGradient(-90, 0, 90, 0); lg.addColorStop(0, 'rgba(220,183,94,0)'); lg.addColorStop(0.3, 'rgba(220,183,94,0.9)'); lg.addColorStop(0.7, 'rgba(220,183,94,0.9)'); lg.addColorStop(1, 'rgba(220,183,94,0)');
-    ctx.strokeStyle = lg; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-90, dy); ctx.lineTo(-10, dy); ctx.moveTo(10, dy); ctx.lineTo(90, dy); ctx.stroke();
-    diamond(0, dy, 5); diamond(0, dy, 2.2, '#151b28');
+    // tagline in spaced small caps between two gold rules, a knot underneath
+    const dy = 40, tag = mt('tagline').toUpperCase();
+    ctx.font = `700 11px ${FONTS.head}`;
+    const sp = 3.2, chars = [...tag], tw = chars.reduce((a, c) => a + ctx.measureText(c).width + sp, -sp);
+    const half = Math.min(150, tw / 2 + 64);
+    const lg = ctx.createLinearGradient(-half, 0, half, 0); lg.addColorStop(0, 'rgba(220,183,94,0)'); lg.addColorStop(0.25, 'rgba(220,183,94,0.9)'); lg.addColorStop(0.75, 'rgba(220,183,94,0.9)'); lg.addColorStop(1, 'rgba(220,183,94,0)');
+    ctx.strokeStyle = lg; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-half, dy); ctx.lineTo(-tw / 2 - 10, dy); ctx.moveTo(tw / 2 + 10, dy); ctx.lineTo(half, dy); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#eadbb4';
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6;
+    let cx2 = -tw / 2; for (const c of chars) { ctx.fillText(c, cx2, dy + 1); cx2 += ctx.measureText(c).width + sp; }
+    ctx.restore();
+    diamond(0, dy + 15, 5); diamond(0, dy + 15, 2.2, '#151b28');
     ctx.restore();
   }
 
@@ -272,7 +280,7 @@
     // logo fades in and settles whenever the menu opens
     const k = REDUCED_MOTION ? 1 : easeOut(since(logoT0) / 0.9), float = REDUCED_MOTION ? 0 : Math.sin(pNow / 1300) * 1.5;
     const extra = clamp((H - SAFE.t - SAFE.b - 640) / 200, 0, 1);   // tall phones: a bigger logo a little lower
-    drawLogo(W / 2, top + 160 + extra * 22 + (1 - k) * 14 + float, 0.84 + extra * 0.18, k);
+    drawLogo(W / 2, top + 170 + extra * 22 + (1 - k) * 14 + float, 0.84 + extra * 0.18, k);
     // PLAY: gold plate with pointed ends, soft breathing glow
     const pw = 300, ph = 58, px = (W - pw) / 2, py = TAB_Y - 150;
     if (!REDUCED_MOTION) {
