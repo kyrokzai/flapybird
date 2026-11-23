@@ -1,0 +1,38 @@
+# Publishes БАТЫР01 to GitHub Pages (branch gh-pages) on every push to the development branch.
+# One-time setup in the repository: Settings → Pages → Build and deployment → Source: "Deploy from a branch",
+# Branch: gh-pages, folder: / (root).
+name: Deploy БАТЫР01 to GitHub Pages
+on:
+  push:
+    branches: [claude/mergen-archer]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: index.html must match src/ (run `npm run build` before pushing)
+        run: node tools/build.mjs --check
+      - name: Collect the site
+        run: |
+          mkdir _site
+          cp index.html _site/
+          cp -r assets _site/
+          touch _site/.nojekyll
+      - name: Push to gh-pages
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd _site
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "Deploy ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages

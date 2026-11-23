@@ -1,0 +1,9 @@
+{
+  "name": "batyr01",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "check": "node tools/build.mjs --check"
+  }
+}

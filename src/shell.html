@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>БАТЫР01</title>
+<meta name="description" content="БАТЫР01: браузерный 3D экшен-рогалик с лучником в казахском стиле.">
+<meta name="theme-color" content="#0b3a48">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #0b2630;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #124556 0%, #071a21 75%);
+  }
+  #wrap { position: relative; box-shadow: 0 0 50px rgba(0,0,0,.6); background: #0d3b47; }
+  #wrap canvas { position: absolute; left: 0; top: 0; display: block; outline: none; }
+  #nogl { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
+          color: #f7edd5; font: 600 16px Rubik, Arial, sans-serif; padding: 24px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="gl"></canvas>
+  <canvas id="game" tabindex="0" aria-label="БАТЫР01"></canvas>
+  <div id="nogl">Не удалось запустить 3D-графику (WebGL). Обновите браузер или включите аппаратное ускорение.</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<link rel="preload" href="assets/sky_menu.js" as="script">
+<link rel="preload" href="assets/batyr.js" as="script">
+<link rel="preload" href="assets/horse.js" as="script">
+<script>
+(() => {
+  'use strict';
+/*@@GAME@@*/
+})();
+</script>
+</body>
+</html>
