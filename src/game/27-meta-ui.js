@@ -115,13 +115,13 @@
   // ---- Battle tab
   function drawFightTab() {
     const wob = Math.sin(time * 1.5) * 2;
-    txt('БАТЫР01', W / 2, 124 + wob, fitText('БАТЫР01', W - 60, 50), C.gold, { stroke: C.ink, lw: 9, weight: 900 });
-    koshkar(ctx, W / 2, 163, 26, C.red, 3.2);
-    txt(tr('subtitle'), W / 2, 184, 14, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
+    txt('БАТЫР01', W / 2, 116 + wob, fitText('БАТЫР01', W - 90, 42), C.gold, { stroke: C.ink, lw: 8, weight: 900 });
+    koshkar(ctx, W / 2, 146, 16, C.red, 2.6);
+    txt(tr('subtitle'), W / 2, 162, 11, C.cream, { stroke: C.ink, lw: 3.5, weight: 900 });
     const label = tr('play') + '  ⚡' + RUN_COST;
-    button(W / 2 - 110, 452, 220, 58, label, () => { Sound.init(); Sound.click(); startGame(); }, { size: 24 });
-    txt(tr('hint'), W / 2, 526, 11, '#fff', { stroke: C.ink, lw: 3, weight: 700 });
-    txt(tr('best', best), W / 2, 548, 12, C.cream, { stroke: C.ink, lw: 3, weight: 700 });
+    button(W / 2 - 110, 466, 220, 54, label, () => { Sound.init(); Sound.click(); startGame(); }, { size: 24 });
+    txt(tr('hint'), W / 2, 534, 11, '#fff', { stroke: C.ink, lw: 3, weight: 700 });
+    txt(tr('best', best), W / 2, 553, 12, C.cream, { stroke: C.ink, lw: 3, weight: 700 });
   }
 
   // ---- Gear tab

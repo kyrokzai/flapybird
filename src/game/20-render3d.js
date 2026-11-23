@@ -9,9 +9,10 @@
     // camera
     const c = G3.cam;
     if (menu) {
-      const sw2 = Math.sin(time * 0.25) * 0.6;
-      if (c.fov !== 30) { c.fov = 30; c.updateProjectionMatrix(); }
-      c.position.set(sw2, 0.5, 10.4); c.lookAt(sw2 * 0.2, 0.5, 1.4); c.updateMatrixWorld();
+      // close-up portrait of the batyr: slow small orbit around him, camera a little below his chest (heroic angle)
+      const a = Math.sin(time * 0.18) * 0.16, dist = MENU_CAM.dist;
+      if (c.fov !== MENU_CAM.fov) { c.fov = MENU_CAM.fov; c.updateProjectionMatrix(); }
+      c.position.set(Math.sin(a) * dist, MENU_CAM.y, 1.4 + Math.cos(a) * dist); c.lookAt(0, MENU_CAM.look, 1.4); c.updateMatrixWorld();
       G3.scene.fog.near = 18; G3.scene.fog.far = 95;
     } else {
       if (introT <= 0 && c.fov !== 30) { c.fov = 30; c.updateProjectionMatrix(); }

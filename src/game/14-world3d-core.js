@@ -370,11 +370,19 @@
     }
     pines.count = k; pines.castShadow = true; R.add(pines);
     }
-    const geo = new THREE.IcosahedronGeometry(1, 1);
-    const rp = geo.attributes.position;
-    for (let i = 0; i < rp.count; i++) { const q = Math.sin(rp.getX(i) * 9.1 + rp.getY(i) * 5.3 + rp.getZ(i) * 7.7) * 43758.5; const f = 0.85 + (q - Math.floor(q)) * 0.3; rp.setXYZ(i, rp.getX(i) * f, rp.getY(i) * f, rp.getZ(i) * f); }
+    // weathered flat stone under the batyr: smooth noise, darker in the cracks, moss toward the ground
+    const geo = new THREE.IcosahedronGeometry(1, 4);
+    const rp = geo.attributes.position, cols = [];
+    const nz = (x, y, z) => Math.sin(x * 3.1 + y * 1.7) * Math.cos(z * 2.3 - x) * 0.5 + Math.sin(x * 7.3 + z * 5.1 + y * 3.3) * 0.18;
+    for (let i = 0; i < rp.count; i++) {
+      const x = rp.getX(i), y = rp.getY(i), z = rp.getZ(i), f = 1 + nz(x, y, z) * 0.16;
+      rp.setXYZ(i, x * f, y * f, z * f);
+      const c = colC(y < -0.1 ? '#55603a' : '#8a7b6a').clone().multiplyScalar(0.85 + nz(z * 2, x * 2, y * 2) * 0.3);
+      cols.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     geo.computeVertexNormals();
-    const rock = new THREE.Mesh(geo, mat('#7d6a5c', { flat: true, r: 0.95 }));
-    rock.position.set(0, -0.12, 1.4); rock.scale.set(1.05, 0.34, 0.85); rock.castShadow = rock.receiveShadow = true; R.add(rock);
+    const rock = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }));
+    rock.position.set(0, -0.1, 1.4); rock.scale.set(0.95, 0.3, 0.72); rock.castShadow = rock.receiveShadow = true; R.add(rock);
   }
 

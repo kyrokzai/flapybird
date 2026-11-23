@@ -302,7 +302,7 @@
     }
     G3.pano.visible = !!tex; G3.sky.visible = !tex;
     if (!tex) return false;
-    G3.pano.material.map = tex; G3.pano.material.color.setScalar(name === 'menu' ? 0.62 : 1.35); G3.pano.material.needsUpdate = true;
+    G3.pano.material.map = name === 'menu' ? blurredTex(tex, name) : tex; G3.pano.material.color.setScalar(name === 'menu' ? 0.62 : 1.35); G3.pano.material.needsUpdate = true;
     G3.pano.rotation.y = yaw || 0;
     const rt = G3.pmrem.fromEquirectangular(tex);
     if (G3.envRT) G3.envRT.dispose();
@@ -456,21 +456,24 @@
       const menuPano = setPano('menu', PANO_YAW.menu);
       G3.sun.position.set(-7, 5.5, -12); G3.sun.target.position.set(0, 0, 0); G3.sun.color = col('#ffc27a'); G3.sun.intensity = 2.3;
       G3.fill.intensity = 1.6; G3.hemi.intensity = 0.35; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
-      const outer = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), mat('#6a8338', { r: 1 })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.01; outer.receiveShadow = true; R.add(outer);
-      const nb = Math.round(520 * Q.grass), grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
-      const dm = new THREE.Object3D(); let k = 0;
-      for (let i = 0; i < nb * 3 && k < nb; i++) {
-        const x = (rnd() - 0.5) * 10, z = (rnd() - 0.5) * 14;
-        if (Math.hypot(x, z - 1.4) < 1.3) continue;
-        dm.position.set(x, 0, z); dm.rotation.set((rnd() - 0.5) * 0.5, rnd() * 3, (rnd() - 0.5) * 0.5); dm.scale.setScalar(0.7 + rnd() * 0.8); dm.updateMatrix();
-        grass.setMatrixAt(k, dm.matrix); grass.setColorAt(k, colC(b.tuft[rnd() < 0.6 ? 0 : 1]).clone()); k++;
-      }
-      grass.count = k; R.add(grass);
+      const gt = groundTex(true); gt.repeat.set(30, 30);
+      const outer = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, color: col('#9aa07a') })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.01; outer.receiveShadow = true; R.add(outer);
+      // dense tufts around the batyr, thinning out with distance; low near the camera so they frame without hiding him
+      const nb = Math.round(1700 * Q.grass);
+      R.add(makeGrassField(nb, r => {
+        const x = (r() - 0.5) * 16, z = -7 + r() * 14;
+        const dHero = Math.hypot(x, (z - 1.4) * 1.3);
+        if (dHero < 0.75) return null;
+        const short = dHero < 1.8 ? 0.45 + (dHero - 0.75) * 0.5 : 1;   // short grass at his boots
+        if (r() > 0.35 + 0.65 * Math.exp(-Math.abs(z - 1.4) / 4.5)) return null;
+        const near = z > 3.2 ? 0.55 + (6.5 - z) * 0.1 : 1;
+        return [x, z, (0.75 + r() * 0.55) * Math.max(0.45, near) * short];
+      }, true, 80));
       for (const o of MENU_OBS) R.add(o.kind === 'yurt' ? makeYurt(X3(o.x + 20), Z3(o.y + 20)) : makeRock(o, X3(o.x + 20), Z3(o.y + 20)));
       for (const [x, z, s] of [[-2.6, -4.2, 1.6], [2.8, -3.2, 1.3], [-3.4, 3.6, 1.2]]) R.add(makeYurt(x, z, s));
       buildMenuScenery(R, menuPano);
       if (G3.models.horse) {
-        const h = G3.models.horse.clone(); h.scale.setScalar(1.95); h.position.set(1.75, 0, 0.75); h.rotation.y = 0.2;
+        const h = G3.models.horse.clone(); h.scale.setScalar(1.95); h.position.set(1.25, 0, -0.6); h.rotation.y = 0.35;
         if (!G3.horseUni) G3.horseUni = { uT: { value: 0 } };
         h.traverse(o => {
           if (!o.isMesh || o.material.userData.horse) return;

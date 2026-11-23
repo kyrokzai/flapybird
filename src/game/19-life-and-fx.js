@@ -105,7 +105,7 @@
       });
     }
     // butterflies + falling leaves (park and menu)
-    if (theme === 'park' || menu) {
+    if (theme === 'park' && !menu) {
       const cols = ['#ffd23a', '#ffffff', '#ff8ac8', '#7ad0ff', '#ff9a3a'];
       for (let i = 0; i < (menu ? 6 : 9); i++) {
         const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: col(cols[i % cols.length]), side: THREE.DoubleSide });
