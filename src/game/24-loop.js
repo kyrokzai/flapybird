@@ -49,7 +49,7 @@
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
-    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; },
+    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },

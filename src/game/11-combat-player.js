@@ -68,7 +68,7 @@
     addFx('ring', e.x, e.y, { col, size: e.boss ? 4.5 : 1.5, max: e.boss ? 0.8 : 0.45 });
     addFx('wisp', e.x, e.y, { col: '#fff6d0', size: e.boss ? 3 : 1.1, max: 0.8 });
     if (e.boss) slowT = 1.0;
-    if (e.boss) { shake = 18; Sound.boom(); }
+    if (e.boss) { shake = 18; Sound.boom(); buzz([60, 40, 110]); }
     const gems = Math.ceil(e.xp / 3);
     for (let i = 0; i < gems; i++) dropPickup(e.x, e.y, 'xp', e.xp / gems);
     const coins = Math.min(12, e.coin);

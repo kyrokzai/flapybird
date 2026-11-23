@@ -7,21 +7,21 @@
       equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
       daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
       shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
-      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
     },
     kz: {
       tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
       equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
       daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
       shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
-      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
     },
     en: {
       tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
       equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
       daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
       shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
-      noChest: 'Reach room 5 to earn a chest', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
     },
   };
   const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -222,8 +222,6 @@
 
   // ---- popups
   function popupFrame(y, h) {
-    ui.push({ x: 0, y: 0, w: W, h: H, fn: null });   // blocks the screen underneath
-    overlay(0.65);
     panel(24, y, W - 48, h);
   }
   function drawItemPopup() {
@@ -247,19 +245,39 @@
   }
   function drawRewardPopup() {
     const d = popupData || { items: [] };
-    const h = 150 + (d.coins ? 30 : 0) + (d.gems ? 30 : 0) + (d.items.length ? 104 : 0), top = Math.round((H - h) / 2) - 20;
-    popupFrame(top, h);
+    if (!d.t0) d.t0 = pNow;
+    const hasItems = d.items.length > 0, chestT = hasItems ? 0.85 : 0, t = since(d.t0) - chestT;
+    const best = d.items.reduce((m, it) => Math.max(m, it.r), 0), bcol = RARITY[best].col;
+    const h = 150 + (d.coins ? 30 : 0) + (d.gems ? 30 : 0) + (hasItems ? 120 : 0), top = Math.round((H - h) / 2) - 20;
+    if (t < 0) {
+      // closed chest shakes harder and glows in the colour of the best item inside; tap to open at once
+      const k = since(d.t0) / chestT, sh = Math.sin(pNow / 30) * k * 6;
+      rays(W / 2, H / 2 - 10, 90 + k * 60, bcol, k * 0.7, pNow / 900);
+      drawChest(W / 2 + sh, H / 2 - 10, 62 + k * 6, bcol, 0);
+      ui.push({ x: 0, y: 0, w: W, h: H, fn: () => { d.t0 -= chestT * 1000; } });
+      return;
+    }
+    if (hasItems && !d.burst) { d.burst = true; Sound.level(); buzz(45); }
+    if (hasItems && best >= 1) rays(W / 2, top + h - 120, 150, bcol, 0.55, pNow / 1400);
+    panel(24, top, W - 48, h);
     txt(mt('rewards'), W / 2, top + 40, 22, C.redDk, { weight: 900 });
     let y = top + 64;
-    if (d.coins) { coinIcon(W / 2 - 30, y + 12, 10); txt('+' + d.coins, W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
-    if (d.gems) { gemIcon(W / 2 - 30, y + 12, 10); txt('+' + d.gems, W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
+    if (d.coins) { coinIcon(W / 2 - 30, y + 12, 10); txt('+' + countUp(d.coins, t / 0.7), W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
+    if (d.gems) { gemIcon(W / 2 - 30, y + 12, 10); txt('+' + countUp(d.gems, t / 0.7), W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
     const n = d.items.length;
     d.items.forEach((it, i) => {
-      const s = 70, x = W / 2 - (n * (s + 10) - 10) / 2 + i * (s + 10);
-      itemCard(it, x, y + 4, s, null);
-      txt(GEAR[it.b].name[lang], x + s / 2, y + s + 16, fitText(GEAR[it.b].name[lang], s + 8, 10), RARITY[it.r].col, { weight: 900, stroke: C.ink, lw: 2.5 });
+      const s = 74, x = W / 2 - (n * (s + 10) - 10) / 2 + i * (s + 10), k = easeBack((t - i * 0.14) / 0.32);
+      if (k <= 0) return;
+      ctx.save(); ctx.translate(x + s / 2, y + 6 + s / 2); ctx.scale(k, k); ctx.translate(-(x + s / 2), -(y + 6 + s / 2));
+      if (it.r >= 2) { ctx.shadowColor = RARITY[it.r].col; ctx.shadowBlur = 18 + Math.sin(pNow / 200) * 6; }
+      itemCard(it, x, y + 6, s, null);
+      ctx.restore();
+      txt(GEAR[it.b].name[lang], x + s / 2, y + s + 20, fitText(GEAR[it.b].name[lang], s + 8, 10), RARITY[it.r].col, { weight: 900, stroke: C.ink, lw: 2.5 });
+      txt(RARITY[it.r].name[lang], x + s / 2, y + s + 34, 9, '#6a5a45', { weight: 700 });
     });
-    button(W / 2 - 70, top + h - 68, 140, 44, mt('ok'), () => { menuPopup = null; popupData = null; Sound.click(); }, { size: 16 });
+    // white flash right after the chest bursts
+    if (hasItems && t < 0.3) { ctx.fillStyle = `rgba(255,250,230,${(1 - t / 0.3) * 0.8})`; ctx.fillRect(0, 0, W, H); }
+    button(W / 2 - 70, top + h - 62, 140, 44, mt('ok'), () => { menuPopup = null; popupData = null; Sound.click(); }, { size: 16 });
   }
   function drawEnergyPopup() {
     popupFrame(170, 280);
@@ -280,15 +298,18 @@
 
   function drawMenu() {
     energyTick();
-    if (!dailyShown && G3.heroSpear) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
+    if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     const top = ctx.createLinearGradient(0, 0, 0, 200);
     top.addColorStop(0, 'rgba(7,30,38,0.75)'); top.addColorStop(1, 'rgba(7,30,38,0)');
     ctx.fillStyle = top; ctx.fillRect(0, 0, W, 200);
     ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold);
+    const tk = tabEase();
+    ctx.save(); ctx.globalAlpha = 0.25 + 0.75 * tk; ctx.translate((1 - tk) * 26, 0);
     if (menuTab === 'fight') drawFightTab();
     else if (menuTab === 'gear') drawGearTab();
     else if (menuTab === 'talents') drawTalentsTab();
     else drawQuestsTab();
+    ctx.restore();
     resourceBar();
     const tg = (x, w, on, label, fn) => {
       rr(ctx, x, 24, w, 34, 9); ctx.fillStyle = C.ink; ctx.fill();
@@ -309,8 +330,9 @@
       rr(ctx, bx, by - 3, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
       rr(ctx, bx, by - 3, Math.max(6, bw * k), 6, 3); ctx.fillStyle = C.gold; ctx.fill();
     }
-    if (menuPopup === 'item') drawItemPopup();
-    else if (menuPopup === 'reward') drawRewardPopup();
-    else if (menuPopup === 'energy') drawEnergyPopup();
-    else if (menuPopup === 'daily') drawDailyPopup();
+    if (menuPopup) { ui.push({ x: 0, y: 0, w: W, h: H, fn: null }); overlay(0.65 * clamp(since(popT0) / 0.15, 0, 1)); }
+    if (menuPopup === 'item') withPop(drawItemPopup);
+    else if (menuPopup === 'reward') withPop(drawRewardPopup);
+    else if (menuPopup === 'energy') withPop(drawEnergyPopup);
+    else if (menuPopup === 'daily') withPop(drawDailyPopup);
   }

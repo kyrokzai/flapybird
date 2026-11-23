@@ -26,6 +26,8 @@
     ctx.save();
     if (o.disabled) ctx.globalAlpha = 0.5;
     rr(ctx, x, y + 4, w, h, 12); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+    const down = !o.disabled && isPressed(x, y, w, h);
+    if (down) ctx.translate(0, 3);
     rr(ctx, x, y, w, h, 12); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, x + 3, y + 3, w - 6, h - 6, 9);
     const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, c1); g.addColorStop(1, c2);
@@ -33,6 +35,7 @@
     rr(ctx, x + 8, y + 6, w - 16, 5, 2.5); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
     const size = fitText(label, w - 18, o.size || 18);
     txt(label, x + w / 2, y + h / 2 + 1, size, '#ffffff', { stroke: C.ink, lw: 4, weight: 900 });
+    if (down) { rr(ctx, x + 3, y + 3, w - 6, h - 6, 9); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fill(); }
     ctx.restore();
     ui.push({ x, y, w, h, fn: o.disabled ? null : fn, tag: o.tag });
   }
@@ -337,7 +340,8 @@
       txt(tr('dead'), W / 2, 156, 28, C.redDk, { weight: 900 });
       txt(tr('deadText'), W / 2, 184, 13, C.ink, { weight: 500 });
     }
-    const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(run.kills)], [tr('sCoins'), '+' + run.coins + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
+    const ck = (endT - 0.5) / 0.9;
+    const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
       txt(k, 60, 214 + i * 24, 14, '#6a5a45', { align: 'left', weight: 500 });
       txt(v, W - 60, 214 + i * 24, 15, C.ink, { align: 'right', weight: 900 });
@@ -346,15 +350,20 @@
     const reached = won ? TOTAL_ROOMS : run.room, pw = (W - 120) / TOTAL_ROOMS;
     for (let r = 1; r <= TOTAL_ROOMS; r++) {
       const boss = r % 5 === 0, px = 60 + (r - 0.5) * pw, rad = boss ? 6 : 4;
-      ctx.fillStyle = r < reached || won ? C.gold : r === reached ? C.red : 'rgba(42,22,12,0.2)';
+      const lit = r <= Math.ceil(reached * easeOut((endT - 0.6) / 0.9));
+      ctx.fillStyle = !lit ? 'rgba(42,22,12,0.2)' : r < reached || won ? C.gold : C.red;
       ctx.beginPath(); ctx.arc(px, 342, rad, 0, TAU); ctx.fill();
       if (r === best && !won) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
     }
     const rw = run.rewards;
     txt(mt('rewards'), 60, 368, 14, C.redDk, { align: 'left', weight: 900 });
     let rx = 60;
-    if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + rw.gems, rx + 20, 396, 15, C.ink, { align: 'left', weight: 900 }); rx += 60; }
-    if (rw) rw.items.forEach(it => { itemCard(it, rx, 376, 40, null); rx += 46; });
+    if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + countUp(rw.gems, (endT - 1.0) / 0.6), rx + 20, 396, 15, C.ink, { align: 'left', weight: 900 }); rx += 60; }
+    if (rw) rw.items.forEach((it, i) => {
+      const k = easeBack((endT - 1.2 - i * 0.16) / 0.3);
+      if (k > 0) { ctx.save(); ctx.translate(rx + 20, 396); ctx.scale(k, k); ctx.translate(-rx - 20, -396); if (it.r >= 2) { ctx.shadowColor = RARITY[it.r].col; ctx.shadowBlur = 14; } itemCard(it, rx, 376, 40, null); ctx.restore(); }
+      rx += 46;
+    });
     if (!rw || (!rw.gems && !rw.items.length)) txt(mt('noChest'), W / 2, 396, 12, '#8a7a65', { weight: 500 });
     button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(); });
     button(54, 478, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });

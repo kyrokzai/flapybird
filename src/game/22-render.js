@@ -1,5 +1,6 @@
   // =================================================================== render
   function render() {
+    polishTick();
     render3D();
     ui = [];
     ctx.setTransform(K, 0, 0, K, 0, 0);
@@ -20,6 +21,7 @@
       drawHud();
       drawJoystick();
       drawBanner();
+      if (scene === 'play' && !modal) drawTutorial();
       if (scene === 'play') {
         if (modal === 'levelup') drawLevelUp();
         else if (modal === 'kydyr') drawKydyrModal();
@@ -28,5 +30,7 @@
       } else { ui = []; drawEnd(); }
     }
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }
+    drawTransition();
+    drawSplash();
   }
 

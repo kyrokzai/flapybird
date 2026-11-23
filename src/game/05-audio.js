@@ -114,14 +114,14 @@
     shoot() { if (this.ok()) { this.tone('triangle', 520, 240, 0, 0.08, 0.07); this.hiss(3000, 900, 0, 0.08, 0.12); } },
     hit() { if (this.ok()) this.tone('square', 260, 130, 0, 0.05, 0.035); },
     kill() { if (this.ok()) { this.hiss(900, 200, 0, 0.18, 0.25); this.tone('triangle', 330, 90, 0, 0.16, 0.12); } },
-    hurt() { if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
+    hurt() { buzz(35); if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
     pick() {
       if (!this.ok()) return;
       const now = this.ac.currentTime; if (now - this.lastPick < 0.045) return; this.lastPick = now;
       this.tone('sine', 1250 + Math.random() * 300, 1600, 0, 0.06, 0.04);
     },
-    level() { if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
-    crate() { if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
+    level() { buzz(20); if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
+    crate() { buzz(15); if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
     shield() { if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
     clear() { if (this.ok()) [523, 659, 784, 1047].forEach((f, i) => { this.tone('triangle', f, f, i * 0.09, 0.35, 0.08); this.tone('sine', f * 2, f * 2, i * 0.09, 0.2, 0.02); }); },
     // looping background ambience per location + occasional events (birds, horns, keyboards, gulls, wind)

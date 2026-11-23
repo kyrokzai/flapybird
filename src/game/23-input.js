@@ -8,6 +8,7 @@
     canvas.focus({ preventScroll: true });
     Sound.init();
     const p = toLogical(e);
+    press = { x: p.x, y: p.y, t: performance.now() };
     for (let i = ui.length - 1; i >= 0; i--) {
       const b = ui[i];
       if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { if (b.fn) b.fn(); return; }

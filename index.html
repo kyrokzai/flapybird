@@ -75,12 +75,12 @@
 
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 2;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 3;
   const Save = {
     data: null,
     defaults() {
       return {
-        v: SAVE_VERSION, coins: 0, gems: 0, best: 0,
+        v: SAVE_VERSION, coins: 0, gems: 0, best: 0, tut: false,
         talents: { atk: 0, hp: 0, armor: 0, magnet: 0, regen: 0, loot: 0, start: 0 },
         // starter gear: a common bow and chapan, already equipped
         gear: { items: [{ id: 1, b: 'bow', r: 0, l: 1 }, { id: 2, b: 'shapan', r: 0, l: 1 }], eq: { weapon: 1, armor: 2 }, next: 3 },
@@ -116,6 +116,8 @@
         out.talents.hp = Math.min(20, (d.upHp || 0) * 2);
         delete out.upAtk; delete out.upHp;
       }
+      // v2 → v3: first-run tutorial flag; players who already reached a room skip it
+      if ((d.v || 0) < 3) out.tut = (d.best || 0) > 0;
       out.v = SAVE_VERSION;
       return out;
     },
@@ -387,14 +389,14 @@
     shoot() { if (this.ok()) { this.tone('triangle', 520, 240, 0, 0.08, 0.07); this.hiss(3000, 900, 0, 0.08, 0.12); } },
     hit() { if (this.ok()) this.tone('square', 260, 130, 0, 0.05, 0.035); },
     kill() { if (this.ok()) { this.hiss(900, 200, 0, 0.18, 0.25); this.tone('triangle', 330, 90, 0, 0.16, 0.12); } },
-    hurt() { if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
+    hurt() { buzz(35); if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
     pick() {
       if (!this.ok()) return;
       const now = this.ac.currentTime; if (now - this.lastPick < 0.045) return; this.lastPick = now;
       this.tone('sine', 1250 + Math.random() * 300, 1600, 0, 0.06, 0.04);
     },
-    level() { if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
-    crate() { if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
+    level() { buzz(20); if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
+    crate() { buzz(15); if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
     shield() { if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
     clear() { if (this.ok()) [523, 659, 784, 1047].forEach((f, i) => { this.tone('triangle', f, f, i * 0.09, 0.35, 0.08); this.tone('sine', f * 2, f * 2, i * 0.09, 0.2, 0.02); }); },
     // looping background ambience per location + occasional events (birds, horns, keyboards, gulls, wind)
@@ -866,7 +868,7 @@
     addFx('ring', e.x, e.y, { col, size: e.boss ? 4.5 : 1.5, max: e.boss ? 0.8 : 0.45 });
     addFx('wisp', e.x, e.y, { col: '#fff6d0', size: e.boss ? 3 : 1.1, max: 0.8 });
     if (e.boss) slowT = 1.0;
-    if (e.boss) { shake = 18; Sound.boom(); }
+    if (e.boss) { shake = 18; Sound.boom(); buzz([60, 40, 110]); }
     const gems = Math.ceil(e.xp / 3);
     for (let i = 0; i < gems; i++) dropPickup(e.x, e.y, 'xp', e.xp / gems);
     const coins = Math.min(12, e.coin);
@@ -1200,6 +1202,7 @@
 
   function update(dt) {
     time += dt;
+    tutTick(dt);
     Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
     if (hurtFlash > 0) hurtFlash -= dt;
     for (const e of enemies) if (e.punch > 0) e.punch = Math.max(0, e.punch - dt * 7);
@@ -3786,6 +3789,8 @@
     ctx.save();
     if (o.disabled) ctx.globalAlpha = 0.5;
     rr(ctx, x, y + 4, w, h, 12); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+    const down = !o.disabled && isPressed(x, y, w, h);
+    if (down) ctx.translate(0, 3);
     rr(ctx, x, y, w, h, 12); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, x + 3, y + 3, w - 6, h - 6, 9);
     const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, c1); g.addColorStop(1, c2);
@@ -3793,6 +3798,7 @@
     rr(ctx, x + 8, y + 6, w - 16, 5, 2.5); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
     const size = fitText(label, w - 18, o.size || 18);
     txt(label, x + w / 2, y + h / 2 + 1, size, '#ffffff', { stroke: C.ink, lw: 4, weight: 900 });
+    if (down) { rr(ctx, x + 3, y + 3, w - 6, h - 6, 9); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fill(); }
     ctx.restore();
     ui.push({ x, y, w, h, fn: o.disabled ? null : fn, tag: o.tag });
   }
@@ -4097,7 +4103,8 @@
       txt(tr('dead'), W / 2, 156, 28, C.redDk, { weight: 900 });
       txt(tr('deadText'), W / 2, 184, 13, C.ink, { weight: 500 });
     }
-    const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(run.kills)], [tr('sCoins'), '+' + run.coins + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
+    const ck = (endT - 0.5) / 0.9;
+    const rows = [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
       txt(k, 60, 214 + i * 24, 14, '#6a5a45', { align: 'left', weight: 500 });
       txt(v, W - 60, 214 + i * 24, 15, C.ink, { align: 'right', weight: 900 });
@@ -4106,15 +4113,20 @@
     const reached = won ? TOTAL_ROOMS : run.room, pw = (W - 120) / TOTAL_ROOMS;
     for (let r = 1; r <= TOTAL_ROOMS; r++) {
       const boss = r % 5 === 0, px = 60 + (r - 0.5) * pw, rad = boss ? 6 : 4;
-      ctx.fillStyle = r < reached || won ? C.gold : r === reached ? C.red : 'rgba(42,22,12,0.2)';
+      const lit = r <= Math.ceil(reached * easeOut((endT - 0.6) / 0.9));
+      ctx.fillStyle = !lit ? 'rgba(42,22,12,0.2)' : r < reached || won ? C.gold : C.red;
       ctx.beginPath(); ctx.arc(px, 342, rad, 0, TAU); ctx.fill();
       if (r === best && !won) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
     }
     const rw = run.rewards;
     txt(mt('rewards'), 60, 368, 14, C.redDk, { align: 'left', weight: 900 });
     let rx = 60;
-    if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + rw.gems, rx + 20, 396, 15, C.ink, { align: 'left', weight: 900 }); rx += 60; }
-    if (rw) rw.items.forEach(it => { itemCard(it, rx, 376, 40, null); rx += 46; });
+    if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + countUp(rw.gems, (endT - 1.0) / 0.6), rx + 20, 396, 15, C.ink, { align: 'left', weight: 900 }); rx += 60; }
+    if (rw) rw.items.forEach((it, i) => {
+      const k = easeBack((endT - 1.2 - i * 0.16) / 0.3);
+      if (k > 0) { ctx.save(); ctx.translate(rx + 20, 396); ctx.scale(k, k); ctx.translate(-rx - 20, -396); if (it.r >= 2) { ctx.shadowColor = RARITY[it.r].col; ctx.shadowBlur = 14; } itemCard(it, rx, 376, 40, null); ctx.restore(); }
+      rx += 46;
+    });
     if (!rw || (!rw.gems && !rw.items.length)) txt(mt('noChest'), W / 2, 396, 12, '#8a7a65', { weight: 500 });
     button(54, 424, W - 108, 48, tr('again') + ' ⚡' + RUN_COST, () => { Sound.click(); startGame(); });
     button(54, 478, W - 108, 36, tr('menu'), () => { Sound.click(); scene = 'menu'; }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
@@ -4122,6 +4134,7 @@
 
   // =================================================================== render
   function render() {
+    polishTick();
     render3D();
     ui = [];
     ctx.setTransform(K, 0, 0, K, 0, 0);
@@ -4142,6 +4155,7 @@
       drawHud();
       drawJoystick();
       drawBanner();
+      if (scene === 'play' && !modal) drawTutorial();
       if (scene === 'play') {
         if (modal === 'levelup') drawLevelUp();
         else if (modal === 'kydyr') drawKydyrModal();
@@ -4150,6 +4164,8 @@
       } else { ui = []; drawEnd(); }
     }
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }
+    drawTransition();
+    drawSplash();
   }
 
   // =================================================================== input
@@ -4162,6 +4178,7 @@
     canvas.focus({ preventScroll: true });
     Sound.init();
     const p = toLogical(e);
+    press = { x: p.x, y: p.y, t: performance.now() };
     for (let i = ui.length - 1; i >= 0; i--) {
       const b = ui[i];
       if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { if (b.fn) b.fn(); return; }
@@ -4243,7 +4260,7 @@
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
-    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; },
+    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },
@@ -4587,21 +4604,21 @@
       equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
       daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
       shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
-      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
     },
     kz: {
       tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
       equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
       daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
       shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
-      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
     },
     en: {
       tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
       equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
       daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
       shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
-      noChest: 'Reach room 5 to earn a chest', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
     },
   };
   const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -4802,8 +4819,6 @@
 
   // ---- popups
   function popupFrame(y, h) {
-    ui.push({ x: 0, y: 0, w: W, h: H, fn: null });   // blocks the screen underneath
-    overlay(0.65);
     panel(24, y, W - 48, h);
   }
   function drawItemPopup() {
@@ -4827,19 +4842,39 @@
   }
   function drawRewardPopup() {
     const d = popupData || { items: [] };
-    const h = 150 + (d.coins ? 30 : 0) + (d.gems ? 30 : 0) + (d.items.length ? 104 : 0), top = Math.round((H - h) / 2) - 20;
-    popupFrame(top, h);
+    if (!d.t0) d.t0 = pNow;
+    const hasItems = d.items.length > 0, chestT = hasItems ? 0.85 : 0, t = since(d.t0) - chestT;
+    const best = d.items.reduce((m, it) => Math.max(m, it.r), 0), bcol = RARITY[best].col;
+    const h = 150 + (d.coins ? 30 : 0) + (d.gems ? 30 : 0) + (hasItems ? 120 : 0), top = Math.round((H - h) / 2) - 20;
+    if (t < 0) {
+      // closed chest shakes harder and glows in the colour of the best item inside; tap to open at once
+      const k = since(d.t0) / chestT, sh = Math.sin(pNow / 30) * k * 6;
+      rays(W / 2, H / 2 - 10, 90 + k * 60, bcol, k * 0.7, pNow / 900);
+      drawChest(W / 2 + sh, H / 2 - 10, 62 + k * 6, bcol, 0);
+      ui.push({ x: 0, y: 0, w: W, h: H, fn: () => { d.t0 -= chestT * 1000; } });
+      return;
+    }
+    if (hasItems && !d.burst) { d.burst = true; Sound.level(); buzz(45); }
+    if (hasItems && best >= 1) rays(W / 2, top + h - 120, 150, bcol, 0.55, pNow / 1400);
+    panel(24, top, W - 48, h);
     txt(mt('rewards'), W / 2, top + 40, 22, C.redDk, { weight: 900 });
     let y = top + 64;
-    if (d.coins) { coinIcon(W / 2 - 30, y + 12, 10); txt('+' + d.coins, W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
-    if (d.gems) { gemIcon(W / 2 - 30, y + 12, 10); txt('+' + d.gems, W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
+    if (d.coins) { coinIcon(W / 2 - 30, y + 12, 10); txt('+' + countUp(d.coins, t / 0.7), W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
+    if (d.gems) { gemIcon(W / 2 - 30, y + 12, 10); txt('+' + countUp(d.gems, t / 0.7), W / 2 - 14, y + 12, 18, C.ink, { align: 'left', weight: 900 }); y += 30; }
     const n = d.items.length;
     d.items.forEach((it, i) => {
-      const s = 70, x = W / 2 - (n * (s + 10) - 10) / 2 + i * (s + 10);
-      itemCard(it, x, y + 4, s, null);
-      txt(GEAR[it.b].name[lang], x + s / 2, y + s + 16, fitText(GEAR[it.b].name[lang], s + 8, 10), RARITY[it.r].col, { weight: 900, stroke: C.ink, lw: 2.5 });
+      const s = 74, x = W / 2 - (n * (s + 10) - 10) / 2 + i * (s + 10), k = easeBack((t - i * 0.14) / 0.32);
+      if (k <= 0) return;
+      ctx.save(); ctx.translate(x + s / 2, y + 6 + s / 2); ctx.scale(k, k); ctx.translate(-(x + s / 2), -(y + 6 + s / 2));
+      if (it.r >= 2) { ctx.shadowColor = RARITY[it.r].col; ctx.shadowBlur = 18 + Math.sin(pNow / 200) * 6; }
+      itemCard(it, x, y + 6, s, null);
+      ctx.restore();
+      txt(GEAR[it.b].name[lang], x + s / 2, y + s + 20, fitText(GEAR[it.b].name[lang], s + 8, 10), RARITY[it.r].col, { weight: 900, stroke: C.ink, lw: 2.5 });
+      txt(RARITY[it.r].name[lang], x + s / 2, y + s + 34, 9, '#6a5a45', { weight: 700 });
     });
-    button(W / 2 - 70, top + h - 68, 140, 44, mt('ok'), () => { menuPopup = null; popupData = null; Sound.click(); }, { size: 16 });
+    // white flash right after the chest bursts
+    if (hasItems && t < 0.3) { ctx.fillStyle = `rgba(255,250,230,${(1 - t / 0.3) * 0.8})`; ctx.fillRect(0, 0, W, H); }
+    button(W / 2 - 70, top + h - 62, 140, 44, mt('ok'), () => { menuPopup = null; popupData = null; Sound.click(); }, { size: 16 });
   }
   function drawEnergyPopup() {
     popupFrame(170, 280);
@@ -4860,15 +4895,18 @@
 
   function drawMenu() {
     energyTick();
-    if (!dailyShown && G3.heroSpear) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
+    if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     const top = ctx.createLinearGradient(0, 0, 0, 200);
     top.addColorStop(0, 'rgba(7,30,38,0.75)'); top.addColorStop(1, 'rgba(7,30,38,0)');
     ctx.fillStyle = top; ctx.fillRect(0, 0, W, 200);
     ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold);
+    const tk = tabEase();
+    ctx.save(); ctx.globalAlpha = 0.25 + 0.75 * tk; ctx.translate((1 - tk) * 26, 0);
     if (menuTab === 'fight') drawFightTab();
     else if (menuTab === 'gear') drawGearTab();
     else if (menuTab === 'talents') drawTalentsTab();
     else drawQuestsTab();
+    ctx.restore();
     resourceBar();
     const tg = (x, w, on, label, fn) => {
       rr(ctx, x, 24, w, 34, 9); ctx.fillStyle = C.ink; ctx.fill();
@@ -4889,10 +4927,148 @@
       rr(ctx, bx, by - 3, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
       rr(ctx, bx, by - 3, Math.max(6, bw * k), 6, 3); ctx.fillStyle = C.gold; ctx.fill();
     }
-    if (menuPopup === 'item') drawItemPopup();
-    else if (menuPopup === 'reward') drawRewardPopup();
-    else if (menuPopup === 'energy') drawEnergyPopup();
-    else if (menuPopup === 'daily') drawDailyPopup();
+    if (menuPopup) { ui.push({ x: 0, y: 0, w: W, h: H, fn: null }); overlay(0.65 * clamp(since(popT0) / 0.15, 0, 1)); }
+    if (menuPopup === 'item') withPop(drawItemPopup);
+    else if (menuPopup === 'reward') withPop(drawRewardPopup);
+    else if (menuPopup === 'energy') withPop(drawEnergyPopup);
+    else if (menuPopup === 'daily') withPop(drawDailyPopup);
+  }
+  // =================================================================== polish: splash, transitions, press feedback, tutorial, haptics
+  let press = null, pNow = performance.now(), pdt = 0;
+  let splashA = TEST_MODE ? 0 : 1, splashOut = TEST_MODE, splashT0 = performance.now(), tipI = 0;
+  let lastScene = null, transA = 0, lastTab = null, tabT0 = 0, lastPopup = null, popT0 = 0;
+  const tut = { step: 0, moveT: 0, stillT: 0, doneT: 0 };
+
+  const easeOut = k => 1 - Math.pow(1 - clamp(k, 0, 1), 3);
+  const easeBack = k => { k = clamp(k, 0, 1); const c = 1.70158; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+  const since = t0 => (pNow - t0) / 1000;
+
+  // a button looks pushed in for a moment after a tap inside it
+  function isPressed(x, y, w, h) {
+    return press && pNow - press.t < 140 && press.x >= x && press.x <= x + w && press.y >= y && press.y <= y + h;
+  }
+
+  // short vibration on phones (only when sound effects are on: one switch for "feedback")
+  function buzz(p) {
+    if (SIM.on || !Sound.sfx || !navigator.vibrate) return;
+    try { navigator.vibrate(p); } catch (e) { /* not allowed before the first tap */ }
+  }
+
+  function polishTick() {
+    const now = performance.now(); pdt = Math.min(0.05, (now - pNow) / 1000); pNow = now;
+    if (lastScene !== scene) { if (lastScene !== null) transA = 1; lastScene = scene; }
+    transA = Math.max(0, transA - pdt * 2.6);
+    if (menuTab !== lastTab) { lastTab = menuTab; tabT0 = now; }
+    if (menuPopup !== lastPopup) { lastPopup = menuPopup; popT0 = now; }
+    if (!splashOut && (G3.heroSpear && since(splashT0) > 2.4 || since(splashT0) > 20)) splashOut = true;
+    if (splashOut) splashA = Math.max(0, splashA - pdt * 1.6);
+  }
+
+  // ---- splash while the menu scene loads
+  const TIPS = {
+    ru: ['Стойте на месте — батыр стреляет сам', 'Ящики с припасами можно открыть выстрелом', 'Три одинаковых предмета объединяются в более редкий', 'Бомба сносит вражеские снаряды', 'Қыдыр ата помогает тем, кто дошёл до ворот', 'Заходите каждый день: на 7-й день эпический предмет'],
+    kz: ['Орнында тұрыңыз — батыр өзі атады', 'Жәшіктерді оқпен ашуға болады', 'Үш бірдей зат сирегіне бірігеді', 'Бомба жау оқтарын жояды', 'Қыдыр ата қақпаға жеткендерге көмектеседі', 'Күнде кіріңіз: 7-күні эпикалық зат'],
+    en: ['Stand still and the batyr shoots by himself', 'Supply crates open with an arrow too', 'Three identical items merge into a rarer one', 'A bomb wipes out enemy projectiles', 'Kydyr ata helps those who reach the gate', 'Come back daily: an epic item on day 7'],
+  };
+  function drawSplash() {
+    if (splashA <= 0) return;
+    ui.push({ x: 0, y: 0, w: W, h: H, fn: null });
+    ctx.save(); ctx.globalAlpha = splashA;
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b3a46'); g.addColorStop(0.55, '#07262e'); g.addColorStop(1, '#1a0f0a');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // soft sun disc behind the logo
+    const sun = ctx.createRadialGradient(W / 2, 250, 10, W / 2, 250, 200);
+    sun.addColorStop(0, 'rgba(255,200,90,0.35)'); sun.addColorStop(1, 'rgba(255,200,90,0)');
+    ctx.fillStyle = sun; ctx.fillRect(0, 50, W, 400);
+    ornamentBand(ctx, 0, 0, W, 16, C.red, C.gold); ornamentBand(ctx, 0, H - 16, W, 16, C.red, C.gold);
+    const t = since(splashT0), rise = easeOut(t / 0.9);
+    ctx.save(); ctx.globalAlpha = splashA * rise;
+    koshkar(ctx, W / 2, 178 - (1 - rise) * 20, 40 + Math.sin(t * 2) * 1.5, C.gold, 4);
+    txt('БАТЫР01', W / 2, 250 + (1 - rise) * 16, fitText('БАТЫР01', W - 50, 60), C.gold, { stroke: C.ink, lw: 11, weight: 900 });
+    txt(tr('subtitle'), W / 2, 298, 15, C.cream, { stroke: C.ink, lw: 4, weight: 900 });
+    ctx.restore();
+    const k = (G3.loadDone || 0) / (G3.loadTotal || 1), bw = 220, bx = (W - bw) / 2, by = 440;
+    rr(ctx, bx - 2, by - 6, bw + 4, 12, 6); ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+    const fillW = Math.max(8, bw * (G3.heroSpear ? Math.max(k, 0.35) : Math.min(0.33, 0.05 + t * 0.08)));
+    rr(ctx, bx, by - 4, fillW, 8, 4); const pg = ctx.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, C.goldDk); pg.addColorStop(1, '#ffe27a'); ctx.fillStyle = pg; ctx.fill();
+    txt(tr('loading'), W / 2, by + 22, 12, '#9fb3b8', { weight: 700 });
+    tipI = Math.floor(t / 3.2) % TIPS.ru.length;
+    const tip = TIPS[lang][tipI], ta = clamp(Math.min((t % 3.2) / 0.4, (3.2 - t % 3.2) / 0.4), 0, 1);
+    ctx.save(); ctx.globalAlpha = splashA * ta;
+    wrap('💡 ' + tip, W / 2, 520, W - 70, 18, 13, C.cream, { weight: 700 });
+    ctx.restore();
+    ctx.restore();
+  }
+
+  // ---- whole-screen fade when the scene changes (menu → battle → results → menu)
+  function drawTransition() {
+    if (transA <= 0) return;
+    ctx.fillStyle = `rgba(4,16,22,${easeOut(transA) * 0.95})`; ctx.fillRect(0, 0, W, H);
+  }
+  // tab content slides in, popups pop
+  function tabEase() { return easeOut(since(tabT0) / 0.22); }
+  function popEase() { return easeBack(since(popT0) / 0.26); }
+  function withPop(fn) {
+    const k = popEase(), a = clamp(since(popT0) / 0.12, 0, 1);
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.translate(W / 2, H / 2); ctx.scale(0.86 + 0.14 * k, 0.86 + 0.14 * k); ctx.translate(-W / 2, -H / 2);
+    fn(); ctx.restore();
+  }
+
+  // ---- chest and reward reveal
+  function drawChest(x, y, s, col, lid) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, s * 0.62, s * 0.8, s * 0.14, 0, 0, TAU); ctx.fill();
+    rr(ctx, -s * 0.7, -s * 0.05, s * 1.4, s * 0.65, s * 0.08); ctx.fillStyle = '#7a4a22'; ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
+    ctx.save(); ctx.translate(0, -s * 0.05); ctx.rotate(-lid * 0.9);
+    ctx.beginPath(); ctx.moveTo(-s * 0.7, 0); ctx.quadraticCurveTo(-s * 0.7, -s * 0.5, 0, -s * 0.52); ctx.quadraticCurveTo(s * 0.7, -s * 0.5, s * 0.7, 0); ctx.closePath();
+    ctx.fillStyle = '#8f5a2a'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillRect(-s * 0.08, -s * 0.52, s * 0.16, s * 0.52);
+    ctx.restore();
+    ctx.fillStyle = col; ctx.fillRect(-s * 0.08, -s * 0.05, s * 0.16, s * 0.65);
+    for (const sx of [-1, 1]) { ctx.fillRect(sx * s * 0.62 - s * 0.04, -s * 0.05, s * 0.08, s * 0.65); }
+    ctx.fillStyle = C.gold; rr(ctx, -s * 0.13, s * 0.05, s * 0.26, s * 0.24, 4); ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(0, s * 0.14, s * 0.04, 0, TAU); ctx.fill(); ctx.fillRect(-s * 0.015, s * 0.14, s * 0.03, s * 0.08);
+    koshkar(ctx, 0, -s * 0.3, s * 0.18, C.gold, 2);
+    ctx.restore();
+  }
+  function rays(x, y, r, col, a, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.globalAlpha *= a;
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    for (let i = 0; i < 12; i++) { ctx.rotate(TAU / 12); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, -r * 0.13); ctx.lineTo(r, r * 0.13); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  }
+  const countUp = (v, k) => Math.round(v * easeOut(k));
+
+  // ---- first-run tutorial in room 1
+  function tutActive() { return scene === 'play' && !modal && run && run.room === 1 && !Save.data.tut && introT <= 0 && !SIM.on; }
+  function tutTick(dt) {
+    if (!tutActive()) return;
+    if (tut.step === 0) { if (player.moving) tut.moveT += dt; if (tut.moveT > 0.7) tut.step = 1; }
+    else if (tut.step === 1) { if (!player.moving) tut.stillT += dt; if (tut.stillT > 1.4 || run.kills > 0) { tut.step = 2; tut.doneT = 0; } }
+    else { tut.doneT += dt; if (tut.doneT > 1.6) { Save.data.tut = true; Save.write(); } }
+  }
+  function drawTutorial() {
+    if (!tutActive()) return;
+    const msg = mt(['tutMove', 'tutStop', 'tutGood'][tut.step]);
+    const y = 104;
+    rr(ctx, 30, y - 24, W - 60, 46, 14); ctx.fillStyle = 'rgba(7,30,38,0.82)'; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.stroke();
+    txt(msg, W / 2, y - 1, fitText(msg, W - 80, 15), '#fff', { weight: 900 });
+    if (tut.step === 0) {
+      // finger swiping left and right
+      const k = (Math.sin(pNow / 420) + 1) / 2, hx = W / 2 - 60 + k * 120, hy = 540;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(W / 2 - 60, hy); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(hx, hy, 14, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx, hy, 22 + Math.sin(pNow / 200) * 3, 0, TAU); ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.stroke();
+    } else if (tut.step === 1) {
+      const pulse = 0.5 + Math.sin(pNow / 180) * 0.5;
+      ctx.strokeStyle = `rgba(244,196,48,${0.4 + pulse * 0.5})`; ctx.lineWidth = 3;
+      const p = proj(player.x, 0.1, player.y);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 28 + pulse * 8, 0, TAU); ctx.stroke();
+    }
   }
 })();
 </script>

@@ -1,11 +1,11 @@
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 2;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 3;
   const Save = {
     data: null,
     defaults() {
       return {
-        v: SAVE_VERSION, coins: 0, gems: 0, best: 0,
+        v: SAVE_VERSION, coins: 0, gems: 0, best: 0, tut: false,
         talents: { atk: 0, hp: 0, armor: 0, magnet: 0, regen: 0, loot: 0, start: 0 },
         // starter gear: a common bow and chapan, already equipped
         gear: { items: [{ id: 1, b: 'bow', r: 0, l: 1 }, { id: 2, b: 'shapan', r: 0, l: 1 }], eq: { weapon: 1, armor: 2 }, next: 3 },
@@ -41,6 +41,8 @@
         out.talents.hp = Math.min(20, (d.upHp || 0) * 2);
         delete out.upAtk; delete out.upHp;
       }
+      // v2 → v3: first-run tutorial flag; players who already reached a room skip it
+      if ((d.v || 0) < 3) out.tut = (d.best || 0) > 0;
       out.v = SAVE_VERSION;
       return out;
     },
