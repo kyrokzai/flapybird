@@ -48,7 +48,9 @@
     // page dots and buttons
     COMIC.frames.forEach((_, i) => { ctx.beginPath(); ctx.arc(W / 2 - (COMIC.frames.length - 1) * 8 + i * 16, H - SAFE.b - 78, i === comicI ? 4.5 : 3, 0, TAU); ctx.fillStyle = i === comicI ? T.gold : 'rgba(255,236,200,0.35)'; ctx.fill(); });
     button(W / 2 - 80, H - SAFE.b - 62, 160, 42, comicI < COMIC.frames.length - 1 ? mt('next') + ' ›' : mt('toBattle'), () => { if (shown.length < full.length) comicT0 -= 30000; else comicNext(); }, { size: 15 });
-    txt(mt('skip'), W - 40, SAFE.t + 32, 12, T.muted, { weight: 700 });
+    ctx.font = `700 12px ${FONT}`; const skw = ctx.measureText(mt('skip')).width + 24;
+    rr(ctx, W - 12 - skw, SAFE.t + 18, skw, 28, 14); ctx.fillStyle = 'rgba(8,11,18,0.72)'; ctx.fill(); goldFrame(W - 12 - skw, SAFE.t + 18, skw, 28, 14, 1);
+    txt(mt('skip'), W - 12 - skw / 2, SAFE.t + 32.5, 12, T.text, { weight: 700 });
     ui.push({ x: W - 80, y: SAFE.t + 14, w: 76, h: 36, fn: () => { Sound.click(); comicEnd(); } });
     frameBand(SAFE.t + 8);
   }
