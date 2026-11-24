@@ -1,5 +1,5 @@
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
-  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
+  const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', hero: 'HERO_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB', prop_birch: 'PROP_BIRCH_GLB', lm_portal: 'LM_PORTAL_GLB', civ_woman: 'CIV_WOMAN_GLB',
     prop_gate: 'PROP_GATE_GLB', prop_chest: 'PROP_CHEST_GLB', prop_fence: 'PROP_FENCE_GLB', prop_hedge: 'PROP_HEDGE_GLB', prop_lamp: 'PROP_LAMP_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
@@ -322,19 +322,22 @@
     return { g, up, uni, batyr: true, bow, mats: [] };
   }
   // archer batyr with a real skeleton (auto-rigged): idle, run, aim loop (part of the archery clip), hit, death
-  function makeBatyrRig(model) {
+  function makeBatyrRig(model, tripo) {
     const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
-    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.9);
+    // tripo: the owner's comic warrior (assets/hero.js), Tripo skeleton; so far only a run clip, the rest is posed in code
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(tripo ? 1.75 : 0.9);
     model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
     up.add(model);
-    const clips = model.userData.clips || [], mixer = new THREE.AnimationMixer(model), act = {};
+    const clips = model.userData.clips || [], mixer = new THREE.AnimationMixer(model), act = {}, m0 = {};
     for (const c of clips) act[c.name] = mixer.clipAction(c);
     const shot = clips.find(c => c.name === 'shot');
     if (shot) act.aim = mixer.clipAction(THREE.AnimationUtils.subclip(shot, 'aim', 60, 111, 30));
     for (const k of ['hit', 'death']) if (act[k]) { act[k].setLoop(THREE.LoopOnce, 1); act[k].clampWhenFinished = true; }
     if (act.aim) act.aim.timeScale = 1.5;
+    const run = clips.find(c => c.name === 'run');
+    if (!act.idle && run) { act.idle = mixer.clipAction(THREE.AnimationUtils.subclip(run, 'idle', 15, 16, 30)); m0.pose = true; }   // the most upright frame of the run as a standing pose
     if (act.idle) act.idle.play();
-    return { g, up, rig: true, mixer, act, cur: 'idle', hitT: 0, lastHp: null };
+    return Object.assign(m0, { g, up, rig: true, mixer, act, cur: 'idle', hitT: 0, lastHp: null, deadK: 0 });
   }
   function animateRig(m, o) {
     const dt = Math.min(0.05, o.dt || 1 / 60);
@@ -354,6 +357,15 @@
     }
     if (m.act.run) m.act.run.timeScale = o.runK || 1.15;
     m.mixer.update(dt);
+    if (m.pose) {
+      // clips the warrior does not have yet: breathing while standing, a flinch on a hit, a fall on death
+      const still = !o.moving && !o.dead;
+      m.up.scale.y = still && !REDUCED_MOTION ? 1 + Math.sin(time * 2.2) * 0.012 : 1;
+      m.deadK = o.dead ? Math.min(1, m.deadK + dt * 2.5) : 0;
+      const fl = m.hitT > 0 ? Math.sin((0.5 - m.hitT) / 0.5 * Math.PI) * 0.22 : 0;
+      m.up.rotation.z = -fl + m.deadK * m.deadK * 1.45;
+      m.up.position.y = m.deadK * 0.12;
+    }
   }
   function animateBatyr(m, o) {
     m.uni.uSwing.value = o.moving ? Math.sin(o.walk) * 0.55 : 0;

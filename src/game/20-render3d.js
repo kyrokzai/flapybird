@@ -43,6 +43,7 @@
     // hero
     // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
     if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
+    if (G3.models.hero && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.hero, true); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_rig && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.batyr_rig); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_bow && !G3.heroBow) { G3.heroBow = makeBatyr(G3.models.batyr_bow, true); G3.dyn.add(G3.heroBow.g); }
     if (!G3.heroProc) { G3.heroProc = makeHero(); G3.dyn.add(G3.heroProc.g); G3.heroRing = decal(G3.ringTex, '#5fd3ff', 0.95, 0.55); G3.dyn.add(G3.heroRing); }
