@@ -44,7 +44,7 @@
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !TEST_MODE) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* sandboxed frame */ } }
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_birch', 'prop_tree', 'civ_woman', 'lm_portal', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+  const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_gate', 'prop_hedge', 'prop_chest', 'prop_birch', 'prop_tree', 'civ_woman', 'prop_fence', 'prop_lamp', 'lm_portal', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
   const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'], ['i', 'icons'], ['c', 'comic'], ['a', 'music_menu'], ['a', 'sfx'],

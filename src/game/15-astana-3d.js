@@ -280,6 +280,30 @@
     return g;
   }
 
+  // many copies of one model, one draw call per mesh (hedges, railings, street lamps). Each place is
+  // { x, z, ry, w, h, l }: world size across (model x), up (y) and along (model z); a missing size keeps the proportions.
+  // pivot: model-space [x, z] that lands on (x, z); by default the middle of the bounding box.
+  function propInstances(name, places, pivot) {
+    const src = G3.models[name]; if (!src || !places.length) return null;
+    src.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(src), bs = box.getSize(new THREE.Vector3());
+    const px = pivot ? pivot[0] : (box.min.x + box.max.x) / 2, pz = pivot ? pivot[1] : (box.min.z + box.max.z) / 2;
+    const g = new THREE.Group(), base = new THREE.Matrix4().makeTranslation(-px, -box.min.y, -pz), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const mats = places.map(p => {
+      const k = p.h ? p.h / bs.y : p.l ? p.l / bs.z : p.w / bs.x;
+      const sc = new THREE.Vector3(p.w ? p.w / bs.x : k, p.h ? p.h / bs.y : k, p.l ? p.l / bs.z : k);
+      return new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y || 0, p.z), q.setFromAxisAngle(up, p.ry || 0).clone(), sc).multiply(base);
+    });
+    src.traverse(o => {
+      if (!o.isMesh) return;
+      const im = new THREE.InstancedMesh(o.geometry, o.material, places.length);
+      mats.forEach((m, i) => im.setMatrixAt(i, m4.multiplyMatrices(m, o.matrixWorld)));
+      im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false;   // the base bounding sphere does not cover the instances
+      g.add(im);
+    });
+    return g;
+  }
+
   // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
   const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH' };
   function loadSky(name, done) {
@@ -394,8 +418,18 @@
   // --- walls and gate per theme
   function themeWalls(R, theme, zN, zS) {
     const len = zS - zN, zc = (zN + zS) / 2;
+    const hedge = theme === 'park' && G3.models.prop_hedge, fence = theme === 'street' && G3.models.prop_fence, runs = [];
+    // the owner's hedge / railing models are laid end to end along the wall, stretched a little so the pieces meet exactly
+    const lay = (L, alongX, x, z, piece, w, h, y) => {
+      const n = Math.max(1, Math.round(L / piece)), l = L / n;
+      for (let i = 0; i < n; i++) { const t = -L / 2 + l * (i + 0.5); runs.push({ x: x + (alongX ? t : 0), y, z: z + (alongX ? 0 : t), ry: alongX ? Math.PI / 2 : 0, w, h, l: l * 1.02 }); }
+    };
     const seg = (L, alongX, x, z) => {
-      if (theme === 'park' || theme === 'beach') {
+      if (hedge) lay(L, alongX, x, z, 2.1, 0.42, 0.62);
+      else if (fence) {
+        const curb = mesh(G3.geo.box, mat('#b8b4ac', { r: 0.7 }), x, 0.1, z, alongX ? L : 0.3, 0.2, alongX ? 0.3 : L); curb.receiveShadow = true; R.add(curb);
+        lay(L, alongX, x, z, 1.3, 0.16, 0.6, 0.2);
+      } else if (theme === 'park' || theme === 'beach') {
         const h = theme === 'park' ? 0.55 : 0.35;
         const m = theme === 'park' ? mat('#3f6a2c', { r: 1, flat: true }) : mat('#f2efe8', { r: 0.6 });
         const b = mesh(G3.geo.box, m, x, h / 2, z, alongX ? L : 0.32, h, alongX ? 0.32 : L); b.receiveShadow = true; R.add(b);
@@ -412,9 +446,23 @@
     };
     seg(3.6, true, -2.55, zN - 0.15); seg(3.6, true, 2.55, zN - 0.15); seg(8.6, true, 0, zS + 0.15);
     seg(len, false, -4.15, zc); seg(len, false, 4.15, zc);
+    if (runs.length) R.add(propInstances(hedge ? 'prop_hedge' : 'prop_fence', runs));
     // gate
     G3.doors = [];
-    if (theme === 'office') {
+    if (theme !== 'office' && G3.models.prop_gate) {
+      // the owner's carved wooden gate: a static frame with the crest, and two leaves hinged on the posts
+      const src = G3.models.prop_gate; src.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(src), k = 2.2 / (box.max.z - box.min.z);
+      const root = new THREE.Group(); root.position.set(0, -box.min.y * k, zN - 0.15); root.rotation.y = Math.PI / 2; root.scale.setScalar(k); R.add(root);
+      src.traverse(o => {
+        if (!o.isMesh) return;
+        const m = new THREE.Mesh(o.geometry, o.material); m.applyMatrix4(o.matrixWorld); m.castShadow = true; m.receiveShadow = true;
+        if (o.name !== 'doorL' && o.name !== 'doorR') { root.add(m); return; }
+        const sx = o.name === 'doorL' ? -1 : 1, hx = -0.015, hz = sx * 0.315;   // hinge line on the inner face of the post
+        const pv = new THREE.Group(); pv.position.set(hx, 0, hz); m.position.x -= hx; m.position.z -= hz; pv.add(m); root.add(pv);
+        G3.doors.push({ pv, sx });
+      });
+    } else if (theme === 'office') {
       const steel = mat('#9aa2ac', { m: 0.85, r: 0.3 });
       R.add(mesh(G3.geo.box, steel, 0, 1.12, zN - 0.15, 1.8, 0.24, 0.3));
       for (const sx of [-1, 1]) R.add(mesh(G3.geo.box, steel, sx * 0.84, 0.56, zN - 0.15, 0.14, 1.12, 0.3));
@@ -513,14 +561,17 @@
     for (const o of obstacles) R.add(def.arena ? arenaProp(o) : themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
 
     // scenery beside the arena
+    const lamps = [];
     if (def.arena) buildArenaScenery(R, zN, zS);
     else for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
       if (theme === 'park' && G3.models.prop_birch && rnd() < 0.45) { const t = propModel('prop_birch', 3 + rnd() * 1.4, 'h'); t.position.set(x + s * 0.6, 0, z + rnd()); t.rotation.y = rnd() * TAU; R.add(t); }
       else if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
+      else if (theme === 'street' && G3.models.prop_lamp) { lamps.push({ x: s * 4.75, z, ry: s < 0 ? 0 : Math.PI, h: 2.5 }); R.add(mesh(G3.geo.cyl, mat('#fff6d8', { e: '#ffe9a0', ei: 1.6 }), s * 4.75 - s * 0.26, 2.37, z, 0.09, 0.02, 0.09, false)); }
       else if (theme === 'street') { const p = mesh(G3.geo.cyl, mat('#2f3338', { m: 0.7 }), s * 4.7, 1.0, z, 0.04, 2.0, 0.04); R.add(p); const l = mesh(G3.geo.sphere, mat('#fff6d8', { e: '#ffe9a0', ei: 1.2 }), s * 4.55, 2.0, z, 0.1); R.add(l); }
       else if (theme === 'beach') R.add(themeProp('beach', 'stone', { seed: Math.floor(rnd() * 1e5) * 3 }, x, z));
     }
+    if (lamps.length) R.add(propInstances('prop_lamp', lamps, [0.049, 0.0948]));
     // landmarks to the north, seen in the fly-over
     if (!(pano && theme === 'beach')) for (const [kind, x, dz, s] of def.lm) { const lm = landmarkModel(kind) || landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.multiplyScalar(s); R.add(lm); }
     const city = mulberry32(n * 13);

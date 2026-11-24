@@ -1,6 +1,7 @@
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB', prop_birch: 'PROP_BIRCH_GLB', lm_portal: 'LM_PORTAL_GLB', civ_woman: 'CIV_WOMAN_GLB',
+    prop_gate: 'PROP_GATE_GLB', prop_chest: 'PROP_CHEST_GLB', prop_fence: 'PROP_FENCE_GLB', prop_hedge: 'PROP_HEDGE_GLB', prop_lamp: 'PROP_LAMP_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
     prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {

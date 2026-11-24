@@ -84,10 +84,18 @@
       g.beginPath(); g.moveTo(8, 8); g.lineTo(w - 8, h - 8); g.stroke();
       koshkar(g, w / 2, h / 2 + 4, 36, '#f0c040', 4);
     });
-    const g = new THREE.Group(), box = new THREE.Group(); box.scale.setScalar(1.3); g.add(box);
-    box.add(mesh(G3.geo.box, mat('#ffffff', { map: G3.crateTex, r: 0.8, e: '#3a2208', ei: 0.35 }), 0, 0.22, 0, 0.44, 0.44, 0.44));
-    const gold = mat('#f0c040', { m: 0.9, r: 0.3, e: '#a8740f', ei: 0.35 });
-    for (const y of [0.04, 0.4]) box.add(mesh(G3.geo.box, gold, 0, y, 0, 0.46, 0.04, 0.46));
+    const g = new THREE.Group(), box = new THREE.Group(); g.add(box);
+    if (G3.models.prop_chest) {
+      // the owner's carved chest, lit a little from within by its own texture so it reads as loot
+      const c = propModel('prop_chest', 0.82, 'w'); c.rotation.y = Math.PI / 2;
+      c.traverse(o => { if (!o.isMesh) return; if (!G3.chestMat) { G3.chestMat = o.material.clone(); G3.chestMat.emissive = col('#ffffff'); G3.chestMat.emissiveMap = G3.chestMat.map; G3.chestMat.emissiveIntensity = 0.28; } o.material = G3.chestMat; o.castShadow = true; });
+      box.add(c);
+    } else {
+      box.scale.setScalar(1.3);
+      box.add(mesh(G3.geo.box, mat('#ffffff', { map: G3.crateTex, r: 0.8, e: '#3a2208', ei: 0.35 }), 0, 0.22, 0, 0.44, 0.44, 0.44));
+      const gold = mat('#f0c040', { m: 0.9, r: 0.3, e: '#a8740f', ei: 0.35 });
+      for (const y of [0.04, 0.4]) box.add(mesh(G3.geo.box, gold, 0, y, 0, 0.46, 0.04, 0.46));
+    }
     const gl = glow('#ffd24a', 1.4, 0.4); gl.position.y = 0.35; g.add(gl); g.userData.glow = gl;
     // gold ring on the ground, a beam of light and a bobbing marker above
     g.add(lootShadow(1.7));
