@@ -5,7 +5,13 @@
   const ctx = canvas.getContext('2d');
   let K = 1, cssW = W, cssH = H;
   function resize() {
-    const iw = window.innerWidth, ih = window.innerHeight, oldH = H;
+    const iw = window.innerWidth, oldH = H, oldT = SAFE.t;
+    let ih = Math.max(window.innerHeight, document.documentElement.clientHeight || 0);
+    // iPhone home-screen app: at launch Safari reports a viewport shorter than the screen, which left a dark band below the game
+    if (navigator.standalone === true && screen.width && screen.height) {
+      const full = iw <= Math.min(screen.width, screen.height) + 1 ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+      if (full > ih) { ih = full; document.documentElement.style.height = document.body.style.height = full + 'px'; }
+    }
     H = Math.round(Math.min(860, Math.max(640, W * ih / iw)));
     const scale = Math.min(iw / W, ih / H);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -19,7 +25,7 @@
     canvas.width = Math.round(W * scale * dpr);
     canvas.height = Math.round(H * scale * dpr);
     K = canvas.width / W;
-    if (G3.cam && oldH !== H) fitCamera();
+    if (G3.cam && (oldH !== H || Math.abs(oldT - SAFE.t) > 0.5)) fitCamera();
     if (G3.r) {
       const pr = G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
       G3.r.setPixelRatio(pr); G3.r.setSize(cssW, cssH, false);
@@ -30,6 +36,10 @@
     }
   }
   window.addEventListener('resize', () => resize());
+  // phones settle their viewport late (toolbars, notch, home-screen launch): measure again a little later
+  window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => resize());
+  window.addEventListener('pageshow', () => { setTimeout(resize, 300); setTimeout(resize, 1200); });
 
   function rr(g, x, y, w, h, r) {
     g.beginPath();

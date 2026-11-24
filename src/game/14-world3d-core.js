@@ -230,7 +230,7 @@
     c.aspect = W / H; c.fov = G3.baseFov; c.updateProjectionMatrix();
     for (let d = 12; d < 80; d += 0.25) {
       let lo = -8, hi = 8;
-      for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; placeCam(d, m, el); if (proj3(0, 0, -6.5).y < 100) hi = m; else lo = m; }
+      for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; placeCam(d, m, el); if (proj3(0, 0, -6.5).y < 100 + SAFE.t) hi = m; else lo = m; }   // the far edge sits just below the HUD (and the notch)
       const tz = (lo + hi) / 2; placeCam(d, tz, el);
       const bl = proj3(-4.05, 0, 6.6), br = proj3(4.05, 0, 6.6);
       if (bl.y <= H - 8 && bl.x >= 0 && br.x <= W) { G3.camBase = { d, tz, el }; return; }
