@@ -88,6 +88,7 @@
     e.anim += dt;
     if (e.spawn > 0) { e.spawn -= dt; return; }
     e.flash -= dt; e.wind = false;
+    eliteTick(e, dt);
     if (e.burn > 0) {
       e.burn -= dt; e.burnT -= dt;
       if (e.burnT <= 0) { e.burnT = 0.4; hitEnemy(e, e.burnDmg, { noCrit: true, silent: true, col: '#ffae4d' }); if (e.dead) return; }

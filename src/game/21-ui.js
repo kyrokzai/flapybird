@@ -232,10 +232,14 @@
   function drawWorldOverlay() {
     if (introT > 0) return;
     for (const e of enemies) {
-      if (e.boss || e.spawn > 0 || e.hp >= e.maxHp) continue;
-      const p = proj(e.x, MODEL_H[e.type] + 0.12, e.y), w = e.r * 2 + 8;
+      if (e.boss || e.spawn > 0 || (e.hp >= e.maxHp && !e.elite)) continue;
+      const p = proj(e.x, MODEL_H[e.type] * (e.elite ? 1.2 : 1) + 0.12, e.y), w = e.r * 2 + 8;
       ctx.fillStyle = 'rgba(0,0,0,0.65)'; rr(ctx, p.x - w / 2 - 1, p.y - 1, w + 2, 6, 3); ctx.fill();
-      ctx.fillStyle = '#e0423a'; rr(ctx, p.x - w / 2, p.y, Math.max(2, w * clamp(e.hp / e.maxHp, 0, 1)), 4, 2); ctx.fill();
+      ctx.fillStyle = e.elite ? ELITES[e.elite].col : '#e0423a'; rr(ctx, p.x - w / 2, p.y, Math.max(2, w * clamp(e.hp / e.maxHp, 0, 1)), 4, 2); ctx.fill();
+      if (e.elite) {
+        if (e.ward > 0) { ctx.fillStyle = '#fff2b0'; rr(ctx, p.x - w / 2, p.y - 4, Math.max(2, w * e.ward / e.wardMax), 2.5, 1.2); ctx.fill(); }
+        txt('★ ' + ELITES[e.elite].name[lang], p.x, p.y - 10, 9.5, ELITES[e.elite].col, { weight: 800, stroke: C.ink, lw: 2.5 });
+      }
     }
     if (scene === 'play') {
       const p = proj(player.x, 1.85, player.y), w = 42;

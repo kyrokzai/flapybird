@@ -535,6 +535,7 @@
     m.burn = glow('#ff8a20', 0.7, 0); m.burn.position.y = MODEL_H[e.type] * 0.6; g.add(m.burn);
     m.slow = glow('#8fe0ff', 1.0, 0); m.slow.position.y = MODEL_H[e.type] * 0.4; g.add(m.slow);
     m.shadow = blobShadow((e.boss ? 2.6 : 1.2) * (e.r / 13) * 0.9, e.fly ? 0.3 : 0.42); m.g.add(m.shadow);
+    if (!e.boss) addEliteVisuals(e, m);
     return m;
   }
 
@@ -561,6 +562,7 @@
     m.warn.material.opacity = e.wind ? 0.45 + Math.sin(time * 18) * 0.25 : 0;
     m.burn.material.opacity = e.burn > 0 ? 0.6 + Math.sin(time * 25) * 0.25 : 0;
     m.slow.material.opacity = e.slow > 0 ? 0.45 : 0;
+    updateEliteVisuals(e, m);
     setFlash(m, e.flash > 0);
     const moving = Math.hypot(e.vx, e.vy) > 5, a = e.anim;
     switch (e.type) {

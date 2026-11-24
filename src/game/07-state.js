@@ -25,7 +25,7 @@
   const baseAtk = () => 10 * (1 + (run && run.S ? run.S.atk : 0));
   const atk = () => baseAtk() * (1 + 0.25 * sk('atk'));
   const fireInterval = () => 0.78 / (1 + 0.2 * sk('spd')) / (1 + (run && run.S ? run.S.aspd : 0)) / (player && player.weapon && player.weapon.kind === 'w_rapid' ? 1.9 : 1);
-  const moveSpeed = () => 140 * (1 + 0.15 * sk('speed'));
+  const moveSpeed = () => 140 * (1 + 0.15 * sk('speed')) * (player && player.chill > 0 ? 0.72 : 1);   // ice elites chill the batyr
   const upCost = lvl => Math.round(40 * Math.pow(lvl + 1, 1.45) / 10) * 10;
   const xpNeed = lvl => 12 + lvl * 8;
 
@@ -38,6 +38,7 @@
       newRun(mode); return;
     }
     if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
+    if (COMIC.ready && !Save.data.introSeen && !TEST_MODE) { scene = 'menu'; playComic(() => newRun(mode)); return; }   // the story begins with the comic, once
     newRun(mode);
   }
 

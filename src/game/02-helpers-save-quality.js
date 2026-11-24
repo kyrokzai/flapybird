@@ -1,6 +1,6 @@
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 5;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 6;
   const Save = {
     data: null,
     defaults() {
@@ -13,8 +13,9 @@
         daily: { day: 0, last: '' },
         quests: { date: '', list: [], bonus: false },
         settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null },
-        profile: { name: '', avatar: 0 },
-        stats: { runs: 0, wins: 0, kills: 0, bosses: 0, rooms: 0, coins: 0, time: 0, arenaRuns: 0 },
+        profile: { name: '', avatar: 0, frame: 'gold' },
+        stats: { runs: 0, wins: 0, kills: 0, bosses: 0, rooms: 0, coins: 0, time: 0, arenaRuns: 0, wolves: 0, elites: 0, arenaWins: 0, noRevWins: 0, maxLevel: 0, merges: 0, legend: 0 },
+        ach: {}, frames: ['gold'], pass: { season: 1, start: 0, claimed: [] }, introSeen: false,
         glory: 0,
         tickets: { n: 1, day: '' },
       };
@@ -37,7 +38,7 @@
     },
     upgrade(d) {
       const def = this.defaults(), out = Object.assign(def, d);
-      for (const k of ['settings', 'talents', 'energy', 'daily', 'quests', 'profile', 'stats', 'tickets']) out[k] = Object.assign(this.defaults()[k], d[k] || {});
+      for (const k of ['settings', 'talents', 'energy', 'daily', 'quests', 'profile', 'stats', 'tickets', 'pass', 'ach']) out[k] = Object.assign(this.defaults()[k], d[k] || {});
       if (!d.gear || !Array.isArray(d.gear.items)) out.gear = this.defaults().gear;
       // v1 → v2: the two shop upgrades become talents (old +8% / +10% steps = two new talent levels each)
       if ((d.v || 0) < 2) {
@@ -50,6 +51,8 @@
       // v3 → v4: survival arena record
       if ((d.v || 0) < 4) out.bestWave = d.bestWave || 0;
       // v4 → v5: profile, lifetime stats, glory (estimated from the records so far), arena tickets
+      // v5 → v6: achievements, frames, season pass (counts glory from now on), comic intro flag
+      if ((d.v || 0) < 6) { out.pass.start = out.glory || 0; if (!Array.isArray(out.frames)) out.frames = ['gold']; if (out.gear.items.some(i => i.r >= 3)) out.stats.legend = 1; }
       if ((d.v || 0) < 5) { out.glory = (d.best || 0) * 25 + (out.bestWave || 0) * 18; out.stats.rooms = Math.max(0, (d.best || 1) - 1); }
       out.v = SAVE_VERSION;
       return out;

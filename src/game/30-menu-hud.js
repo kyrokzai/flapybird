@@ -261,13 +261,14 @@
   }
 
   // ---- bottom tab bar
-  const TAB_ICON = { fight: icoSwords, gear: icoHelmet, talents: icoTree, quests: icoScroll };
+  const TAB_ICON = { fight: icoSwords, gear: icoHelmet, talents: icoTree, quests: icoScroll, pass: (x, y, s, c) => icoRoad(x, y, s, c) };
+  const TABS = ['fight', 'gear', 'talents', 'quests', 'pass'];
   function tabBar() {
-    const y = TAB_Y, h = 60, gap = 6, w = (W - 16 - gap * 3) / 4;
+    const y = TAB_Y, h = 60, gap = 5, w = (W - 16 - gap * (TABS.length - 1)) / TABS.length;
     const bg = ctx.createLinearGradient(0, y - 10, 0, H); bg.addColorStop(0, 'rgba(9,12,19,0)'); bg.addColorStop(0.18, 'rgba(9,12,19,0.94)'); bg.addColorStop(1, 'rgba(6,8,13,0.98)');
     ctx.fillStyle = bg; ctx.fillRect(0, y - 10, W, H - y + 10);
     frameBand(y - 4);
-    ['fight', 'gear', 'talents', 'quests'].forEach((id, i) => {
+    TABS.forEach((id, i) => {
       const x = 8 + i * (w + gap), on = menuTab === id, ty = y + 6, down = isPressed(x, ty, w, h);
       ctx.save(); if (down) ctx.translate(0, 2);
       rr(ctx, x, ty, w, h, 10);
@@ -278,8 +279,8 @@
       else { rr(ctx, x, ty, w, h, 10); ctx.strokeStyle = 'rgba(220,183,94,0.35)'; ctx.lineWidth = 1.2; ctx.stroke(); }
       TAB_ICON[id](x + w / 2, ty + 22, 15, on ? T.goldLt : '#b9a476');
       const label = mt('tab' + id[0].toUpperCase() + id.slice(1));
-      txt(label, x + w / 2, ty + 46, fitText(label, w - 8, 11, 700), on ? '#fff3d6' : T.muted, { weight: 700 });
-      const badge = id === 'quests' ? questsReady() + (canClaimDaily() ? 1 : 0) : id === 'gear' ? (gearItems().some(canMerge) ? 1 : 0) : 0;
+      txt(label, x + w / 2, ty + 46, fitText(label, w - 6, 10.5, 700), on ? '#fff3d6' : T.muted, { weight: 700 });
+      const badge = id === 'quests' ? questsReady() + (canClaimDaily() ? 1 : 0) : id === 'gear' ? (gearItems().some(canMerge) ? 1 : 0) : id === 'pass' ? passReady() : 0;
       if (badge) {
         const bx = x + w - 10, by = ty + 8;
         ctx.beginPath(); ctx.arc(bx, by, 8, 0, TAU); ctx.fillStyle = '#c4161c'; ctx.fill(); ctx.strokeStyle = '#ffd7a0'; ctx.lineWidth = 1.2; ctx.stroke();
@@ -398,6 +399,7 @@
   // ---- the menu frame around every tab
   function drawMenu() {
     energyTick(); ticketsTick();
+    achUpdate();
     TAB_Y = H - SAFE.b - 72;
     if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     // cinematic grade over the 3D scene: dark top and bottom so the gold chrome reads
@@ -417,12 +419,16 @@
       else if (menuTab === 'quests') drawQuestsTab();
       else if (menuTab === 'profile') drawProfileTab();
       else if (menuTab === 'rating') drawRatingTab();
+      else if (menuTab === 'ach') drawAchTab();
+      else if (menuTab === 'pass') drawPassTab();
       ctx.restore();
       topBar();
       counters();
     });
     if (menuTab === 'fight') { const tk = tabEase(); ctx.save(); ctx.globalAlpha = 0.25 + 0.75 * tk; drawFightTab(); ctx.restore(); }
     tabBar();
+    if (menuPopup === 'comic') { ui.push({ x: 0, y: 0, w: W, h: H, fn: null }); drawComic(); return; }
+    shiftUI(SAFE.t, () => drawToasts(pdt));
     if (menuPopup) { ui.push({ x: 0, y: 0, w: W, h: H, fn: null }); overlay(0.7 * clamp(since(popT0) / 0.15, 0, 1)); }
     if (menuPopup === 'item') withPop(drawItemPopup, true);
     else if (menuPopup === 'reward') withPop(drawRewardPopup, false);

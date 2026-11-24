@@ -44,6 +44,7 @@
     if (e.dead || e.spawn > 0) return;
     let d = dmg, crit = false;
     if (!opts.noCrit && Math.random() < player.crit) { d *= player.critMul; crit = true; }
+    d = eliteAbsorb(e, d);
     e.hp -= d; e.flash = 0.1; e.punch = 1;
     burst(e.x, e.y, crit ? '#ffb040' : '#fff0c0', crit ? 8 : 4, 130, 2.2);
     if (crit) { hitStop = Math.max(hitStop, 0.025); shake = Math.max(shake, 3); }
@@ -61,7 +62,7 @@
     e.dead = true;
     run.kills++;
     questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; run.bossKills = (run.bossKills || 0) + 1; }
-    if (!SIM.on) { Save.data.stats.kills++; if (e.boss) Save.data.stats.bosses++; }
+    if (!SIM.on) { const st = Save.data.stats; st.kills++; if (e.boss) st.bosses++; if (e.type === 'w') st.wolves++; }
     // a story boss pays an arena ticket
     if (e.boss && !isSurv() && !SIM.on) { addTicket(1); floatText(e.x, e.y, '+1 ' + mt('ticket'), '#c99bff', 15, 2.6); }
     Sound.kill();
@@ -79,6 +80,8 @@
     for (let i = 0; i < coins; i++) dropPickup(e.x, e.y, 'coin', coinV / coins);
     if (Math.random() < (e.boss ? 1 : 0.09)) dropPickup(e.x, e.y, 'heart', 0);
     if (e.boss) dropBonus(e.x, e.y, randomItem()); else if (Math.random() < 0.05) dropBonus(e.x, e.y, randomItem());
+    eliteDeath(e);
+    if (!SIM.on && run.kills % 10 === 0) achUpdate();
     if (sk('blood')) healPlayer(player.maxHp * 0.02 * sk('blood'));
   }
 
@@ -191,7 +194,7 @@
     run.xp += v;
     while (run.xp >= xpNeed(run.level)) {
       run.xp -= xpNeed(run.level);
-      run.level++; questEvent('level', run.level);
+      run.level++; questEvent('level', run.level); if (!SIM.on && run.level > Save.data.stats.maxLevel) Save.data.stats.maxLevel = run.level;
       run.pendingLv++;
     }
   }

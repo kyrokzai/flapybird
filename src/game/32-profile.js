@@ -55,21 +55,22 @@
     run.recorded = true;
     const st = Save.data.stats;
     st.runs++; if (won) st.wins++;
-    if (isSurv()) st.arenaRuns++;
+    if (isSurv()) { st.arenaRuns++; if (won) st.arenaWins++; } else if (won && !run.revived) st.noRevWins++;
     st.coins += run.coins; st.time += Math.round(run.t || 0);
     run.glory = gloryFor(won);
     Save.data.glory += run.glory;
-    Save.write();
+    Save.write(); achUpdate();
   }
 
   // ---- avatars: gold emblems on a coloured disc
   const AVATARS = [['#7a2a24', 'eagle'], ['#1f4f7a', 'wolf'], ['#2f6a3a', 'horse'], ['#6a3a8a', 'shanyrak'], ['#8a6a1a', 'bow'], ['#3a3f4a', 'koshkar']];
   function drawAvatar(x, y, r, idx, ring) {
+    ring = ring || frameCol();
     const [bg, kind] = AVATARS[idx % AVATARS.length];
     ctx.save();
     const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, r * 0.1, x, y, r); g.addColorStop(0, bg); g.addColorStop(1, '#0b0f17');
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
-    ctx.lineWidth = Math.max(1.5, r * 0.09); ctx.strokeStyle = ring || goldGrad(y - r, r * 2); ctx.stroke();
+    ctx.lineWidth = Math.max(1.8, r * 0.11); ctx.strokeStyle = ring; ctx.stroke();
     ctx.translate(x, y); ctx.scale(r / 30, r / 30); ctx.fillStyle = goldGrad(-24, 48); ctx.strokeStyle = goldGrad(-24, 48); ctx.lineWidth = 3; ctx.lineCap = 'round';
     if (kind === 'eagle') { ctx.save(); ctx.translate(0, 4); ctx.scale(0.42, 0.42); eaglePath(); ctx.fill('evenodd'); ctx.restore(); }
     else if (kind === 'wolf') { ctx.beginPath(); ctx.moveTo(-14, -14); ctx.lineTo(-8, -2); ctx.lineTo(-12, 8); ctx.lineTo(0, 16); ctx.lineTo(12, 8); ctx.lineTo(8, -2); ctx.lineTo(14, -14); ctx.lineTo(4, -6); ctx.lineTo(-4, -6); ctx.closePath(); ctx.fill(); }
@@ -129,7 +130,12 @@
       txt(k, x + 10, y + 12, 9.5, T.muted, { align: 'left', weight: 600 });
       txt(String(v), x + 10, y + 27, 14, T.text, { align: 'left', weight: 800 });
     });
-    button(40, 488, W - 80, 44, mt('rating'), () => { menuTab = 'rating'; Sound.click(); }, { size: 15, icon: (x, y, s, c) => icoTrophy(x, y, s, c) });
+    const hw = (W - 90) / 2, ar = achReady();
+    button(40, 488, hw, 44, mt('rating'), () => { menuTab = 'rating'; Sound.click(); }, { size: 13, icon: (x, y, s, c) => icoTrophy(x, y, s, c) });
+    button(50 + hw, 488, hw, 44, mt('achievements') + (ar ? ' (' + ar + ')' : ''), () => { menuTab = 'ach'; achPage = 0; Sound.click(); }, { size: 12, col: ar ? '#7a5a1a' : '#2a3550', col2: ar ? '#3a280a' : '#151c2c' });
+    // frame and intro replay
+    button(W - 98, 186, 72, 24, mt('frame'), () => { const f = Save.data.frames, i = f.indexOf(p.frame); p.frame = f[(i + 1) % f.length]; Save.write(); Sound.click(); }, { size: 10, col: '#2a3550', col2: '#151c2c' });
+    if (COMIC.ready) button(W - 98, 538, 72, 24, mt('intro'), () => { Sound.click(); playComic(null); }, { size: 10, col: '#2a3550', col2: '#151c2c' });
   }
 
   // ---- Rating tab: leagues and the ladder of epic heroes with the player in it

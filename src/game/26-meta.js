@@ -60,6 +60,7 @@
     if (g.items.length >= INV_MAX) { bank += 30 * (it.r + 1); return null; }   // full bag: sold for coins
     const item = { id: g.next++, b: it.b, r: it.r, l: it.l || 1 };
     g.items.push(item);
+    if (item.r >= 3) Save.data.stats.legend = 1;
     // fill an empty slot automatically so new players feel the upgrade at once
     if (!g.eq[GEAR[item.b].slot]) g.eq[GEAR[item.b].slot] = item.id;
     return item;
@@ -80,6 +81,7 @@
     const mates = mergeMates(it).sort((a, b) => isEquipped(b) - isEquipped(a) || a.l - b.l).slice(0, 2);
     const g = Save.data.gear, wasEq = [it, ...mates].some(isEquipped);
     it.r++; it.l = Math.max(it.l, ...mates.map(m => m.l));
+    Save.data.stats.merges++; if (it.r >= 3) Save.data.stats.legend = 1;
     g.items = g.items.filter(o => !mates.includes(o));
     if (wasEq) g.eq[GEAR[it.b].slot] = it.id;
     Save.write(); Sound.level();

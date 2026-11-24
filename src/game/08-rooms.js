@@ -38,6 +38,7 @@
       st: 'chase', t: rand(0.3, 1.2), cd: rand(0.8, 2), rot: 0, face: Math.PI / 2, anim: Math.random() * 10,
       pi: 0, ps: {}, hitWall: false, alpha: 1,
     };
+    maybeElite(e);
     enemies.push(e);
     return e;
   }

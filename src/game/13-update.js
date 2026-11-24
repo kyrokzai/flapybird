@@ -123,6 +123,7 @@
   function updatePlayer(dt) {
     const p = player;
     if (p.inv > 0) p.inv -= dt;
+    if (p.chill > 0) p.chill -= dt;
     if (p.atkAnim > 0) p.atkAnim -= dt;
     const mv = moveInput();
     p.moving = mv.x !== 0 || mv.y !== 0;
