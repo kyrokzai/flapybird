@@ -112,6 +112,7 @@
   }
 
   function skillIcon(id, x, y, s) {
+    if (iconImg('skill', id)) { iconDisc('skill', id, x, y, s); return; }
     const sd = SKILL[id];
     ctx.save(); ctx.translate(x, y);
     ctx.fillStyle = C.teal; ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5;

@@ -4047,6 +4047,7 @@
   }
 
   function skillIcon(id, x, y, s) {
+    if (iconImg('skill', id)) { iconDisc('skill', id, x, y, s); return; }
     const sd = SKILL[id];
     ctx.save(); ctx.translate(x, y);
     ctx.fillStyle = C.teal; ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5;
@@ -4487,13 +4488,13 @@
   const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
-  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'], ['a', 'music_menu'], ['a', 'sfx'],
+  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'], ['i', 'icons'], ['a', 'music_menu'], ['a', 'sfx'],
     ['sky', 'park'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
   G3.loadTotal = LOAD_ALL.length; G3.loadDone = 0;
   (function next(i) {
     if (i >= LOAD_ALL.length) return;
     const [k, n] = LOAD_ALL[i], go = () => { G3.loadDone = i + 1; next(i + 1); };
-    if (k === 'sky') loadSky(n, go); else if (k === 'a') loadAudio(n, go); else loadModel(n, go);
+    if (k === 'sky') loadSky(n, go); else if (k === 'a') loadAudio(n, go); else if (k === 'i') loadIcons(go); else loadModel(n, go);
   })(0);
   function loadAudio(name, done) {
     const sc = document.createElement('script'); sc.src = 'assets/' + name + '.js';
@@ -4908,6 +4909,7 @@
   }
   const TALENT_ICON = { atk: 'weapon', hp: 'heart', armor: 'armor', magnet: 'magnet', regen: 'heart', loot: 'coin', start: 'star' };
   function talentIcon(id, x, y, s) {
+    if (iconImg('talent', id)) { iconDisc('talent', id, x, y, s * 0.9); return; }
     const k = TALENT_ICON[id];
     if (k === 'heart') heart(x, y + 1, s * 0.5, id === 'regen' ? '#7cf07a' : '#ff5a5f');
     else if (k === 'coin') coinIcon(x, y, s * 0.55);
@@ -4920,7 +4922,9 @@
     const g = ctx.createLinearGradient(0, y, 0, y + s); g.addColorStop(0, R.col); g.addColorStop(1, 'rgba(12,15,24,0.96)');
     rr(ctx, x + 2, y + 2, s - 4, s - 4, 7); ctx.fillStyle = g; ctx.fill();
     rr(ctx, x + 1, y + 1, s - 2, s - 2, 8); ctx.strokeStyle = it.r >= 2 ? R.col : 'rgba(220,183,94,0.55)'; ctx.lineWidth = 1.3; ctx.stroke();
-    slotIcon(GEAR[it.b].slot, x + s / 2, y + s / 2 - 3, s * 0.36, '#fff');
+    const gi = iconImg('gear', it.b);
+    if (gi) { const p = s * 0.08; ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = s * 0.08; ctx.shadowOffsetY = s * 0.03; ctx.drawImage(gi, x + p, y + p * 0.7, s - p * 2, s - p * 2); ctx.restore(); }
+    else slotIcon(GEAR[it.b].slot, x + s / 2, y + s / 2 - 3, s * 0.36, '#fff');
     txt(tr('lvl') + it.l, x + s - 5, y + s - 9, Math.max(9, s * 0.17), '#fff', { align: 'right', stroke: C.ink, lw: 3, weight: 900 });
     if (isEquipped(it)) { ctx.fillStyle = '#7cf07a'; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, TAU); ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (canMerge(it)) { ctx.fillStyle = '#ff5a3a'; ctx.beginPath(); ctx.arc(x + s - 8, y + 8, 4.5, 0, TAU); ctx.fill(); }
@@ -5361,7 +5365,7 @@
     sg.drawImage(img, 0, 0, small.width, small.height);
     bg.drawImage(small, 0, 0, w, h);
     // keep a little of the original detail on top so the horizon does not turn to mush
-    bg.globalAlpha = 0.28; bg.drawImage(img, 0, 0, w, h); bg.globalAlpha = 1;
+    bg.globalAlpha = 0.6; bg.drawImage(img, 0, 0, w, h); bg.globalAlpha = 1;
     const t = new THREE.CanvasTexture(big);
     t.encoding = THREE.sRGBEncoding; t.mapping = THREE.EquirectangularReflectionMapping;
     return (G3.skyBlur[name] = t);
@@ -6298,6 +6302,29 @@
       if (k >= 1) { f.done = true; if (f.kind === 'coin') coinPulse = 1; else xpPulse = 1; }
     }
     for (let i = flyers.length - 1; i >= 0; i--) if (flyers[i].done) flyers.splice(i, 1);
+  }
+  // =================================================================== painted icons (assets/icons.js: gear, skills, talents as webp data URLs)
+  const ICONS = { gear: {}, skill: {}, talent: {} };
+  function loadIcons(done) {
+    const sc = document.createElement('script'); sc.src = 'assets/icons.js';
+    sc.onload = () => {
+      const P = window.ICON_PACK || {}; window.ICON_PACK = null;
+      for (const kind in ICONS) for (const k in (P[kind] || {})) { const im = new Image(); im.onload = () => { ICONS[kind][k] = im; }; im.src = P[kind][k]; }
+      done();
+    };
+    sc.onerror = () => done();
+    document.head.appendChild(sc);
+  }
+  const iconImg = (kind, id) => ICONS[kind][id] || null;
+  // round icon with a gold rim (skills, talents)
+  function iconDisc(kind, id, x, y, r) {
+    const im = ICONS[kind][id];
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = r * 0.35; ctx.shadowOffsetY = r * 0.08;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = '#121622'; ctx.fill();
+    ctx.restore();
+    ctx.drawImage(im, x - r, y - r, r * 2, r * 2);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.lineWidth = Math.max(1.5, r * 0.1); ctx.strokeStyle = goldGrad(y - r, r * 2); ctx.stroke();
   }
 })();
 </script>

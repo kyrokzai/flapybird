@@ -58,6 +58,7 @@
   }
   const TALENT_ICON = { atk: 'weapon', hp: 'heart', armor: 'armor', magnet: 'magnet', regen: 'heart', loot: 'coin', start: 'star' };
   function talentIcon(id, x, y, s) {
+    if (iconImg('talent', id)) { iconDisc('talent', id, x, y, s * 0.9); return; }
     const k = TALENT_ICON[id];
     if (k === 'heart') heart(x, y + 1, s * 0.5, id === 'regen' ? '#7cf07a' : '#ff5a5f');
     else if (k === 'coin') coinIcon(x, y, s * 0.55);
@@ -70,7 +71,9 @@
     const g = ctx.createLinearGradient(0, y, 0, y + s); g.addColorStop(0, R.col); g.addColorStop(1, 'rgba(12,15,24,0.96)');
     rr(ctx, x + 2, y + 2, s - 4, s - 4, 7); ctx.fillStyle = g; ctx.fill();
     rr(ctx, x + 1, y + 1, s - 2, s - 2, 8); ctx.strokeStyle = it.r >= 2 ? R.col : 'rgba(220,183,94,0.55)'; ctx.lineWidth = 1.3; ctx.stroke();
-    slotIcon(GEAR[it.b].slot, x + s / 2, y + s / 2 - 3, s * 0.36, '#fff');
+    const gi = iconImg('gear', it.b);
+    if (gi) { const p = s * 0.08; ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = s * 0.08; ctx.shadowOffsetY = s * 0.03; ctx.drawImage(gi, x + p, y + p * 0.7, s - p * 2, s - p * 2); ctx.restore(); }
+    else slotIcon(GEAR[it.b].slot, x + s / 2, y + s / 2 - 3, s * 0.36, '#fff');
     txt(tr('lvl') + it.l, x + s - 5, y + s - 9, Math.max(9, s * 0.17), '#fff', { align: 'right', stroke: C.ink, lw: 3, weight: 900 });
     if (isEquipped(it)) { ctx.fillStyle = '#7cf07a'; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, TAU); ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (canMerge(it)) { ctx.fillStyle = '#ff5a3a'; ctx.beginPath(); ctx.arc(x + s - 8, y + 8, 4.5, 0, TAU); ctx.fill(); }

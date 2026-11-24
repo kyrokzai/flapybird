@@ -121,7 +121,7 @@
     sg.drawImage(img, 0, 0, small.width, small.height);
     bg.drawImage(small, 0, 0, w, h);
     // keep a little of the original detail on top so the horizon does not turn to mush
-    bg.globalAlpha = 0.28; bg.drawImage(img, 0, 0, w, h); bg.globalAlpha = 1;
+    bg.globalAlpha = 0.6; bg.drawImage(img, 0, 0, w, h); bg.globalAlpha = 1;
     const t = new THREE.CanvasTexture(big);
     t.encoding = THREE.sRGBEncoding; t.mapping = THREE.EquirectangularReflectionMapping;
     return (G3.skyBlur[name] = t);
