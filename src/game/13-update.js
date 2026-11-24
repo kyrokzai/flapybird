@@ -248,7 +248,8 @@
     for (const p of pickups) {
       p.t += dt;
       const d = Math.hypot(player.x - p.x, player.y - p.y);
-      if (p.t > 0.45 && (d < 70 * (1 + run.S.magnet) || roomClear)) {
+      // story rooms pull everything in on clear; on the arena anything left lying for 8 s flies to the batyr
+      if (p.t > 0.45 && (d < 70 * (1 + run.S.magnet) || roomClear || (isSurv() && p.t > 8))) {
         const a = Math.atan2(player.y - p.y, player.x - p.x), s = 520;
         p.vx += Math.cos(a) * s * dt * 6; p.vy += Math.sin(a) * s * dt * 6;
         const sp = Math.hypot(p.vx, p.vy), mx = 480;

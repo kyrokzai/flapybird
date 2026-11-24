@@ -26,6 +26,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) for (const f of [`800 20px "Montserrat"`, `600 20px "Montserrat"`, `700 20px "Cormorant SC"`, `900 20px "Cinzel"`]) document.fonts.load(f, "БҚӘ01").catch(() => {});
   // installable app (PWA): offline cache + our own "install" button (Chrome's prompt is kept for it)
+  let installPrompt = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; });
   window.addEventListener('appinstalled', () => { installPrompt = null; });
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !TEST_MODE) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* sandboxed frame */ } }

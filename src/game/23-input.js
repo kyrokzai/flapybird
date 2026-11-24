@@ -32,7 +32,7 @@
     if (e.code === 'KeyE' || e.code === 'KeyB') throwBomb();
     if (e.code === 'Enter' || e.code === 'Space') {
       if (scene === 'menu' && !menuPopup) startGame();
-      else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) startGame();
+      else if ((scene === 'dead' || scene === 'victory') && endT > 0.8) startGame(run && run.mode);
     }
     if (modal === 'levelup' && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) pickCard(+e.code.slice(-1) - 1);
   });

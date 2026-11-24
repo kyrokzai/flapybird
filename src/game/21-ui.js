@@ -185,7 +185,7 @@
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
     txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
-    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}` + (run.waveT > 0 && (run.wave === 0 || run.waveCleared || run.waveT < 99) ? '  ·  ' + Math.ceil(Math.max(0, run.waveT - (run.wave === 0 ? introT : 0))) + mt('sec') : '') : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
+    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}` + (run.waveT > 0 ? '  ·  ' + Math.ceil(run.waveT) + mt('sec') : '') : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
     txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
@@ -378,7 +378,7 @@
     button(60, 424, W - 120, 42, tr('graphics') + ': ' + qualityLabel(), cycleQuality, { col: '#a99bff', col2: '#5a46c8', size: 14 });
     button(60, 476, W - 120, 42, tr('toMenu'), () => {
       bank += run.coins;
-      if (isSurv()) { if (run.wave > (Save.data.bestWave || 0)) Save.data.bestWave = run.wave; }
+      if (isSurv()) { if (wavesDone() > (Save.data.bestWave || 0)) Save.data.bestWave = wavesDone(); }
       else if (run.room > best) best = run.room;
       saveProgress();
       scene = 'menu'; modal = null; Sound.click();
@@ -400,7 +400,7 @@
     const ck = (endT - 0.5) / 0.9;
     const surv = isSurv();
     const rows = surv
-      ? [[mt('wave'), String(run.wave)], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), mt('wave').toLowerCase() + ' ' + (Save.data.bestWave || 0)]]
+      ? [[mt('wavesDone'), String(wavesDone())], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), mt('wave').toLowerCase() + ' ' + (Save.data.bestWave || 0)]]
       : [[tr('sRoom'), (won ? TOTAL_ROOMS : run.room) + ' / ' + TOTAL_ROOMS], [tr('sLevel'), String(run.level)], [tr('sKills'), String(countUp(run.kills, ck))], [tr('sCoins'), '+' + countUp(run.coins, ck) + ' ₸'], [tr('sBest'), tr('roomWord') + ' ' + best]];
     rows.forEach(([k, v], i) => {
       txt(k, 60, 214 + i * 24, 14, T.muted, { align: 'left', weight: 500 });

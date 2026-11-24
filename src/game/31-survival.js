@@ -15,11 +15,13 @@
   const SURV_POOL = [['s', 1], ['w', 1], ['j', 3], ['a', 5], ['m', 7]];   // [type, first wave]
   const SURV_BOSS = ['D', 'J', 'A'];
   const isSurv = () => !!(run && run.mode === 'survival');
+  // waves actually survived: the wave on the field only counts once it is beaten
+  const wavesDone = () => isSurv() ? Math.max(0, run.wave - (run.waveCleared ? 0 : 1)) : 0;
   // difficulty level used for enemy HP and damage: story = room number, survival grows with the wave
   const diffLevel = () => isSurv() ? 1 + Math.max(0, run.wave - 1) * 0.55 : run.room;
 
   function survivalSetup() {
-    run.mode = 'survival'; run.wave = 0; run.waveT = INTRO_T + 2.2; run.supplyT = 16; run.waveCleared = true;
+    run.mode = 'survival'; run.wave = 0; run.waveT = 4;   // counts down once the fly-over ends run.supplyT = 16; run.waveCleared = true;
     run.room = SURV_ROOM; buildRoom(SURV_ROOM);
     crates = [];   // supplies arrive during the fight
   }
@@ -79,7 +81,7 @@
 
   // rewards for the end of a survival run: a chest for every 5 waves (up to 3), gems for waves
   function survivalRewards() {
-    const w = run.wave, chests = [];
+    const w = wavesDone(), chests = [];
     for (let i = 0; i < Math.min(3, Math.floor(w / 5)); i++) chests.push(i === 2 || w >= 15 && i === 0 ? 1 : 0);
     const items = [];
     for (const minR of chests) { const it = addItem(rollItem(minR)); if (it) items.push(it); }

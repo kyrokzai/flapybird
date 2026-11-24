@@ -1,6 +1,6 @@
   // =================================================================== main menu chrome (premium look): frames, logo, top bar, counters, PLAY, tab bar
   const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  let logoT0 = performance.now(), installPrompt = null;
+  let logoT0 = performance.now();
 
   // draw fn() shifted down by oy, moving the tap areas it registers with it
   function shiftUI(oy, fn) {
@@ -340,7 +340,8 @@
     });
     if (inst) button(54, 440, W - 108, 42, mt('install'), () => {
       const p = installPrompt; installPrompt = null; menuPopup = null;
-      try { p.prompt(); } catch (e) { /* already shown */ }
+      Sound.click();
+      try { Promise.resolve(p.prompt()).catch(() => {}); } catch (e) { /* already shown */ }
     }, { size: 14, col: '#2f6a3a', col2: '#163a1e' });
     txt('×', W - 48, 208, 20, T.muted, { weight: 600 });
     ui.push({ x: W - 70, y: 190, w: 40, h: 36, fn: () => { menuPopup = null; Sound.click(); } });
