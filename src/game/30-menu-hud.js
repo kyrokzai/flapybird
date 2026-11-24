@@ -199,7 +199,8 @@
   function topBar() {
     const y = 22, h = 32;
     // language: one capsule, three segments, the active one is a gold pill
-    const lx = 12, lw = 150, langs = [['ru', 'RU'], ['kz', 'ҚАЗ'], ['en', 'EN']], sw = lw / 3;
+    avatarButton(10, y, h);
+    const lx = 48, lw = 122, langs = [['ru', 'RU'], ['kz', 'ҚАЗ'], ['en', 'EN']], sw = lw / 3;
     capsule(lx, y, lw, h);
     langs.forEach(([id, label], i) => {
       const sx = lx + i * sw, on = lang === id;
@@ -222,11 +223,11 @@
     ui.push({ x: mx + mw / 2, y: y - 4, w: mw / 2, h: h + 8, fn: () => { Sound.init(); Sound.setSfx(!Sound.sfx); } });
     // install the game as an app (hidden once it runs as the installed app)
     if (!isInstalledApp()) {
-      const ix = 172, pulse = REDUCED_MOTION ? 0 : 0.5 + 0.5 * Math.sin(pNow / 500);
+      const ix = 176, pulse = REDUCED_MOTION ? 0 : 0.5 + 0.5 * Math.sin(pNow / 500);
       ctx.save(); ctx.shadowColor = `rgba(255,200,90,${0.25 + pulse * 0.35})`; ctx.shadowBlur = 10; capsule(ix, y, 38, h); ctx.restore();
-      capsule(ix, y, 38, h);
-      icoInstall(ix + 19, y + h / 2, 15, T.goldLt);
-      ui.push({ x: ix - 2, y: y - 4, w: 42, h: h + 8, fn: doInstall });
+      capsule(ix, y, 34, h);
+      icoInstall(ix + 17, y + h / 2, 15, T.goldLt);
+      ui.push({ x: ix - 2, y: y - 4, w: 38, h: h + 8, fn: doInstall });
     }
     // settings (graphics quality)
     const gx = W - 48;
@@ -316,9 +317,14 @@
       }
     }
     // survival arena: the bonus mode for coins and levels
-    const aw = 236, ax = (W - aw) / 2, ay = TAB_Y - 114;
-    button(ax, ay, aw, 40, mt('survival'), () => { Sound.init(); Sound.click(); startGame('survival'); },
-      { col: '#7a2a24', col2: '#3a1210', size: 14, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '⚡' + RUN_COST });
+    // timed bonus round, entered with a ticket; locked until the first boss (Dau) is beaten
+    const aw = 250, ax = (W - aw) / 2, ay = TAB_Y - 114, open = arenaUnlocked();
+    if (open) {
+      button(ax, ay, aw, 40, mt('survival') + ' · 3:00', () => { Sound.init(); Sound.click(); startGame('survival'); },
+        { col: '#7a2a24', col2: '#3a1210', size: 13, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '🎟' + Save.data.tickets.n });
+    } else {
+      button(ax, ay, aw, 40, '🔒 ' + mt('arenaLocked'), () => { Sound.click(); }, { col: '#2a3040', col2: '#151a26', size: 11 });
+    }
     // hint and record
     const hy = TAB_Y - 58;
     const hs = fitText(tr('hint'), W - 70, 12, 600); ctx.font = `600 ${hs}px ${FONT}`; const hw = ctx.measureText(tr('hint')).width;
@@ -391,7 +397,7 @@
 
   // ---- the menu frame around every tab
   function drawMenu() {
-    energyTick();
+    energyTick(); ticketsTick();
     TAB_Y = H - SAFE.b - 72;
     if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     // cinematic grade over the 3D scene: dark top and bottom so the gold chrome reads
@@ -409,6 +415,8 @@
       if (menuTab === 'gear') drawGearTab();
       else if (menuTab === 'talents') drawTalentsTab();
       else if (menuTab === 'quests') drawQuestsTab();
+      else if (menuTab === 'profile') drawProfileTab();
+      else if (menuTab === 'rating') drawRatingTab();
       ctx.restore();
       topBar();
       counters();
@@ -422,4 +430,5 @@
     else if (menuPopup === 'daily') withPop(drawDailyPopup, true);
     else if (menuPopup === 'settings') withPop(drawSettingsPopup, true);
     else if (menuPopup === 'install') withPop(drawInstallPopup, true);
+    else if (menuPopup === 'tickets') withPop(drawTicketsPopup, true);
   }

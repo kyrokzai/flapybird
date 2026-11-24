@@ -189,7 +189,7 @@
   const canClaimBonus = () => { const q = questsFresh(); return !q.bonus && q.list.every(it => it.claimed); };
   function claimQuestBonus() {
     if (!canClaimBonus()) return null;
-    const q = Save.data.quests; q.bonus = true; Save.data.gems += 20;
+    const q = Save.data.quests; q.bonus = true; Save.data.gems += 20; addTicket(1);
     const it = addItem(rollItem(1)); saveProgress(); Sound.level();
     return it;
   }

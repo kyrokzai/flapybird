@@ -185,7 +185,7 @@
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
     txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
-    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}` + (run.waveT > 0 ? '  ·  ' + Math.ceil(run.waveT) + mt('sec') : '') : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
+    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}  ·  ⏱ ${fmtClock(run.timeLeft)}` : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
     txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
@@ -377,7 +377,7 @@
     button(70 + half, 374, half, 42, tr('sfx') + ': ' + onoff(Sound.sfx), () => { Sound.init(); Sound.setSfx(!Sound.sfx); }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
     button(60, 424, W - 120, 42, tr('graphics') + ': ' + qualityLabel(), cycleQuality, { col: '#a99bff', col2: '#5a46c8', size: 14 });
     button(60, 476, W - 120, 42, tr('toMenu'), () => {
-      bank += run.coins;
+      bank += run.coins; recordRun(false);
       if (isSurv()) { if (wavesDone() > (Save.data.bestWave || 0)) Save.data.bestWave = wavesDone(); }
       else if (run.room > best) best = run.room;
       saveProgress();
@@ -391,8 +391,9 @@
     if (endT < 0.5) return;
     panel(30, 110, W - 60, 420);
     if (won) {
-      txt(tr('victory'), W / 2, 156, 40, C.gold, { stroke: C.ink, lw: 7, weight: 900 });
-      txt(tr('victoryText'), W / 2, 188, 13, T.text, { weight: 500 });
+      const vt = isSurv() ? mt('arenaWin') : tr('victory');
+      txt(vt, W / 2, 156, fitText(vt, W - 90, 36), C.gold, { stroke: C.ink, lw: 7, weight: 900 });
+      txt(isSurv() ? mt('arenaWinText') : tr('victoryText'), W / 2, 188, 13, T.text, { weight: 500 });
     } else {
       txt(tr('dead'), W / 2, 156, 28, T.gold, { weight: 900 });
       txt(tr('deadText'), W / 2, 184, 13, T.text, { weight: 500 });
@@ -419,6 +420,7 @@
     const rw = run.rewards;
     txt(mt('rewards'), 60, 368, 14, T.gold, { align: 'left', weight: 900 });
     let rx = 60;
+    if (run.glory) { txt('+' + countUp(run.glory, (endT - 0.9) / 0.6) + ' ' + mt('glory'), W - 60, 368, 12, '#e9c76b', { align: 'right', weight: 800 }); }
     if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + countUp(rw.gems, (endT - 1.0) / 0.6), rx + 20, 396, 15, T.text, { align: 'left', weight: 900 }); rx += 60; }
     if (rw) rw.items.forEach((it, i) => {
       const k = easeBack((endT - 1.2 - i * 0.16) / 0.3);

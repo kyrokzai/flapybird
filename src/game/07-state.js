@@ -31,6 +31,12 @@
 
   // menu "play": costs energy (free in test mode); without enough energy the menu shows how to get more
   function startGame(mode) {
+    // the arena is entered with a ticket, the story with energy
+    if (mode === 'survival') {
+      if (!arenaUnlocked()) { scene = 'menu'; menuTab = 'fight'; Sound.click(); return; }
+      if (!spendTicket()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'tickets'; Sound.click(); return; }
+      newRun(mode); return;
+    }
     if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
     newRun(mode);
   }
@@ -38,7 +44,7 @@
   function newRun(mode) {
     const S = statsTotal();   // talents + equipped gear
     const maxHp = Math.round(150 * (1 + S.hp));
-    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null };
+    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null, t: 0, bossKills: 0 };
     player = {
       x: W / 2, y: AY2 - 30, r: 11, hp: maxHp, maxHp, inv: 0, face: -Math.PI / 2,
       fireCd: 0.3, volleys: [], atkAnim: 0, moving: false, walk: 0,

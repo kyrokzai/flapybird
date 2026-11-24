@@ -102,7 +102,20 @@
     if (p.kind === 'bonus') return { g: makeBonusModel(p.item), bonus: true };
     const g = new THREE.Group();
     if (p.kind === 'xp') { g.add(mesh(G3.geo.octa, G3.pm.xp, 0, 0, 0, 0.08, 0.12, 0.08)); g.add(glow('#5fe8ff', 0.4, 0.55)); }
-    else if (p.kind === 'coin') { const c = mesh(G3.geo.cyl, G3.pm.coin, 0, 0, 0, 0.09, 0.025, 0.09); c.rotation.x = Math.PI / 2; g.add(c); }
+    else if (p.kind === 'coin') {
+      // a proper tenge coin: thick gold disc, bright rim, the ₸ stamped on both faces, warm glow
+      if (!G3.coinFace) G3.coinFace = canvasTex(64, 64, (c, w, h) => {
+        c.fillStyle = '#f2c23a'; c.beginPath(); c.arc(w / 2, h / 2, w / 2, 0, TAU); c.fill();
+        c.strokeStyle = '#a8740f'; c.lineWidth = 4; c.beginPath(); c.arc(w / 2, h / 2, w / 2 - 6, 0, TAU); c.stroke();
+        c.fillStyle = '#8a5a08'; c.font = `900 34px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('₸', w / 2, h / 2 + 2);
+      });
+      const coin = new THREE.Group();
+      const body = mesh(G3.geo.cyl, G3.pm.coin, 0, 0, 0, 0.17, 0.045, 0.17); body.rotation.x = Math.PI / 2; coin.add(body);
+      if (!G3.pm.coinFaceM) G3.pm.coinFaceM = new THREE.MeshStandardMaterial({ map: G3.coinFace, metalness: 0.85, roughness: 0.25, emissive: col('#7a5200'), emissiveIntensity: 0.5, transparent: true });
+      for (const s of [-1, 1]) { const f = new THREE.Mesh(G3.geo.plane, G3.pm.coinFaceM); f.scale.set(0.33, 0.33, 1); f.position.z = s * 0.024; if (s < 0) f.rotation.y = Math.PI; coin.add(f); }
+      const rim = mesh(G3.geo.ring, G3.pm.coinRim, 0, 0, 0, 0.17, 0.17, 0.17); coin.add(rim);
+      g.add(coin); g.add(glow('#ffd24a', 0.75, 0.55));
+    }
     else {
       const h = new THREE.Group(); h.scale.setScalar(1.5); g.add(h);
       for (const s of [-1, 1]) h.add(mesh(G3.geo.sLow, G3.pm.heart, 0, 0.04, s * 0.05, 0.065));

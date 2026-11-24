@@ -209,7 +209,7 @@
       claw: mat('#e08a3a', { r: 0.3, m: 0.85, e: '#7a3a00', ei: 0.4 }),
       magic: mat('#d6a8ff', { e: '#9b4dff', ei: 1.6 }), ghost: mat('#eef7ff', { e: '#8fc3ff', ei: 1.2 }),
       fire: mat('#ffd38a', { e: '#ff6a10', ei: 2 }), rock: mat('#9a7a55', { flat: true }), boulder: mat('#8e8577', { flat: true }),
-      xp: mat('#7ff0ff', { e: '#1fb8d8', ei: 1.1, r: 0.2, m: 0.3 }), coin: mat('#ffd34d', { r: 0.25, m: 0.9, e: '#7a5200', ei: 0.3 }),
+      xp: mat('#7ff0ff', { e: '#1fb8d8', ei: 1.1, r: 0.2, m: 0.3 }), coin: mat('#ffd34d', { r: 0.22, m: 0.95, e: '#b07a10', ei: 0.65 }), coinRim: mat('#fff0a8', { r: 0.2, m: 1, e: '#c08a18', ei: 0.8 }),
       heart: mat('#ff4a55', { e: '#a8001a', ei: 0.5, r: 0.4 }), charm: mat('#e7ccff', { e: '#a060ff', ei: 1.3 }),
       aim: new THREE.MeshBasicMaterial({ color: col('#ff3b2f'), transparent: true, opacity: 0.45, depthWrite: false }),
     };

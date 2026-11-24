@@ -19,6 +19,7 @@
 
   function update(dt) {
     time += dt;
+    if (scene === 'play' && run && !modal && introT <= 0) run.t += dt;
     tutTick(dt);
     if (scene === 'play') survivalTick(dt);
     Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
@@ -86,6 +87,7 @@
     if (!roomClear && enemies.length === 0 && !isSurv()) {
       roomClear = true; clearT = 0;
       questEvent('room'); if (run.roomDmg === 0) questEvent('nohit');
+      if (!SIM.on) Save.data.stats.rooms++;
       if (run.S.regen > 0) healPlayer(player.maxHp * run.S.regen);
       slowT = 0.7; Sound.clear();
       banner = { kind: 'clear', t: 2.0 };

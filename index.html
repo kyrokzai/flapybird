@@ -86,7 +86,7 @@
 
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 4;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 5;
   const Save = {
     data: null,
     defaults() {
@@ -99,6 +99,10 @@
         daily: { day: 0, last: '' },
         quests: { date: '', list: [], bonus: false },
         settings: { lang: 'ru', music: true, sfx: true, quality: 'auto', autoQuality: null },
+        profile: { name: '', avatar: 0 },
+        stats: { runs: 0, wins: 0, kills: 0, bosses: 0, rooms: 0, coins: 0, time: 0, arenaRuns: 0 },
+        glory: 0,
+        tickets: { n: 1, day: '' },
       };
     },
     load() {
@@ -119,7 +123,7 @@
     },
     upgrade(d) {
       const def = this.defaults(), out = Object.assign(def, d);
-      for (const k of ['settings', 'talents', 'energy', 'daily', 'quests']) out[k] = Object.assign(this.defaults()[k], d[k] || {});
+      for (const k of ['settings', 'talents', 'energy', 'daily', 'quests', 'profile', 'stats', 'tickets']) out[k] = Object.assign(this.defaults()[k], d[k] || {});
       if (!d.gear || !Array.isArray(d.gear.items)) out.gear = this.defaults().gear;
       // v1 → v2: the two shop upgrades become talents (old +8% / +10% steps = two new talent levels each)
       if ((d.v || 0) < 2) {
@@ -131,6 +135,8 @@
       if ((d.v || 0) < 3) out.tut = (d.best || 0) > 0;
       // v3 → v4: survival arena record
       if ((d.v || 0) < 4) out.bestWave = d.bestWave || 0;
+      // v4 → v5: profile, lifetime stats, glory (estimated from the records so far), arena tickets
+      if ((d.v || 0) < 5) { out.glory = (d.best || 0) * 25 + (out.bestWave || 0) * 18; out.stats.rooms = Math.max(0, (d.best || 1) - 1); }
       out.v = SAVE_VERSION;
       return out;
     },
@@ -724,6 +730,12 @@
 
   // menu "play": costs energy (free in test mode); without enough energy the menu shows how to get more
   function startGame(mode) {
+    // the arena is entered with a ticket, the story with energy
+    if (mode === 'survival') {
+      if (!arenaUnlocked()) { scene = 'menu'; menuTab = 'fight'; Sound.click(); return; }
+      if (!spendTicket()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'tickets'; Sound.click(); return; }
+      newRun(mode); return;
+    }
     if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
     newRun(mode);
   }
@@ -731,7 +743,7 @@
   function newRun(mode) {
     const S = statsTotal();   // talents + equipped gear
     const maxHp = Math.round(150 * (1 + S.hp));
-    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null };
+    run = { room: 1, level: 1, xp: 0, kills: 0, coins: 0, gems: 0, sk: {}, pendingLv: 0, bombs: 1, S, roomDmg: 0, rewards: null, t: 0, bossKills: 0 };
     player = {
       x: W / 2, y: AY2 - 30, r: 11, hp: maxHp, maxHp, inv: 0, face: -Math.PI / 2,
       fireCd: 0.3, volleys: [], atkAnim: 0, moving: false, walk: 0,
@@ -950,7 +962,10 @@
     if (e.dead) return;
     e.dead = true;
     run.kills++;
-    questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; }
+    questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; run.bossKills = (run.bossKills || 0) + 1; }
+    if (!SIM.on) { Save.data.stats.kills++; if (e.boss) Save.data.stats.bosses++; }
+    // a story boss pays an arena ticket
+    if (e.boss && !isSurv() && !SIM.on) { addTicket(1); floatText(e.x, e.y, '+1 ' + mt('ticket'), '#c99bff', 15, 2.6); }
     Sound.kill();
     const col = { w: '#9a9ea8', s: '#5b3a24', j: '#c4572f', a: '#dfe9f2', m: '#6d4c8f', D: '#a8683a', J: '#7a4fa0', A: '#3b9a5b' }[e.type];
     burst(e.x, e.y, col, e.boss ? 60 : 16, e.boss ? 260 : 150, e.boss ? 5 : 3.5);
@@ -1068,8 +1083,8 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
-    if (!SIM.on) { if (isSurv()) survivalRewards(); else runRewards(won); }
-    bank += run.coins; saveProgress();
+    if (!SIM.on) { if (isSurv()) survivalRewards(won); else runRewards(won); }
+    bank += run.coins; recordRun(won); saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
     if (!isSurv() && reached > best) { best = reached; saveProgress(); }
   }
@@ -1293,6 +1308,7 @@
 
   function update(dt) {
     time += dt;
+    if (scene === 'play' && run && !modal && introT <= 0) run.t += dt;
     tutTick(dt);
     if (scene === 'play') survivalTick(dt);
     Sound.setMode(scene === 'play' || scene === 'dead' || scene === 'victory' ? (enemies.some(e => e.boss) ? 'boss' : 'battle') : 'menu');
@@ -1360,6 +1376,7 @@
     if (!roomClear && enemies.length === 0 && !isSurv()) {
       roomClear = true; clearT = 0;
       questEvent('room'); if (run.roomDmg === 0) questEvent('nohit');
+      if (!SIM.on) Save.data.stats.rooms++;
       if (run.S.regen > 0) healPlayer(player.maxHp * run.S.regen);
       slowT = 0.7; Sound.clear();
       banner = { kind: 'clear', t: 2.0 };
@@ -1754,7 +1771,7 @@
       claw: mat('#e08a3a', { r: 0.3, m: 0.85, e: '#7a3a00', ei: 0.4 }),
       magic: mat('#d6a8ff', { e: '#9b4dff', ei: 1.6 }), ghost: mat('#eef7ff', { e: '#8fc3ff', ei: 1.2 }),
       fire: mat('#ffd38a', { e: '#ff6a10', ei: 2 }), rock: mat('#9a7a55', { flat: true }), boulder: mat('#8e8577', { flat: true }),
-      xp: mat('#7ff0ff', { e: '#1fb8d8', ei: 1.1, r: 0.2, m: 0.3 }), coin: mat('#ffd34d', { r: 0.25, m: 0.9, e: '#7a5200', ei: 0.3 }),
+      xp: mat('#7ff0ff', { e: '#1fb8d8', ei: 1.1, r: 0.2, m: 0.3 }), coin: mat('#ffd34d', { r: 0.22, m: 0.95, e: '#b07a10', ei: 0.65 }), coinRim: mat('#fff0a8', { r: 0.2, m: 1, e: '#c08a18', ei: 0.8 }),
       heart: mat('#ff4a55', { e: '#a8001a', ei: 0.5, r: 0.4 }), charm: mat('#e7ccff', { e: '#a060ff', ei: 1.3 }),
       aim: new THREE.MeshBasicMaterial({ color: col('#ff3b2f'), transparent: true, opacity: 0.45, depthWrite: false }),
     };
@@ -3451,7 +3468,20 @@
     if (p.kind === 'bonus') return { g: makeBonusModel(p.item), bonus: true };
     const g = new THREE.Group();
     if (p.kind === 'xp') { g.add(mesh(G3.geo.octa, G3.pm.xp, 0, 0, 0, 0.08, 0.12, 0.08)); g.add(glow('#5fe8ff', 0.4, 0.55)); }
-    else if (p.kind === 'coin') { const c = mesh(G3.geo.cyl, G3.pm.coin, 0, 0, 0, 0.09, 0.025, 0.09); c.rotation.x = Math.PI / 2; g.add(c); }
+    else if (p.kind === 'coin') {
+      // a proper tenge coin: thick gold disc, bright rim, the ₸ stamped on both faces, warm glow
+      if (!G3.coinFace) G3.coinFace = canvasTex(64, 64, (c, w, h) => {
+        c.fillStyle = '#f2c23a'; c.beginPath(); c.arc(w / 2, h / 2, w / 2, 0, TAU); c.fill();
+        c.strokeStyle = '#a8740f'; c.lineWidth = 4; c.beginPath(); c.arc(w / 2, h / 2, w / 2 - 6, 0, TAU); c.stroke();
+        c.fillStyle = '#8a5a08'; c.font = `900 34px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('₸', w / 2, h / 2 + 2);
+      });
+      const coin = new THREE.Group();
+      const body = mesh(G3.geo.cyl, G3.pm.coin, 0, 0, 0, 0.17, 0.045, 0.17); body.rotation.x = Math.PI / 2; coin.add(body);
+      if (!G3.pm.coinFaceM) G3.pm.coinFaceM = new THREE.MeshStandardMaterial({ map: G3.coinFace, metalness: 0.85, roughness: 0.25, emissive: col('#7a5200'), emissiveIntensity: 0.5, transparent: true });
+      for (const s of [-1, 1]) { const f = new THREE.Mesh(G3.geo.plane, G3.pm.coinFaceM); f.scale.set(0.33, 0.33, 1); f.position.z = s * 0.024; if (s < 0) f.rotation.y = Math.PI; coin.add(f); }
+      const rim = mesh(G3.geo.ring, G3.pm.coinRim, 0, 0, 0, 0.17, 0.17, 0.17); coin.add(rim);
+      g.add(coin); g.add(glow('#ffd24a', 0.75, 0.55));
+    }
     else {
       const h = new THREE.Group(); h.scale.setScalar(1.5); g.add(h);
       for (const s of [-1, 1]) h.add(mesh(G3.geo.sLow, G3.pm.heart, 0, 0.04, s * 0.05, 0.065));
@@ -4094,7 +4124,7 @@
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
     txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
-    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}` + (run.waveT > 0 ? '  ·  ' + Math.ceil(run.waveT) + mt('sec') : '') : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
+    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}  ·  ⏱ ${fmtClock(run.timeLeft)}` : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
     txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
@@ -4286,7 +4316,7 @@
     button(70 + half, 374, half, 42, tr('sfx') + ': ' + onoff(Sound.sfx), () => { Sound.init(); Sound.setSfx(!Sound.sfx); }, { col: '#5fc8de', col2: '#1d7f99', size: 14 });
     button(60, 424, W - 120, 42, tr('graphics') + ': ' + qualityLabel(), cycleQuality, { col: '#a99bff', col2: '#5a46c8', size: 14 });
     button(60, 476, W - 120, 42, tr('toMenu'), () => {
-      bank += run.coins;
+      bank += run.coins; recordRun(false);
       if (isSurv()) { if (wavesDone() > (Save.data.bestWave || 0)) Save.data.bestWave = wavesDone(); }
       else if (run.room > best) best = run.room;
       saveProgress();
@@ -4300,8 +4330,9 @@
     if (endT < 0.5) return;
     panel(30, 110, W - 60, 420);
     if (won) {
-      txt(tr('victory'), W / 2, 156, 40, C.gold, { stroke: C.ink, lw: 7, weight: 900 });
-      txt(tr('victoryText'), W / 2, 188, 13, T.text, { weight: 500 });
+      const vt = isSurv() ? mt('arenaWin') : tr('victory');
+      txt(vt, W / 2, 156, fitText(vt, W - 90, 36), C.gold, { stroke: C.ink, lw: 7, weight: 900 });
+      txt(isSurv() ? mt('arenaWinText') : tr('victoryText'), W / 2, 188, 13, T.text, { weight: 500 });
     } else {
       txt(tr('dead'), W / 2, 156, 28, T.gold, { weight: 900 });
       txt(tr('deadText'), W / 2, 184, 13, T.text, { weight: 500 });
@@ -4328,6 +4359,7 @@
     const rw = run.rewards;
     txt(mt('rewards'), 60, 368, 14, T.gold, { align: 'left', weight: 900 });
     let rx = 60;
+    if (run.glory) { txt('+' + countUp(run.glory, (endT - 0.9) / 0.6) + ' ' + mt('glory'), W - 60, 368, 12, '#e9c76b', { align: 'right', weight: 800 }); }
     if (rw && rw.gems) { gemIcon(rx + 8, 396, 8); txt('+' + countUp(rw.gems, (endT - 1.0) / 0.6), rx + 20, 396, 15, T.text, { align: 'left', weight: 900 }); rx += 60; }
     if (rw) rw.items.forEach((it, i) => {
       const k = easeBack((endT - 1.2 - i * 0.16) / 0.3);
@@ -4477,7 +4509,7 @@
     dieNow() { if (TEST_MODE && scene === 'play') { bank = Math.max(bank, REVIVE_COST); player.hp = 0; modal = 'revive'; reviveT = REVIVE_TIME; } },
     give(item) { if (TEST_MODE && player) dropBonus(player.x, player.y - 60, item); },
     get crates() { return crates.filter(c => !c.open).length; }, get crateList() { return crates.filter(c => !c.open).map(c => ({ x: c.x, y: c.y })); },
-    survival() { if (TEST_MODE) newRun('survival'); }, get wave() { return run && run.wave; },
+    survival() { if (TEST_MODE) newRun('survival'); }, get wave() { return run && run.wave; }, arenaTime(s) { if (TEST_MODE && run) run.timeLeft = s; },
     tp(x, y) { if (TEST_MODE && player) { player.x = x; player.y = y; } }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
@@ -4802,7 +4834,7 @@
   const canClaimBonus = () => { const q = questsFresh(); return !q.bonus && q.list.every(it => it.claimed); };
   function claimQuestBonus() {
     if (!canClaimBonus()) return null;
-    const q = Save.data.quests; q.bonus = true; Save.data.gems += 20;
+    const q = Save.data.quests; q.bonus = true; Save.data.gems += 20; addTicket(1);
     const it = addItem(rollItem(1)); saveProgress(); Sound.level();
     return it;
   }
@@ -4826,21 +4858,21 @@
       equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
       daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
       shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
-      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Легенды вышли на улицы', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', install: 'Установить на телефон', wavesDone: 'Отбито волн', installTitle: 'Установить игру', inst_chrome: 'Нажмите меню ⋮ вверху справа в Chrome|Выберите «Установить приложение» или «Добавить на главный экран»|Подтвердите «Установить» — значок BATIR01 появится на экране', inst_samsung: 'Нажмите меню ≡ внизу справа|Выберите «Добавить страницу на» → «Главный экран»|Значок BATIR01 появится на экране', inst_ios: 'Откройте игру в Safari|Нажмите «Поделиться» (квадрат со стрелкой)|Выберите «На экран Домой» → «Добавить»', inst_inapp: 'Вы открыли игру внутри мессенджера|Нажмите ⋮ и выберите «Открыть в Chrome»|В Chrome нажмите эту кнопку ещё раз', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Легенды вышли на улицы', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', install: 'Установить на телефон', wavesDone: 'Отбито волн', installTitle: 'Установить игру', inst_chrome: 'Нажмите меню ⋮ вверху справа в Chrome|Выберите «Установить приложение» или «Добавить на главный экран»|Подтвердите «Установить» — значок BATIR01 появится на экране', inst_samsung: 'Нажмите меню ≡ внизу справа|Выберите «Добавить страницу на» → «Главный экран»|Значок BATIR01 появится на экране', inst_ios: 'Откройте игру в Safari|Нажмите «Поделиться» (квадрат со стрелкой)|Выберите «На экран Домой» → «Добавить»', inst_inapp: 'Вы открыли игру внутри мессенджера|Нажмите ⋮ и выберите «Открыть в Chrome»|В Chrome нажмите эту кнопку ещё раз', defaultName: 'Батыр', profile: 'Профиль', rating: 'Рейтинг', glory: 'славы', tapAvatar: 'нажмите, чтобы сменить', rename: 'ИМЯ', enterName: 'Имя батыра (до 16 букв)', toNext: 'ещё {n}', you: 'вы', stRuns: 'Забегов', stWins: 'Побед', stKills: 'Врагов повержено', stBosses: 'Боссов', stRooms: 'Комнат пройдено', stCoins: 'Монет собрано', stBest: 'Лучшая глава', stWave: 'Лучшая волна', stArena: 'Арен сыграно', stTime: 'Время в игре', hShort: 'ч', mShort: 'мин', ratingNote: 'Слава копится за каждый забег. Обгоните героев эпоса! Таблица с друзьями появится в онлайн-версии.', tickets: 'Билеты на арену', ticket: 'билет', ticketHow: 'Один билет — каждый день бесплатно, ещё по одному за каждого босса в главе и за все ежедневные задания.', buyTicket: 'Билет', arenaLocked: 'Арена откроется после победы над Дәу', arenaWin: 'АРЕНА ПОКОРЕНА!', arenaWinText: 'Батыр выстоял все 3 минуты', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
     },
     kz: {
       tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
       equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
       daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
       shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
-      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Аңыздар көшеге шықты', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', install: 'Телефонға орнату', wavesDone: 'Тойтарылған толқын', installTitle: 'Ойынды орнату', inst_chrome: 'Chrome-да жоғарғы оң жақтағы ⋮ мәзірін басыңыз|«Қолданбаны орнату» немесе «Басты экранға қосу» таңдаңыз|«Орнату» басыңыз — BATIR01 белгішесі экранда пайда болады', inst_samsung: 'Төменгі оң жақтағы ≡ мәзірін басыңыз|«Бетті қосу» → «Басты экран» таңдаңыз|BATIR01 белгішесі экранда пайда болады', inst_ios: 'Ойынды Safari-де ашыңыз|«Бөлісу» батырмасын басыңыз|«Басты экранға» → «Қосу» таңдаңыз', inst_inapp: 'Ойын мессенджер ішінде ашылған|⋮ басып, «Chrome-да ашу» таңдаңыз|Chrome-да осы батырманы қайта басыңыз', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Аңыздар көшеге шықты', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', install: 'Телефонға орнату', wavesDone: 'Тойтарылған толқын', installTitle: 'Ойынды орнату', inst_chrome: 'Chrome-да жоғарғы оң жақтағы ⋮ мәзірін басыңыз|«Қолданбаны орнату» немесе «Басты экранға қосу» таңдаңыз|«Орнату» басыңыз — BATIR01 белгішесі экранда пайда болады', inst_samsung: 'Төменгі оң жақтағы ≡ мәзірін басыңыз|«Бетті қосу» → «Басты экран» таңдаңыз|BATIR01 белгішесі экранда пайда болады', inst_ios: 'Ойынды Safari-де ашыңыз|«Бөлісу» батырмасын басыңыз|«Басты экранға» → «Қосу» таңдаңыз', inst_inapp: 'Ойын мессенджер ішінде ашылған|⋮ басып, «Chrome-да ашу» таңдаңыз|Chrome-да осы батырманы қайта басыңыз', defaultName: 'Батыр', profile: 'Профиль', rating: 'Рейтинг', glory: 'даңқ', tapAvatar: 'ауыстыру үшін басыңыз', rename: 'ЕСІМ', enterName: 'Батыр есімі (16 әріпке дейін)', toNext: 'тағы {n}', you: 'сіз', stRuns: 'Жорықтар', stWins: 'Жеңістер', stKills: 'Жеңілген жаулар', stBosses: 'Бастар', stRooms: 'Өтілген бөлмелер', stCoins: 'Жиналған тиын', stBest: 'Үздік тарау', stWave: 'Үздік толқын', stArena: 'Ареналар', stTime: 'Ойын уақыты', hShort: 'сағ', mShort: 'мин', ratingNote: 'Даңқ әр жорықта жиналады. Эпос батырларын озыңыз! Достармен кесте онлайн нұсқада болады.', tickets: 'Арена билеттері', ticket: 'билет', ticketHow: 'Күн сайын бір билет тегін, тағы біреуі — тараудағы әр басты жеңгені үшін және барлық күнделікті тапсырма үшін.', buyTicket: 'Билет', arenaLocked: 'Арена Дәуді жеңгеннен кейін ашылады', arenaWin: 'АРЕНА БАҒЫНДЫ!', arenaWinText: 'Батыр 3 минут бойы төтеп берді', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
     },
     en: {
       tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
       equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
       daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
       shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
-      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Legends unleashed', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', install: 'Install the app', wavesDone: 'Waves survived', installTitle: 'Install the game', inst_chrome: 'Tap the ⋮ menu at the top right in Chrome|Choose “Install app” or “Add to Home screen”|Confirm “Install” — the BATIR01 icon appears on your screen', inst_samsung: 'Tap the ≡ menu at the bottom right|Choose “Add page to” → “Home screen”|The BATIR01 icon appears on your screen', inst_ios: 'Open the game in Safari|Tap Share (the square with an arrow)|Choose “Add to Home Screen” → “Add”', inst_inapp: 'The game is open inside a messenger|Tap ⋮ and choose “Open in Chrome”|In Chrome, tap this button again', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Legends unleashed', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', install: 'Install the app', wavesDone: 'Waves survived', installTitle: 'Install the game', inst_chrome: 'Tap the ⋮ menu at the top right in Chrome|Choose “Install app” or “Add to Home screen”|Confirm “Install” — the BATIR01 icon appears on your screen', inst_samsung: 'Tap the ≡ menu at the bottom right|Choose “Add page to” → “Home screen”|The BATIR01 icon appears on your screen', inst_ios: 'Open the game in Safari|Tap Share (the square with an arrow)|Choose “Add to Home Screen” → “Add”', inst_inapp: 'The game is open inside a messenger|Tap ⋮ and choose “Open in Chrome”|In Chrome, tap this button again', defaultName: 'Batyr', profile: 'Profile', rating: 'Rating', glory: 'glory', tapAvatar: 'tap to change', rename: 'NAME', enterName: 'Batyr name (up to 16 letters)', toNext: '{n} more', you: 'you', stRuns: 'Runs', stWins: 'Wins', stKills: 'Monsters slain', stBosses: 'Bosses', stRooms: 'Rooms cleared', stCoins: 'Coins collected', stBest: 'Best chapter', stWave: 'Best wave', stArena: 'Arenas played', stTime: 'Time played', hShort: 'h', mShort: 'min', ratingNote: 'Glory builds up with every run. Overtake the heroes of the epics! A table with friends comes with the online version.', tickets: 'Arena tickets', ticket: 'ticket', ticketHow: 'One free ticket every day, plus one for each boss in the chapter and one for finishing all daily quests.', buyTicket: 'Ticket', arenaLocked: 'The arena opens after you defeat Dau', arenaWin: 'ARENA CONQUERED!', arenaWinText: 'The batyr held out for all 3 minutes', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
     },
   };
   const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -5536,7 +5568,8 @@
   function topBar() {
     const y = 22, h = 32;
     // language: one capsule, three segments, the active one is a gold pill
-    const lx = 12, lw = 150, langs = [['ru', 'RU'], ['kz', 'ҚАЗ'], ['en', 'EN']], sw = lw / 3;
+    avatarButton(10, y, h);
+    const lx = 48, lw = 122, langs = [['ru', 'RU'], ['kz', 'ҚАЗ'], ['en', 'EN']], sw = lw / 3;
     capsule(lx, y, lw, h);
     langs.forEach(([id, label], i) => {
       const sx = lx + i * sw, on = lang === id;
@@ -5559,11 +5592,11 @@
     ui.push({ x: mx + mw / 2, y: y - 4, w: mw / 2, h: h + 8, fn: () => { Sound.init(); Sound.setSfx(!Sound.sfx); } });
     // install the game as an app (hidden once it runs as the installed app)
     if (!isInstalledApp()) {
-      const ix = 172, pulse = REDUCED_MOTION ? 0 : 0.5 + 0.5 * Math.sin(pNow / 500);
+      const ix = 176, pulse = REDUCED_MOTION ? 0 : 0.5 + 0.5 * Math.sin(pNow / 500);
       ctx.save(); ctx.shadowColor = `rgba(255,200,90,${0.25 + pulse * 0.35})`; ctx.shadowBlur = 10; capsule(ix, y, 38, h); ctx.restore();
-      capsule(ix, y, 38, h);
-      icoInstall(ix + 19, y + h / 2, 15, T.goldLt);
-      ui.push({ x: ix - 2, y: y - 4, w: 42, h: h + 8, fn: doInstall });
+      capsule(ix, y, 34, h);
+      icoInstall(ix + 17, y + h / 2, 15, T.goldLt);
+      ui.push({ x: ix - 2, y: y - 4, w: 38, h: h + 8, fn: doInstall });
     }
     // settings (graphics quality)
     const gx = W - 48;
@@ -5653,9 +5686,14 @@
       }
     }
     // survival arena: the bonus mode for coins and levels
-    const aw = 236, ax = (W - aw) / 2, ay = TAB_Y - 114;
-    button(ax, ay, aw, 40, mt('survival'), () => { Sound.init(); Sound.click(); startGame('survival'); },
-      { col: '#7a2a24', col2: '#3a1210', size: 14, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '⚡' + RUN_COST });
+    // timed bonus round, entered with a ticket; locked until the first boss (Dau) is beaten
+    const aw = 250, ax = (W - aw) / 2, ay = TAB_Y - 114, open = arenaUnlocked();
+    if (open) {
+      button(ax, ay, aw, 40, mt('survival') + ' · 3:00', () => { Sound.init(); Sound.click(); startGame('survival'); },
+        { col: '#7a2a24', col2: '#3a1210', size: 13, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '🎟' + Save.data.tickets.n });
+    } else {
+      button(ax, ay, aw, 40, '🔒 ' + mt('arenaLocked'), () => { Sound.click(); }, { col: '#2a3040', col2: '#151a26', size: 11 });
+    }
     // hint and record
     const hy = TAB_Y - 58;
     const hs = fitText(tr('hint'), W - 70, 12, 600); ctx.font = `600 ${hs}px ${FONT}`; const hw = ctx.measureText(tr('hint')).width;
@@ -5728,7 +5766,7 @@
 
   // ---- the menu frame around every tab
   function drawMenu() {
-    energyTick();
+    energyTick(); ticketsTick();
     TAB_Y = H - SAFE.b - 72;
     if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     // cinematic grade over the 3D scene: dark top and bottom so the gold chrome reads
@@ -5746,6 +5784,8 @@
       if (menuTab === 'gear') drawGearTab();
       else if (menuTab === 'talents') drawTalentsTab();
       else if (menuTab === 'quests') drawQuestsTab();
+      else if (menuTab === 'profile') drawProfileTab();
+      else if (menuTab === 'rating') drawRatingTab();
       ctx.restore();
       topBar();
       counters();
@@ -5759,6 +5799,7 @@
     else if (menuPopup === 'daily') withPop(drawDailyPopup, true);
     else if (menuPopup === 'settings') withPop(drawSettingsPopup, true);
     else if (menuPopup === 'install') withPop(drawInstallPopup, true);
+    else if (menuPopup === 'tickets') withPop(drawTicketsPopup, true);
   }
   // =================================================================== survival: endless waves on the Astana Arena pitch (bonus mode for coins and levels)
   // the stadium is one more room definition after the 15 story rooms; it has no gate run and no fixed enemies
@@ -5774,6 +5815,8 @@
       return rows;
     })(),
   });
+  const ARENA_TIME = 180;   // the arena is a 3-minute bonus round
+  const fmtClock = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const SURV_POOL = [['s', 1], ['w', 1], ['j', 3], ['a', 5], ['m', 7]];   // [type, first wave]
   const SURV_BOSS = ['D', 'J', 'A'];
   const isSurv = () => !!(run && run.mode === 'survival');
@@ -5783,7 +5826,7 @@
   const diffLevel = () => isSurv() ? 1 + Math.max(0, run.wave - 1) * 0.55 : run.room;
 
   function survivalSetup() {
-    run.mode = 'survival'; run.wave = 0; run.waveT = 4;   // counts down once the fly-over ends run.supplyT = 16; run.waveCleared = true;
+    run.mode = 'survival'; run.timeLeft = ARENA_TIME; run.wave = 0; run.waveT = 4;   // counts down once the fly-over ends run.supplyT = 16; run.waveCleared = true;
     run.room = SURV_ROOM; buildRoom(SURV_ROOM);
     crates = [];   // supplies arrive during the fight
   }
@@ -5791,6 +5834,8 @@
   function survivalTick(dt) {
     if (!isSurv() || scene !== 'play' || introT > 0 || modal) return;
     const alive = enemies.filter(e => !e.dead).length;
+    run.timeLeft -= dt;
+    if (run.timeLeft <= 0) { if (alive === 0 && !run.waveCleared && run.wave > 0) run.waveCleared = true; endRun(true); return; }   // survived the round
     run.waveT -= dt;
     if (alive === 0 && !run.waveCleared && run.wave > 0) waveCleared();
     if (alive === 0 && run.waveT > 4) run.waveT = 4;   // no long waits on an empty pitch
@@ -5809,7 +5854,7 @@
   function nextWave() {
     run.wave++; run.waveCleared = false;
     const w = run.wave, bossWave = w % 5 === 0;
-    const n = Math.min(16, Math.round((bossWave ? 2 : 5) + w * (bossWave ? 0.6 : 1.5)));
+    const n = Math.min(16, Math.round((bossWave ? 3 : 6) + w * (bossWave ? 0.7 : 1.6)));
     const pool = SURV_POOL.filter(p => w >= p[1]).map(p => p[0]);
     for (let i = 0; i < n; i++) {
       const t = pool[Math.floor(Math.random() * pool.length)], sp = freeSpotAwayFromPlayer(170);
@@ -5823,7 +5868,7 @@
       Sound.roar();
       banner = { kind: 'wave', wave: w, boss: type, t: 2.6 };
     } else banner = { kind: 'wave', wave: w, t: 2.0 };
-    run.waveT = 26 + w * 1.2;
+    run.waveT = 18 + w * 0.8;   // a timed round keeps the waves coming
   }
 
   // a cleared wave pays out: a shower of coins around the batyr, a supply drop every second wave, a breather heal
@@ -5842,9 +5887,10 @@
   }
 
   // rewards for the end of a survival run: a chest for every 5 waves (up to 3), gems for waves
-  function survivalRewards() {
+  function survivalRewards(won) {
     const w = wavesDone(), chests = [];
     for (let i = 0; i < Math.min(3, Math.floor(w / 5)); i++) chests.push(i === 2 || w >= 15 && i === 0 ? 1 : 0);
+    if (won) chests.push(1);   // surviving the full 3 minutes: a rare chest
     const items = [];
     for (const minR of chests) { const it = addItem(rollItem(minR)); if (it) items.push(it); }
     const gems = run.gems + Math.floor(w / 3);
@@ -5944,6 +5990,184 @@
       R.add(mesh(G3.geo.box, mat('#fffbe8', { e: '#fff6d0', ei: 2.2 }), x, 6.5, z, 1.4, 0.7, 0.2, false));
       const gl = glow('#fff4d0', 5.5, 0.85); gl.position.set(x, 6.5, z); R.add(gl);
     }
+  }
+  // =================================================================== profile, glory rating, arena tickets
+  // Glory (слава) is earned by every run and never lost; it decides the league and the place on the ladder of epic heroes.
+  const LEAGUES = [
+    { g: 0, col: '#b08d57', name: { ru: 'Жас батыр', kz: 'Жас батыр', en: 'Young Batyr' } },
+    { g: 300, col: '#c0c6cf', name: { ru: 'Сарбаз', kz: 'Сарбаз', en: 'Soldier' } },
+    { g: 800, col: '#e0b84a', name: { ru: 'Жауынгер', kz: 'Жауынгер', en: 'Warrior' } },
+    { g: 1800, col: '#3fc98a', name: { ru: 'Батыр', kz: 'Батыр', en: 'Batyr' } },
+    { g: 3500, col: '#4aa8ff', name: { ru: 'Ер батыр', kz: 'Ер батыр', en: 'Hero' } },
+    { g: 6000, col: '#e0503a', name: { ru: 'Хан батыр', kz: 'Хан батыры', en: "Khan's Champion" } },
+    { g: 10000, col: '#c98bff', name: { ru: 'Аңыз', kz: 'Аңыз', en: 'Legend' } },
+  ];
+  // heroes of the Kazakh epics: milestones to overtake on the glory ladder (not real players)
+  const LEGENDS = [
+    { g: 9000, name: { ru: 'Алпамыс', kz: 'Алпамыс', en: 'Alpamys' } },
+    { g: 7200, name: { ru: 'Қобыланды', kz: 'Қобыланды', en: 'Kobylandy' } },
+    { g: 5600, name: { ru: 'Ер Тарғын', kz: 'Ер Тарғын', en: 'Er Targyn' } },
+    { g: 4200, name: { ru: 'Ер Төстік', kz: 'Ер Төстік', en: 'Er Tostik' } },
+    { g: 3000, name: { ru: 'Едіге', kz: 'Едіге', en: 'Edige' } },
+    { g: 2000, name: { ru: 'Қамбар', kz: 'Қамбар', en: 'Kambar' } },
+    { g: 1300, name: { ru: 'Шора', kz: 'Шора', en: 'Shora' } },
+    { g: 700, name: { ru: 'Ер Сайын', kz: 'Ер Сайын', en: 'Er Sayin' } },
+    { g: 250, name: { ru: 'Қозы Көрпеш', kz: 'Қозы Көрпеш', en: 'Kozy Korpesh' } },
+  ];
+  const leagueOf = g => { let i = 0; for (let k = 0; k < LEAGUES.length; k++) if (g >= LEAGUES[k].g) i = k; return i; };
+  const playerName = () => (Save.data.profile.name || '').trim() || mt('defaultName');
+
+  // ---- tickets for the arena: one free a day, one per story boss, one for all daily quests, or 15 gems
+  const TICKET_MAX = 5, TICKET_GEMS = 15;
+  const arenaUnlocked = () => TEST_MODE || best >= 6 || (Save.data.bestWave || 0) > 0;
+  function ticketsTick() {
+    const t = Save.data.tickets, d = todayStr();
+    if (t.day !== d) { t.day = d; t.n = Math.min(TICKET_MAX, t.n + 1); Save.write(); }
+  }
+  function addTicket(n) { const t = Save.data.tickets; t.n = Math.min(TICKET_MAX, t.n + (n || 1)); Save.write(); }
+  function spendTicket() {
+    if (TEST_MODE) return true;
+    ticketsTick();
+    const t = Save.data.tickets; if (t.n <= 0) return false;
+    t.n--; Save.write(); return true;
+  }
+  function buyTicket() {
+    if (Save.data.gems < TICKET_GEMS || Save.data.tickets.n >= TICKET_MAX) return false;
+    Save.data.gems -= TICKET_GEMS; addTicket(1); Sound.level(); return true;
+  }
+
+  // ---- what a finished run is worth, and the lifetime statistics
+  function gloryFor(won) {
+    if (isSurv()) return 18 * wavesDone() + Math.floor(run.coins / 5) + (won ? 80 : 0);
+    const reached = won ? TOTAL_ROOMS : run.room;
+    return 12 * Math.max(0, reached - 1) + 40 * (run.bossKills || 0) + (won ? 150 : 0);
+  }
+  // called once per finished or abandoned run
+  function recordRun(won) {
+    if (SIM.on || !run || run.recorded) return;
+    run.recorded = true;
+    const st = Save.data.stats;
+    st.runs++; if (won) st.wins++;
+    if (isSurv()) st.arenaRuns++;
+    st.coins += run.coins; st.time += Math.round(run.t || 0);
+    run.glory = gloryFor(won);
+    Save.data.glory += run.glory;
+    Save.write();
+  }
+
+  // ---- avatars: gold emblems on a coloured disc
+  const AVATARS = [['#7a2a24', 'eagle'], ['#1f4f7a', 'wolf'], ['#2f6a3a', 'horse'], ['#6a3a8a', 'shanyrak'], ['#8a6a1a', 'bow'], ['#3a3f4a', 'koshkar']];
+  function drawAvatar(x, y, r, idx, ring) {
+    const [bg, kind] = AVATARS[idx % AVATARS.length];
+    ctx.save();
+    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, r * 0.1, x, y, r); g.addColorStop(0, bg); g.addColorStop(1, '#0b0f17');
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = Math.max(1.5, r * 0.09); ctx.strokeStyle = ring || goldGrad(y - r, r * 2); ctx.stroke();
+    ctx.translate(x, y); ctx.scale(r / 30, r / 30); ctx.fillStyle = goldGrad(-24, 48); ctx.strokeStyle = goldGrad(-24, 48); ctx.lineWidth = 3; ctx.lineCap = 'round';
+    if (kind === 'eagle') { ctx.save(); ctx.translate(0, 4); ctx.scale(0.42, 0.42); eaglePath(); ctx.fill('evenodd'); ctx.restore(); }
+    else if (kind === 'wolf') { ctx.beginPath(); ctx.moveTo(-14, -14); ctx.lineTo(-8, -2); ctx.lineTo(-12, 8); ctx.lineTo(0, 16); ctx.lineTo(12, 8); ctx.lineTo(8, -2); ctx.lineTo(14, -14); ctx.lineTo(4, -6); ctx.lineTo(-4, -6); ctx.closePath(); ctx.fill(); }
+    else if (kind === 'horse') { ctx.beginPath(); ctx.moveTo(-8, 16); ctx.lineTo(-6, -2); ctx.quadraticCurveTo(-4, -16, 8, -16); ctx.lineTo(14, -8); ctx.lineTo(10, -4); ctx.lineTo(4, -6); ctx.lineTo(6, 16); ctx.closePath(); ctx.fill(); }
+    else if (kind === 'shanyrak') { ctx.beginPath(); ctx.arc(0, 0, 13, 0, TAU); ctx.stroke(); for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 13, Math.sin(a) * 13); ctx.lineTo(-Math.cos(a) * 13, -Math.sin(a) * 13); ctx.stroke(); } }
+    else if (kind === 'bow') { ctx.beginPath(); ctx.arc(-6, 0, 16, -1.1, 1.1); ctx.stroke(); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-6 + 16 * Math.cos(1.1), -16 * Math.sin(1.1)); ctx.lineTo(-6 + 16 * Math.cos(1.1), 16 * Math.sin(1.1)); ctx.stroke(); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(16, 0); ctx.stroke(); }
+    else koshkar(ctx, 0, 0, 20, '#e2bd60', 3);
+    ctx.restore();
+  }
+  function leagueBadge(x, y, s, li) {
+    const L = LEAGUES[li];
+    ctx.save(); ctx.translate(x, y);
+    ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * TAU / 6; ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s); } ctx.closePath();
+    const g = ctx.createLinearGradient(0, -s, 0, s); g.addColorStop(0, L.col); g.addColorStop(1, '#141a28');
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = goldGrad(-s, s * 2); ctx.stroke();
+    txt(String(li + 1), 0, 1, s * 0.9, '#fff', { weight: 900, shadow: 'rgba(0,0,0,0.8)', blur: 3, dy: 1 });
+    ctx.restore();
+  }
+
+  // ---- top-bar avatar button
+  function avatarButton(x, y, h) {
+    drawAvatar(x + h / 2, y + h / 2, h / 2, Save.data.profile.avatar);
+    ui.push({ x: x - 2, y: y - 4, w: h + 4, h: h + 8, fn: () => { menuTab = 'profile'; Sound.click(); } });
+  }
+
+  // ---- Profile tab
+  function fmtDur(s) { const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? h + mt('hShort') + ' ' + m + mt('mShort') : m + mt('mShort'); }
+  function drawProfileTab() {
+    const p = Save.data.profile, st = Save.data.stats, g = Save.data.glory, li = leagueOf(g), L = LEAGUES[li], N = LEAGUES[li + 1];
+    screenPanel(mt('profile'));
+    drawAvatar(70, 186, 38, p.avatar);
+    ui.push({ x: 30, y: 146, w: 80, h: 80, fn: () => { p.avatar = (p.avatar + 1) % AVATARS.length; Save.write(); Sound.click(); } });
+    txt(mt('tapAvatar'), 70, 236, 9, T.dim, { weight: 600 });
+    txt(playerName(), 122, 166, fitText(playerName(), 150, 18, 800), T.text, { align: 'left', weight: 800 });
+    button(W - 98, 152, 72, 28, mt('rename'), () => {
+      let v = null; try { v = window.prompt(mt('enterName'), p.name || ''); } catch (e) { v = null; }
+      if (v !== null) { p.name = v.replace(/[<>]/g, '').trim().slice(0, 16); Save.write(); }
+      Sound.click();
+    }, { size: 11, col: '#2a3550', col2: '#151c2c' });
+    leagueBadge(134, 200, 14, li);
+    txt(L.name[lang], 154, 196, 14, L.col, { align: 'left', weight: 800 });
+    txt(g + ' ' + mt('glory'), 154, 213, 11, T.muted, { align: 'left', weight: 600 });
+    // progress to the next league
+    const bx = 122, bw = W - 150, by = 228, k = N ? clamp((g - L.g) / (N.g - L.g), 0, 1) : 1;
+    rr(ctx, bx, by, bw, 6, 3); ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+    rr(ctx, bx, by, Math.max(6, bw * k), 6, 3); ctx.fillStyle = L.col; ctx.fill();
+    if (N) txt(mt('toNext', N.g - g) + ' · ' + N.name[lang], bx + bw, by + 16, 9, T.dim, { align: 'right', weight: 600 });
+    // lifetime statistics
+    const rows = [
+      [mt('stRuns'), st.runs], [mt('stWins'), st.wins], [mt('stKills'), st.kills], [mt('stBosses'), st.bosses],
+      [mt('stRooms'), st.rooms], [mt('stCoins'), st.coins + ' ₸'], [mt('stBest'), best + ' / ' + TOTAL_ROOMS], [mt('stWave'), Save.data.bestWave || 0],
+      [mt('stArena'), st.arenaRuns], [mt('stTime'), fmtDur(st.time)],
+    ];
+    rows.forEach(([k, v], i) => {
+      const x = 22 + (i % 2) * ((W - 44) / 2), y = 262 + Math.floor(i / 2) * 44, w = (W - 44) / 2 - 6;
+      rr(ctx, x, y, w, 38, 8); ctx.fillStyle = T.fill; ctx.fill();
+      txt(k, x + 10, y + 12, 9.5, T.muted, { align: 'left', weight: 600 });
+      txt(String(v), x + 10, y + 27, 14, T.text, { align: 'left', weight: 800 });
+    });
+    button(40, 488, W - 80, 44, mt('rating'), () => { menuTab = 'rating'; Sound.click(); }, { size: 15, icon: (x, y, s, c) => icoTrophy(x, y, s, c) });
+  }
+
+  // ---- Rating tab: leagues and the ladder of epic heroes with the player in it
+  function drawRatingTab() {
+    const g = Save.data.glory, li = leagueOf(g);
+    screenPanel(mt('rating'));
+    // league strip
+    LEAGUES.forEach((L, i) => {
+      const x = 36 + i * ((W - 72) / 6);
+      ctx.save(); if (i > li) ctx.globalAlpha *= 0.35;
+      leagueBadge(x, 158, i === li ? 13 : 10, i);
+      ctx.restore();
+    });
+    txt(LEAGUES[li].name[lang] + ' · ' + g + ' ' + mt('glory'), W / 2, 184, 12, LEAGUES[li].col, { weight: 800 });
+    const list = LEGENDS.map(l => ({ name: l.name[lang], g: l.g, me: false })).concat([{ name: playerName(), g, me: true }]).sort((a, b) => b.g - a.g);
+    list.forEach((r, i) => {
+      const y = 200 + i * 30;
+      rr(ctx, 18, y, W - 36, 26, 7); ctx.fillStyle = r.me ? 'rgba(220,183,94,0.22)' : (i % 2 ? T.fill : 'rgba(255,236,200,0.03)'); ctx.fill();
+      if (r.me) goldFrame(18, y, W - 36, 26, 7, 1.2);
+      txt('#' + (i + 1), 32, y + 13.5, 11, r.me ? T.goldLt : T.dim, { align: 'left', weight: 800 });
+      if (r.me) drawAvatar(70, y + 13, 10, Save.data.profile.avatar);
+      leagueBadge(r.me ? 92 : 70, y + 13, 7, leagueOf(r.g));
+      txt(r.name + (r.me ? '  · ' + mt('you') : ''), r.me ? 106 : 84, y + 13.5, fitText(r.name, 150, 12, 700), r.me ? '#fff3d6' : T.text, { align: 'left', weight: r.me ? 800 : 600 });
+      txt(String(r.g), W - 30, y + 13.5, 12, r.me ? T.goldLt : T.muted, { align: 'right', weight: 800 });
+    });
+    wrap(mt('ratingNote'), W / 2, 508, W - 70, 13, 10, T.dim, { weight: 500 });
+  }
+
+  // ---- out of tickets: how to get more
+  function drawTicketsPopup() {
+    const t = Save.data.tickets;
+    panel(28, 170, W - 56, 300);
+    icoTicket(W / 2, 208, 26, T.goldLt);
+    txt(mt('tickets') + ': ' + t.n + '/' + TICKET_MAX, W / 2, 244, 18, T.gold, { f: 'head', weight: 700 });
+    wrap(mt('ticketHow'), W / 2, 272, W - 90, 16, 12, T.text, { weight: 500 });
+    button(52, 348, W - 104, 44, mt('buyTicket') + '  ' + TICKET_GEMS, () => { if (buyTicket()) { menuPopup = null; } }, { disabled: Save.data.gems < TICKET_GEMS || t.n >= TICKET_MAX, size: 14, col: '#6a3a8a', col2: '#3a1f52' });
+    gemIcon(W - 76, 370, 7);
+    button(W / 2 - 60, 406, 120, 38, mt('ok'), () => { menuPopup = null; Sound.click(); }, { size: 14 });
+  }
+  function icoTicket(x, y, s, c) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-14, -8); ctx.lineTo(14, -8); ctx.lineTo(14, -3); ctx.arc(14, 0, 3, -Math.PI / 2, Math.PI / 2, true); ctx.lineTo(14, 8); ctx.lineTo(-14, 8); ctx.lineTo(-14, 3); ctx.arc(-14, 0, 3, Math.PI / 2, -Math.PI / 2, true); ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(5, -7); ctx.lineTo(5, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = `900 9px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('A', -4, 0.5);
+    ctx.restore();
   }
 })();
 </script>

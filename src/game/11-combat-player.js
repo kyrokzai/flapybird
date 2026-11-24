@@ -59,7 +59,10 @@
     if (e.dead) return;
     e.dead = true;
     run.kills++;
-    questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; }
+    questEvent('kill'); if (e.type === 'w') questEvent('wolf'); if (e.boss) { questEvent('boss'); run.gems += 3; run.bossKills = (run.bossKills || 0) + 1; }
+    if (!SIM.on) { Save.data.stats.kills++; if (e.boss) Save.data.stats.bosses++; }
+    // a story boss pays an arena ticket
+    if (e.boss && !isSurv() && !SIM.on) { addTicket(1); floatText(e.x, e.y, '+1 ' + mt('ticket'), '#c99bff', 15, 2.6); }
     Sound.kill();
     const col = { w: '#9a9ea8', s: '#5b3a24', j: '#c4572f', a: '#dfe9f2', m: '#6d4c8f', D: '#a8683a', J: '#7a4fa0', A: '#3b9a5b' }[e.type];
     burst(e.x, e.y, col, e.boss ? 60 : 16, e.boss ? 260 : 150, e.boss ? 5 : 3.5);
@@ -177,8 +180,8 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
-    if (!SIM.on) { if (isSurv()) survivalRewards(); else runRewards(won); }
-    bank += run.coins; saveProgress();
+    if (!SIM.on) { if (isSurv()) survivalRewards(won); else runRewards(won); }
+    bank += run.coins; recordRun(won); saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
     if (!isSurv() && reached > best) { best = reached; saveProgress(); }
   }
