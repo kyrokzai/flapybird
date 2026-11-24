@@ -298,6 +298,7 @@
     ac: null, noise: null, master: null, musicGain: null, sfxGain: null,
     music: Save.data.settings.music, sfx: Save.data.settings.sfx,
     plucks: {}, nextNote: 0, step: 0, timer: null, lastPick: 0,
+    samples: {}, tracks: {}, packs: [], lastPlay: {}, cur: null,
     init() {
       if (!this.ac) {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -317,6 +318,7 @@
         this.nextNote = ac.currentTime + 0.1;
         this.timer = setInterval(() => this.schedule(), 50);
         if (this.ambWant) { const k = this.ambWant; this.ambWant = null; this.setAmbience(k); }
+        for (const p of this.packs) this.decodePack(p);
       }
       if (this.ac.state === 'suspended') this.ac.resume();
     },
@@ -343,8 +345,63 @@
       s.connect(g); g.connect(this.musicGain);
       s.start(t);
     },
+    // ---- recorded sounds and music (assets/sfx.js, assets/music_*.js); the synth stays as the fallback
+    addPack(name) {
+      const data = name === 'sfx' ? window.SFX_PACK : window['MUSIC_' + name.slice(6).toUpperCase()];
+      if (!data) return;
+      const p = { name, data }; this.packs.push(p);
+      if (name === 'sfx') window.SFX_PACK = null; else window['MUSIC_' + name.slice(6).toUpperCase()] = null;
+      if (this.ac) this.decodePack(p);
+    },
+    decodePack(p) {
+      if (p.done) return; p.done = true;
+      const dec = (b64, fn) => {
+        try {
+          const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+          const pr = this.ac.decodeAudioData(bin, fn, () => {});
+          if (pr && pr.catch) pr.catch(() => {});
+        } catch (e) { /* undecodable: keep the synth */ }
+      };
+      if (p.name === 'sfx') for (const k in p.data) dec(p.data[k], buf => { this.samples[k] = buf; });
+      else dec(p.data, buf => { this.tracks[p.name.slice(6)] = buf; });
+      p.data = null;
+    },
+    // play a recorded effect; false when it is not loaded yet (the caller then uses the synth)
+    play(name, vol, gap) {
+      if (!this.ok() || !this.samples[name]) return false;
+      const now = this.ac.currentTime;
+      if (gap && now - (this.lastPlay[name] || 0) < gap) return true;
+      this.lastPlay[name] = now;
+      const s = this.ac.createBufferSource(); s.buffer = this.samples[name];
+      s.playbackRate.value = 0.94 + Math.random() * 0.12;
+      const g = this.ac.createGain(); g.gain.value = vol;
+      s.connect(g); g.connect(this.sfxGain); s.start();
+      return true;
+    },
+    // recorded music for the current mode with a 1.5 s crossfade; false = no track, use the synth
+    musicTrack() {
+      const want = this.mode || 'menu', buf = this.tracks[want];
+      if (!buf) { if (this.cur) this.stopTrack(); return false; }
+      if (!this.cur || this.cur.name !== want) {
+        this.stopTrack();
+        const ac = this.ac, src = ac.createBufferSource(), g = ac.createGain();
+        src.buffer = buf; src.loop = true;
+        g.gain.setValueAtTime(0.0001, ac.currentTime); g.gain.linearRampToValueAtTime(1.7, ac.currentTime + 1.5);
+        src.connect(g); g.connect(this.musicGain); src.start();
+        this.cur = { name: want, src, g };
+      }
+      return true;
+    },
+    stopTrack() {
+      if (!this.cur) return;
+      const { src, g } = this.cur, t = this.ac.currentTime;
+      g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0.0001, t + 1.2);
+      try { src.stop(t + 1.3); } catch (e) { /* already stopped */ }
+      this.cur = null;
+    },
     schedule() {
       this.ambEvents();
+      if (this.ac && this.musicTrack()) { this.nextNote = this.ac.currentTime + 0.1; return; }
       if (!this.ac || !this.music) { if (this.ac) this.nextNote = this.ac.currentTime + 0.1; return; }
       // three themes: calm dombra in the menu, faster dombra with a dauylpaz drum in battle, minor kobyz drone and heavy drums for bosses
       const mode = this.mode || 'menu', mel = mode === 'boss' ? MELODY_BOSS : mode === 'battle' ? MELODY_BATTLE : MELODY;
@@ -406,18 +463,19 @@
       const g = ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
       s.connect(f); f.connect(g); g.connect(this.sfxGain); s.start(t); s.stop(t + dur + 0.03);
     },
-    shoot() { if (this.ok()) { this.tone('triangle', 520, 240, 0, 0.08, 0.07); this.hiss(3000, 900, 0, 0.08, 0.12); } },
-    hit() { if (this.ok()) this.tone('square', 260, 130, 0, 0.05, 0.035); },
-    kill() { if (this.ok()) { this.hiss(900, 200, 0, 0.18, 0.25); this.tone('triangle', 330, 90, 0, 0.16, 0.12); } },
-    hurt() { buzz(35); if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
-    pick() {
+    shoot() { if (this.play('shoot', 0.32, 0.06)) return; if (this.ok()) { this.tone('triangle', 520, 240, 0, 0.08, 0.07); this.hiss(3000, 900, 0, 0.08, 0.12); } },
+    hit() { if (this.play('hit', 0.3, 0.05)) return; if (this.ok()) this.tone('square', 260, 130, 0, 0.05, 0.035); },
+    kill() { if (this.play('kill', 0.45, 0.05)) return; if (this.ok()) { this.hiss(900, 200, 0, 0.18, 0.25); this.tone('triangle', 330, 90, 0, 0.16, 0.12); } },
+    hurt() { buzz(35); if (this.play('hurt', 0.65, 0.15)) return; if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
+    pick(kind) {
+      if (kind === 'coin' && this.play('coin', 0.28, 0.06)) return;
       if (!this.ok()) return;
       const now = this.ac.currentTime; if (now - this.lastPick < 0.045) return; this.lastPick = now;
       this.tone('sine', 1250 + Math.random() * 300, 1600, 0, 0.06, 0.04);
     },
-    level() { buzz(20); if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
-    crate() { buzz(15); if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
-    shield() { if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
+    level() { buzz(20); if (this.play('level', 0.55, 0.2)) return; if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
+    crate() { buzz(15); if (this.play('crate', 0.6)) return; if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
+    shield() { if (this.play('shield', 0.5)) return; if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
     clear() { if (this.ok()) [523, 659, 784, 1047].forEach((f, i) => { this.tone('triangle', f, f, i * 0.09, 0.35, 0.08); this.tone('sine', f * 2, f * 2, i * 0.09, 0.2, 0.02); }); },
     // looping background ambience per location + occasional events (birds, horns, keyboards, gulls, wind)
     setAmbience(kind) {
@@ -473,9 +531,11 @@
         default: { tone('sine', 2300, 1500, 0, 0.9, 0.012); this.ambNext = now + 8 + Math.random() * 6; }
       }
     },
-    gate() { if (this.ok()) { this.tone('triangle', 392, 784, 0, 0.5, 0.08); this.hiss(400, 2400, 0, 0.5, 0.08); } },
-    roar() { if (this.ok()) { this.tone('sawtooth', 130, 55, 0, 0.8, 0.13); this.hiss(500, 120, 0, 0.8, 0.3, 'lowpass'); } },
-    boom() { if (this.ok()) { this.tone('sine', 90, 35, 0, 0.35, 0.3); this.hiss(500, 80, 0, 0.35, 0.35, 'lowpass'); } },
+    gate() { if (this.play('gate', 0.55)) return; if (this.ok()) { this.tone('triangle', 392, 784, 0, 0.5, 0.08); this.hiss(400, 2400, 0, 0.5, 0.08); } },
+    roar() { if (this.play('roar', 0.75, 0.5)) return; if (this.ok()) { this.tone('sawtooth', 130, 55, 0, 0.8, 0.13); this.hiss(500, 120, 0, 0.8, 0.3, 'lowpass'); } },
+    boom() { if (this.play('boom', 0.7, 0.08)) return; if (this.ok()) { this.tone('sine', 90, 35, 0, 0.35, 0.3); this.hiss(500, 80, 0, 0.35, 0.35, 'lowpass'); } },
+    chest() { buzz(45); if (!this.play('chest', 0.7)) this.level(); },
+    wolf() { this.play('wolf', 0.32, 2.5); },
     click() { if (this.ok()) this.tone('triangle', 660, 880, 0, 0.06, 0.06); },
     magic() { if (this.ok()) this.tone('sine', 900, 400, 0, 0.18, 0.05); },
   };
@@ -1129,7 +1189,7 @@
         e.t -= dt; e.cd -= dt;
         if (e.st === 'chase') {
           steerPath(e, e.speed);
-          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.6; }
+          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.6; Sound.wolf(); }
         } else if (e.st === 'wind') {
           e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player);
           if (e.t <= 0) { e.st = 'dash'; e.t = 0.38; e.dashA = e.face; }
@@ -1467,7 +1527,7 @@
         else if (p.kind === 'coin') { const c = Math.max(1, Math.round(p.v * (1 + run.S.loot))); run.coins += c; questEvent('coins', c); }
         else if (p.kind === 'bonus') applyBonus(p.item);
         else healPlayer(player.maxHp * 0.15);
-        Sound.pick();
+        Sound.pick(p.kind);
       }
     }
     pickups = pickups.filter(p => !p.dead);
@@ -4386,14 +4446,19 @@
   const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
-  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'],
-    ['sky', 'park'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
+  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'], ['a', 'music_menu'], ['a', 'sfx'],
+    ['sky', 'park'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
   G3.loadTotal = LOAD_ALL.length; G3.loadDone = 0;
   (function next(i) {
     if (i >= LOAD_ALL.length) return;
     const [k, n] = LOAD_ALL[i], go = () => { G3.loadDone = i + 1; next(i + 1); };
-    if (k === 'sky') loadSky(n, go); else loadModel(n, go);
+    if (k === 'sky') loadSky(n, go); else if (k === 'a') loadAudio(n, go); else loadModel(n, go);
   })(0);
+  function loadAudio(name, done) {
+    const sc = document.createElement('script'); sc.src = 'assets/' + name + '.js';
+    sc.onload = () => { Sound.addPack(name); done(); }; sc.onerror = () => done();
+    document.head.appendChild(sc);
+  }
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
@@ -4407,7 +4472,7 @@
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
-    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
+    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },
@@ -4959,7 +5024,7 @@
       ui.push({ x: 0, y: 0, w: W, h: H, fn: () => { d.t0 -= chestT * 1000; } });
       return;
     }
-    if (hasItems && !d.burst) { d.burst = true; Sound.level(); buzz(45); }
+    if (hasItems && !d.burst) { d.burst = true; Sound.chest(); }
     if (hasItems && best >= 1) rays(W / 2, top + h - 120, 150, bcol, 0.55, pNow / 1400);
     panel(24, top, W - 48, h);
     txt(mt('rewards'), W / 2, top + 40, 22, T.gold, { weight: 900 });

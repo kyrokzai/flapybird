@@ -215,7 +215,7 @@
       ui.push({ x: 0, y: 0, w: W, h: H, fn: () => { d.t0 -= chestT * 1000; } });
       return;
     }
-    if (hasItems && !d.burst) { d.burst = true; Sound.level(); buzz(45); }
+    if (hasItems && !d.burst) { d.burst = true; Sound.chest(); }
     if (hasItems && best >= 1) rays(W / 2, top + h - 120, 150, bcol, 0.55, pNow / 1400);
     panel(24, top, W - 48, h);
     txt(mt('rewards'), W / 2, top + 40, 22, T.gold, { weight: 900 });

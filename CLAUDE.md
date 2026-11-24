@@ -24,4 +24,5 @@
 - Учитывай `REDUCED_MOTION` (prefers-reduced-motion) для новых анимаций.
 - **Арена выживания** (`31-survival.js`): стадион — 16-я запись в `ROOM_DEFS` (`arena: true`), режим забега `run.mode === 'survival'` (`isSurv()`), сложность врагов — `diffLevel()` (в сюжете = номер комнаты, на арене растёт с волной). Сюжетный баланс и `Mergen.sim` арену не трогают.
 - **PWA:** `manifest.webmanifest`, `sw.js` (страница — сначала сеть, ассеты — кэш с фоновым обновлением, CDN — кэш), значки `icons/`. CI копирует их в `gh-pages`. Если меняешь стратегию кэша, подними `CACHE` в `sw.js`.
+- **Звук:** записанные эффекты — `assets/sfx.js` (`window.SFX_PACK`, mp3 в base64), музыка — `assets/music_menu|battle|boss.js`. `Sound.play(name, vol, gap)` играет запись или возвращает false (тогда звучит синтез), `Sound.musicTrack()` включает тему по `Sound.mode`. Новые эффекты: подрезать тишину, нормализовать пик до −1 dB, mono 64 kbps.
 - Качество графики: пресеты `QUALITY` (low/medium/high), `applyQuality()` переключает на лету. Тяжёлые эффекты масштабируй через `Q.grass` / `Q.fx` или проверку `QL`.

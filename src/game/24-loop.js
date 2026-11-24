@@ -35,14 +35,19 @@
   const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
-  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'],
-    ['sky', 'park'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
+  const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'], ['a', 'music_menu'], ['a', 'sfx'],
+    ['sky', 'park'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
   G3.loadTotal = LOAD_ALL.length; G3.loadDone = 0;
   (function next(i) {
     if (i >= LOAD_ALL.length) return;
     const [k, n] = LOAD_ALL[i], go = () => { G3.loadDone = i + 1; next(i + 1); };
-    if (k === 'sky') loadSky(n, go); else loadModel(n, go);
+    if (k === 'sky') loadSky(n, go); else if (k === 'a') loadAudio(n, go); else loadModel(n, go);
   })(0);
+  function loadAudio(name, done) {
+    const sc = document.createElement('script'); sc.src = 'assets/' + name + '.js';
+    sc.onload = () => { Sound.addPack(name); done(); }; sc.onerror = () => done();
+    document.head.appendChild(sc);
+  }
   requestAnimationFrame(frame);
 
   // hooks for automated tests (room jumping only in #test mode)
@@ -56,7 +61,7 @@
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
-    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
+    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },

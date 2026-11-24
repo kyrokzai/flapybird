@@ -101,7 +101,7 @@
         e.t -= dt; e.cd -= dt;
         if (e.st === 'chase') {
           steerPath(e, e.speed);
-          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.6; }
+          if (d < 150 && e.cd <= 0 && clearPath(e, player, 4)) { e.st = 'wind'; e.t = 0.6; Sound.wolf(); }
         } else if (e.st === 'wind') {
           e.vx = e.vy = 0; e.wind = true; e.face = angTo(e, player);
           if (e.t <= 0) { e.st = 'dash'; e.t = 0.38; e.dashA = e.face; }

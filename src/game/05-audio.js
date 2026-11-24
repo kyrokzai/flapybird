@@ -3,6 +3,7 @@
     ac: null, noise: null, master: null, musicGain: null, sfxGain: null,
     music: Save.data.settings.music, sfx: Save.data.settings.sfx,
     plucks: {}, nextNote: 0, step: 0, timer: null, lastPick: 0,
+    samples: {}, tracks: {}, packs: [], lastPlay: {}, cur: null,
     init() {
       if (!this.ac) {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -22,6 +23,7 @@
         this.nextNote = ac.currentTime + 0.1;
         this.timer = setInterval(() => this.schedule(), 50);
         if (this.ambWant) { const k = this.ambWant; this.ambWant = null; this.setAmbience(k); }
+        for (const p of this.packs) this.decodePack(p);
       }
       if (this.ac.state === 'suspended') this.ac.resume();
     },
@@ -48,8 +50,63 @@
       s.connect(g); g.connect(this.musicGain);
       s.start(t);
     },
+    // ---- recorded sounds and music (assets/sfx.js, assets/music_*.js); the synth stays as the fallback
+    addPack(name) {
+      const data = name === 'sfx' ? window.SFX_PACK : window['MUSIC_' + name.slice(6).toUpperCase()];
+      if (!data) return;
+      const p = { name, data }; this.packs.push(p);
+      if (name === 'sfx') window.SFX_PACK = null; else window['MUSIC_' + name.slice(6).toUpperCase()] = null;
+      if (this.ac) this.decodePack(p);
+    },
+    decodePack(p) {
+      if (p.done) return; p.done = true;
+      const dec = (b64, fn) => {
+        try {
+          const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+          const pr = this.ac.decodeAudioData(bin, fn, () => {});
+          if (pr && pr.catch) pr.catch(() => {});
+        } catch (e) { /* undecodable: keep the synth */ }
+      };
+      if (p.name === 'sfx') for (const k in p.data) dec(p.data[k], buf => { this.samples[k] = buf; });
+      else dec(p.data, buf => { this.tracks[p.name.slice(6)] = buf; });
+      p.data = null;
+    },
+    // play a recorded effect; false when it is not loaded yet (the caller then uses the synth)
+    play(name, vol, gap) {
+      if (!this.ok() || !this.samples[name]) return false;
+      const now = this.ac.currentTime;
+      if (gap && now - (this.lastPlay[name] || 0) < gap) return true;
+      this.lastPlay[name] = now;
+      const s = this.ac.createBufferSource(); s.buffer = this.samples[name];
+      s.playbackRate.value = 0.94 + Math.random() * 0.12;
+      const g = this.ac.createGain(); g.gain.value = vol;
+      s.connect(g); g.connect(this.sfxGain); s.start();
+      return true;
+    },
+    // recorded music for the current mode with a 1.5 s crossfade; false = no track, use the synth
+    musicTrack() {
+      const want = this.mode || 'menu', buf = this.tracks[want];
+      if (!buf) { if (this.cur) this.stopTrack(); return false; }
+      if (!this.cur || this.cur.name !== want) {
+        this.stopTrack();
+        const ac = this.ac, src = ac.createBufferSource(), g = ac.createGain();
+        src.buffer = buf; src.loop = true;
+        g.gain.setValueAtTime(0.0001, ac.currentTime); g.gain.linearRampToValueAtTime(1.7, ac.currentTime + 1.5);
+        src.connect(g); g.connect(this.musicGain); src.start();
+        this.cur = { name: want, src, g };
+      }
+      return true;
+    },
+    stopTrack() {
+      if (!this.cur) return;
+      const { src, g } = this.cur, t = this.ac.currentTime;
+      g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0.0001, t + 1.2);
+      try { src.stop(t + 1.3); } catch (e) { /* already stopped */ }
+      this.cur = null;
+    },
     schedule() {
       this.ambEvents();
+      if (this.ac && this.musicTrack()) { this.nextNote = this.ac.currentTime + 0.1; return; }
       if (!this.ac || !this.music) { if (this.ac) this.nextNote = this.ac.currentTime + 0.1; return; }
       // three themes: calm dombra in the menu, faster dombra with a dauylpaz drum in battle, minor kobyz drone and heavy drums for bosses
       const mode = this.mode || 'menu', mel = mode === 'boss' ? MELODY_BOSS : mode === 'battle' ? MELODY_BATTLE : MELODY;
@@ -111,18 +168,19 @@
       const g = ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
       s.connect(f); f.connect(g); g.connect(this.sfxGain); s.start(t); s.stop(t + dur + 0.03);
     },
-    shoot() { if (this.ok()) { this.tone('triangle', 520, 240, 0, 0.08, 0.07); this.hiss(3000, 900, 0, 0.08, 0.12); } },
-    hit() { if (this.ok()) this.tone('square', 260, 130, 0, 0.05, 0.035); },
-    kill() { if (this.ok()) { this.hiss(900, 200, 0, 0.18, 0.25); this.tone('triangle', 330, 90, 0, 0.16, 0.12); } },
-    hurt() { buzz(35); if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
-    pick() {
+    shoot() { if (this.play('shoot', 0.32, 0.06)) return; if (this.ok()) { this.tone('triangle', 520, 240, 0, 0.08, 0.07); this.hiss(3000, 900, 0, 0.08, 0.12); } },
+    hit() { if (this.play('hit', 0.3, 0.05)) return; if (this.ok()) this.tone('square', 260, 130, 0, 0.05, 0.035); },
+    kill() { if (this.play('kill', 0.45, 0.05)) return; if (this.ok()) { this.hiss(900, 200, 0, 0.18, 0.25); this.tone('triangle', 330, 90, 0, 0.16, 0.12); } },
+    hurt() { buzz(35); if (this.play('hurt', 0.65, 0.15)) return; if (this.ok()) { this.tone('square', 170, 55, 0, 0.22, 0.16); this.hiss(600, 150, 0, 0.2, 0.25, 'lowpass'); } },
+    pick(kind) {
+      if (kind === 'coin' && this.play('coin', 0.28, 0.06)) return;
       if (!this.ok()) return;
       const now = this.ac.currentTime; if (now - this.lastPick < 0.045) return; this.lastPick = now;
       this.tone('sine', 1250 + Math.random() * 300, 1600, 0, 0.06, 0.04);
     },
-    level() { buzz(20); if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
-    crate() { buzz(15); if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
-    shield() { if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
+    level() { buzz(20); if (this.play('level', 0.55, 0.2)) return; if (this.ok()) [587, 740, 880, 1175].forEach((f, i) => this.tone('triangle', f, f, i * 0.08, 0.22, 0.09)); },
+    crate() { buzz(15); if (this.play('crate', 0.6)) return; if (this.ok()) { this.hiss(1800, 300, 0, 0.18, 0.4, 'bandpass'); this.tone('square', 180, 90, 0, 0.12, 0.06); } },
+    shield() { if (this.play('shield', 0.5)) return; if (this.ok()) { this.tone('sine', 900, 1400, 0, 0.18, 0.08); this.tone('triangle', 600, 900, 0, 0.25, 0.05); } },
     clear() { if (this.ok()) [523, 659, 784, 1047].forEach((f, i) => { this.tone('triangle', f, f, i * 0.09, 0.35, 0.08); this.tone('sine', f * 2, f * 2, i * 0.09, 0.2, 0.02); }); },
     // looping background ambience per location + occasional events (birds, horns, keyboards, gulls, wind)
     setAmbience(kind) {
@@ -178,9 +236,11 @@
         default: { tone('sine', 2300, 1500, 0, 0.9, 0.012); this.ambNext = now + 8 + Math.random() * 6; }
       }
     },
-    gate() { if (this.ok()) { this.tone('triangle', 392, 784, 0, 0.5, 0.08); this.hiss(400, 2400, 0, 0.5, 0.08); } },
-    roar() { if (this.ok()) { this.tone('sawtooth', 130, 55, 0, 0.8, 0.13); this.hiss(500, 120, 0, 0.8, 0.3, 'lowpass'); } },
-    boom() { if (this.ok()) { this.tone('sine', 90, 35, 0, 0.35, 0.3); this.hiss(500, 80, 0, 0.35, 0.35, 'lowpass'); } },
+    gate() { if (this.play('gate', 0.55)) return; if (this.ok()) { this.tone('triangle', 392, 784, 0, 0.5, 0.08); this.hiss(400, 2400, 0, 0.5, 0.08); } },
+    roar() { if (this.play('roar', 0.75, 0.5)) return; if (this.ok()) { this.tone('sawtooth', 130, 55, 0, 0.8, 0.13); this.hiss(500, 120, 0, 0.8, 0.3, 'lowpass'); } },
+    boom() { if (this.play('boom', 0.7, 0.08)) return; if (this.ok()) { this.tone('sine', 90, 35, 0, 0.35, 0.3); this.hiss(500, 80, 0, 0.35, 0.35, 'lowpass'); } },
+    chest() { buzz(45); if (!this.play('chest', 0.7)) this.level(); },
+    wolf() { this.play('wolf', 0.32, 2.5); },
     click() { if (this.ok()) this.tone('triangle', 660, 880, 0, 0.06, 0.06); },
     magic() { if (this.ok()) this.tone('sine', 900, 400, 0, 0.18, 0.05); },
   };
