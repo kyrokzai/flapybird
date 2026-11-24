@@ -135,7 +135,7 @@
     }
     for (const [e, m] of G3.ents) {
       if (seen.has(e)) continue;
-      if (scene !== 'menu' && m.dying === undefined && e.dead) { m.dying = 0.32; setFlash(m, true); m.ring.material.opacity = 0; m.warn.material.opacity = 0; }
+      if (scene !== 'menu' && m.dying === undefined && e.dead) { m.dying = 0.32; setFlash(m, true); m.ring.material.opacity = 0; m.warn.material.opacity = 0; if (m.shadow) m.shadow.visible = false; }
       if (m.dying !== undefined && m.dying > 0) {
         m.dying -= dt;
         const k = clamp(m.dying / 0.32, 0, 1);

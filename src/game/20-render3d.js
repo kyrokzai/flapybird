@@ -60,6 +60,7 @@
       hm.g.rotation.y = -player.face;
       (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
     }
+    syncHeroAtmosphere(menu);
     const ens = menu ? [] : enemies;
     syncEnemies(ens, fdt);
     syncList(menu ? [] : arrows, G3.arrowsM, makeArrowModel, (a, m) => { m.g.position.set(X3(a.x), 0.55, Z3(a.y)); m.g.rotation.y = -a.ang; });
@@ -156,8 +157,10 @@
     pos.needsUpdate = true; pc.needsUpdate = true;
 
     if (G3.usePost) {
-      G3.grade.uniforms.exposure.value = menu ? (G3.skyTex.menu ? 1.0 : 1.2) : 0.8;
-      G3.grade.uniforms.sat.value = menu ? 1.1 : 1.18;
+      const gm = !menu && G3.mood && G3.mood.grade;
+      G3.grade.uniforms.exposure.value = menu ? (G3.skyTex.menu ? 1.0 : 1.2) : (gm ? gm[0] : 0.8);
+      G3.grade.uniforms.sat.value = menu ? 1.1 : (gm ? gm[1] : 1.18);
+      G3.grade.uniforms.tint.value.copy(gm ? col(gm[2]) : col('#ffffff'));
       G3.bloom.threshold = menu ? 0.97 : 1.5;
       G3.composer.render();
     } else G3.r.render(G3.scene, G3.cam);

@@ -47,7 +47,8 @@
     e.hp -= d; e.flash = 0.1; e.punch = 1;
     burst(e.x, e.y, crit ? '#ffb040' : '#fff0c0', crit ? 8 : 4, 130, 2.2);
     if (crit) { hitStop = Math.max(hitStop, 0.025); shake = Math.max(shake, 3); }
-    floatText(e.x, e.y, String(Math.round(d)), crit ? '#ff9b2f' : (opts.col || '#ffffff'), crit ? 17 : 13, MODEL_H[e.type] + 0.15);
+    floatText(e.x, e.y, String(Math.round(d)), crit ? '#ff9b2f' : (opts.col || '#ffffff'), crit ? 19 : 13, MODEL_H[e.type] + 0.15);
+    if (!opts.silent) addFx('ring', e.x, e.y, { col: crit ? '#ffb040' : '#fff3c0', size: crit ? 1.2 : 0.55, max: crit ? 0.22 : 0.14 });   // impact flash
     if (opts.fire) { e.burn = 2.2; e.burnDmg = atk() * 0.12 * sk('fire'); }
     if (opts.ice) e.slow = 1.6;
     if (!e.boss && opts.kb) { e.kx += Math.cos(opts.kb) * 90; e.ky += Math.sin(opts.kb) * 90; }

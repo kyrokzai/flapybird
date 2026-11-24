@@ -181,10 +181,10 @@
     const bx = 50, bw = 250;
     rr(ctx, bx, 15, bw, 14, 7); ctx.fillStyle = C.ink; ctx.fill();
     const frac = clamp(run.xp / xpNeed(run.level), 0, 1);
-    if (frac > 0) { rr(ctx, bx + 2, 17, Math.max(10, (bw - 4) * frac), 10, 5); ctx.fillStyle = '#3fd0e8'; ctx.fill(); }
+    if (frac > 0) { rr(ctx, bx + 2, 17, Math.max(10, (bw - 4) * frac), 10, 5); ctx.fillStyle = xpPulse > 0.05 ? '#9ff4ff' : '#3fd0e8'; ctx.fill(); }
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
-    txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
+    txt(String(run.coins), 32, 49, 14 * (1 + coinPulse * 0.35), coinPulse > 0.05 ? '#ffe27a' : '#fff', { align: 'left', weight: 700 });
     const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}  ·  ⏱ ${fmtClock(run.timeLeft)}` : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
     txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
@@ -251,7 +251,9 @@
     for (const t of texts) {
       const p = proj(t.x, t.h, t.y);
       ctx.globalAlpha = clamp(t.life / 0.4, 0, 1);
-      txt(t.t, p.x, p.y - t.rise, t.size, t.col, { stroke: C.ink, lw: 3, weight: 900 });
+      // crits pop up big and shake for a moment
+      const age = 0.8 - t.life, pk = t.pop ? Math.max(0, 1 - age / 0.14) : 0, sh = pk * 3;
+      txt(t.t, p.x + (sh ? (Math.random() - 0.5) * sh : 0), p.y - t.rise, t.size * (1 + pk * 0.6), t.col, { stroke: C.ink, lw: t.pop ? 4 : 3, weight: 900 });
     }
     ctx.globalAlpha = 1;
   }

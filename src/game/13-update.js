@@ -265,7 +265,7 @@
         else if (p.kind === 'coin') { const c = Math.max(1, Math.round(p.v * (1 + run.S.loot))); run.coins += c; questEvent('coins', c); }
         else if (p.kind === 'bonus') applyBonus(p.item);
         else healPlayer(player.maxHp * 0.15);
-        Sound.pick(p.kind);
+        flyToHud(p); Sound.pick(p.kind);
       }
     }
     pickups = pickups.filter(p => !p.dead);

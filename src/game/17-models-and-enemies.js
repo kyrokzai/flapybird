@@ -534,6 +534,7 @@
     m.warn = decal(G3.ringTex, '#ff3b2f', e.r / CELL * 3.2, 0); g.add(m.warn);
     m.burn = glow('#ff8a20', 0.7, 0); m.burn.position.y = MODEL_H[e.type] * 0.6; g.add(m.burn);
     m.slow = glow('#8fe0ff', 1.0, 0); m.slow.position.y = MODEL_H[e.type] * 0.4; g.add(m.slow);
+    m.shadow = blobShadow((e.boss ? 2.6 : 1.2) * (e.r / 13) * 0.9, e.fly ? 0.3 : 0.42); m.g.add(m.shadow);
     return m;
   }
 

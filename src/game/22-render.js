@@ -19,6 +19,7 @@
         }
       }
       shiftUI(SAFE.t, drawHud);
+      if (run) drawFlyers(pdt);
       drawJoystick();
       shiftUI(SAFE.t, drawBanner);
       if (scene === 'play' && !modal) shiftUI(SAFE.t, drawTutorial);

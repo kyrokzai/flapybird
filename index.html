@@ -899,7 +899,7 @@
       particles.push({ x, y, h: rand(0.2, 0.7), vh: rand(0.5, 3), vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.7), max: 0.7, col, size: size * rand(0.6, 1.2) });
     }
   }
-  function floatText(x, y, t, col, size, h) { texts.push({ x: x + rand(-6, 6), y, h: h || 1.1, rise: 0, t, col, size, life: 0.8 }); }
+  function floatText(x, y, t, col, size, h) { texts.push({ x: x + rand(-6, 6), y, h: h || 1.1, rise: 0, t, col, size, life: 0.8, pop: size >= 17 }); }
 
   // =================================================================== combat: player
   function pickTarget() {
@@ -950,7 +950,8 @@
     e.hp -= d; e.flash = 0.1; e.punch = 1;
     burst(e.x, e.y, crit ? '#ffb040' : '#fff0c0', crit ? 8 : 4, 130, 2.2);
     if (crit) { hitStop = Math.max(hitStop, 0.025); shake = Math.max(shake, 3); }
-    floatText(e.x, e.y, String(Math.round(d)), crit ? '#ff9b2f' : (opts.col || '#ffffff'), crit ? 17 : 13, MODEL_H[e.type] + 0.15);
+    floatText(e.x, e.y, String(Math.round(d)), crit ? '#ff9b2f' : (opts.col || '#ffffff'), crit ? 19 : 13, MODEL_H[e.type] + 0.15);
+    if (!opts.silent) addFx('ring', e.x, e.y, { col: crit ? '#ffb040' : '#fff3c0', size: crit ? 1.2 : 0.55, max: crit ? 0.22 : 0.14 });   // impact flash
     if (opts.fire) { e.burn = 2.2; e.burnDmg = atk() * 0.12 * sk('fire'); }
     if (opts.ice) e.slow = 1.6;
     if (!e.boss && opts.kb) { e.kx += Math.cos(opts.kb) * 90; e.ky += Math.sin(opts.kb) * 90; }
@@ -1554,7 +1555,7 @@
         else if (p.kind === 'coin') { const c = Math.max(1, Math.round(p.v * (1 + run.S.loot))); run.coins += c; questEvent('coins', c); }
         else if (p.kind === 'bonus') applyBonus(p.item);
         else healPlayer(player.maxHp * 0.15);
-        Sound.pick(p.kind);
+        flyToHud(p); Sound.pick(p.kind);
       }
     }
     pickups = pickups.filter(p => !p.dead);
@@ -1611,16 +1612,17 @@
 
   // final colour pass: ACES tone mapping, sRGB, a touch of saturation/contrast and a vignette
   const GRADE_SHADER = {
-    uniforms: { tDiffuse: { value: null }, exposure: { value: 1.2 }, vign: { value: 0.42 }, sat: { value: 1.1 }, contrast: { value: 1.06 } },
+    uniforms: { tDiffuse: { value: null }, exposure: { value: 1.2 }, vign: { value: 0.42 }, sat: { value: 1.1 }, contrast: { value: 1.06 }, tint: { value: new THREE.Color(1, 1, 1) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: [
-      'uniform sampler2D tDiffuse; uniform float exposure, vign, sat, contrast; varying vec2 vUv;',
+      'uniform sampler2D tDiffuse; uniform float exposure, vign, sat, contrast; uniform vec3 tint; varying vec2 vUv;',
       'vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }',
       'void main(){',
       '  vec3 c = aces(texture2D(tDiffuse, vUv).rgb * exposure);',
       '  c = pow(c, vec3(1.0 / 2.2));',
       '  float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = mix(vec3(l), c, sat);',
       '  c = (c - 0.5) * contrast + 0.5;',
+      '  c *= tint;',
       '  vec2 q = vUv - 0.5; c *= 1.0 - vign * dot(q, q) * 1.6;',
       '  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);',
       '}'].join('\n'),
@@ -2438,6 +2440,7 @@
       }
       G3.doors = []; G3.gateGlow = null; G3.gateBeam = null;
       buildLife(R, 'menu', -6, 6, true);
+      G3.mood = null;
       Sound.setAmbience('menu');
       return;
     }
@@ -2456,19 +2459,7 @@
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: def.arena ? pitchTex(ROWS) : themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
 
-    if (theme === 'park') {
-      const nb = Math.round(380 * Q.grass), grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
-      const dm = new THREE.Object3D(); let k = 0;
-      for (let i = 0; i < nb * 3 && k < nb; i++) {
-        const x = (rnd() - 0.5) * 7.8, z = zN + rnd() * ROWS;
-        const px = x * CELL + W / 2, py = z * CELL + ACY;
-        if (obstacles.some(o => px > o.x - 4 && px < o.x + o.w + 4 && py > o.y - 4 && py < o.y + o.h + 4)) continue;
-        if (Math.abs(px - (W / 2 + Math.sin((py - ARENA.y) / 70 + n) * 60)) < 22) continue;
-        dm.position.set(x, 0, z); dm.rotation.set((rnd() - 0.5) * 0.5, rnd() * 3, (rnd() - 0.5) * 0.5); dm.scale.setScalar(0.7 + rnd() * 0.8); dm.updateMatrix();
-        grass.setMatrixAt(k, dm.matrix); grass.setColorAt(k, colC(th.tuft[rnd() < 0.6 ? 0 : 1]).clone()); k++;
-      }
-      grass.count = k; grass.receiveShadow = true; R.add(grass);
-    }
+    buildRoomGrass(R, theme, n, zN, zS);
 
     themeWalls(R, theme, zN, zS);
     for (const o of obstacles) R.add(def.arena ? arenaProp(o) : themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
@@ -2490,6 +2481,7 @@
       b.material.map.repeat.set(1, h / 6); R.add(b);
     }
     buildLife(R, theme, zN, zS, false);
+    applyMood(R, n, theme, zN, zS);
     Sound.setAmbience(theme);
   }
 
@@ -3250,6 +3242,7 @@
     m.warn = decal(G3.ringTex, '#ff3b2f', e.r / CELL * 3.2, 0); g.add(m.warn);
     m.burn = glow('#ff8a20', 0.7, 0); m.burn.position.y = MODEL_H[e.type] * 0.6; g.add(m.burn);
     m.slow = glow('#8fe0ff', 1.0, 0); m.slow.position.y = MODEL_H[e.type] * 0.4; g.add(m.slow);
+    m.shadow = blobShadow((e.boss ? 2.6 : 1.2) * (e.r / 13) * 0.9, e.fly ? 0.3 : 0.42); m.g.add(m.shadow);
     return m;
   }
 
@@ -3501,7 +3494,7 @@
     }
     for (const [e, m] of G3.ents) {
       if (seen.has(e)) continue;
-      if (scene !== 'menu' && m.dying === undefined && e.dead) { m.dying = 0.32; setFlash(m, true); m.ring.material.opacity = 0; m.warn.material.opacity = 0; }
+      if (scene !== 'menu' && m.dying === undefined && e.dead) { m.dying = 0.32; setFlash(m, true); m.ring.material.opacity = 0; m.warn.material.opacity = 0; if (m.shadow) m.shadow.visible = false; }
       if (m.dying !== undefined && m.dying > 0) {
         m.dying -= dt;
         const k = clamp(m.dying / 0.32, 0, 1);
@@ -3834,6 +3827,7 @@
       hm.g.rotation.y = -player.face;
       (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
     }
+    syncHeroAtmosphere(menu);
     const ens = menu ? [] : enemies;
     syncEnemies(ens, fdt);
     syncList(menu ? [] : arrows, G3.arrowsM, makeArrowModel, (a, m) => { m.g.position.set(X3(a.x), 0.55, Z3(a.y)); m.g.rotation.y = -a.ang; });
@@ -3930,8 +3924,10 @@
     pos.needsUpdate = true; pc.needsUpdate = true;
 
     if (G3.usePost) {
-      G3.grade.uniforms.exposure.value = menu ? (G3.skyTex.menu ? 1.0 : 1.2) : 0.8;
-      G3.grade.uniforms.sat.value = menu ? 1.1 : 1.18;
+      const gm = !menu && G3.mood && G3.mood.grade;
+      G3.grade.uniforms.exposure.value = menu ? (G3.skyTex.menu ? 1.0 : 1.2) : (gm ? gm[0] : 0.8);
+      G3.grade.uniforms.sat.value = menu ? 1.1 : (gm ? gm[1] : 1.18);
+      G3.grade.uniforms.tint.value.copy(gm ? col(gm[2]) : col('#ffffff'));
       G3.bloom.threshold = menu ? 0.97 : 1.5;
       G3.composer.render();
     } else G3.r.render(G3.scene, G3.cam);
@@ -4120,10 +4116,10 @@
     const bx = 50, bw = 250;
     rr(ctx, bx, 15, bw, 14, 7); ctx.fillStyle = C.ink; ctx.fill();
     const frac = clamp(run.xp / xpNeed(run.level), 0, 1);
-    if (frac > 0) { rr(ctx, bx + 2, 17, Math.max(10, (bw - 4) * frac), 10, 5); ctx.fillStyle = '#3fd0e8'; ctx.fill(); }
+    if (frac > 0) { rr(ctx, bx + 2, 17, Math.max(10, (bw - 4) * frac), 10, 5); ctx.fillStyle = xpPulse > 0.05 ? '#9ff4ff' : '#3fd0e8'; ctx.fill(); }
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
-    txt(String(run.coins), 32, 49, 14, '#fff', { align: 'left', weight: 700 });
+    txt(String(run.coins), 32, 49, 14 * (1 + coinPulse * 0.35), coinPulse > 0.05 ? '#ffe27a' : '#fff', { align: 'left', weight: 700 });
     const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}  ·  ⏱ ${fmtClock(run.timeLeft)}` : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
     txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
@@ -4190,7 +4186,9 @@
     for (const t of texts) {
       const p = proj(t.x, t.h, t.y);
       ctx.globalAlpha = clamp(t.life / 0.4, 0, 1);
-      txt(t.t, p.x, p.y - t.rise, t.size, t.col, { stroke: C.ink, lw: 3, weight: 900 });
+      // crits pop up big and shake for a moment
+      const age = 0.8 - t.life, pk = t.pop ? Math.max(0, 1 - age / 0.14) : 0, sh = pk * 3;
+      txt(t.t, p.x + (sh ? (Math.random() - 0.5) * sh : 0), p.y - t.rise, t.size * (1 + pk * 0.6), t.col, { stroke: C.ink, lw: t.pop ? 4 : 3, weight: 900 });
     }
     ctx.globalAlpha = 1;
   }
@@ -4393,6 +4391,7 @@
         }
       }
       shiftUI(SAFE.t, drawHud);
+      if (run) drawFlyers(pdt);
       drawJoystick();
       shiftUI(SAFE.t, drawBanner);
       if (scene === 'play' && !modal) shiftUI(SAFE.t, drawTutorial);
@@ -6168,6 +6167,137 @@
     ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(5, -7); ctx.lineTo(5, 7); ctx.stroke(); ctx.setLineDash([]);
     ctx.font = `900 9px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('A', -4, 0.5);
     ctx.restore();
+  }
+  // =================================================================== atmosphere: time of day per room, contact shadows, lamps, mist, room grass, loot flying to the HUD
+  // Each room gets a mood that matches its panorama: morning and day in the parks, golden hour → night along the avenue,
+  // the office from day to evening, warm beach light, the arena under floodlights.
+  // sun: colour, sunI: × theme intensity, hemi: [sky, ground, intensity], pano: [tint, brightness], grade: [exposure, saturation, tint], lamps, mist, light (hero lantern)
+  const MOODS = {
+    1: { name: 'morning', sun: '#ffe2bc', sunI: 0.92, hemi: ['#eef4ff', '#5a6a3a', 0.5], pano: ['#ffe8d0', 1], grade: [0.84, 1.16, '#fff8f0'], mist: 0.06 },
+    2: { name: 'day' }, 3: { name: 'day' },
+    4: { name: 'afternoon', sun: '#ffe0b4', sunI: 0.95, pano: ['#fff0d8', 1], grade: [0.81, 1.17, '#fffaf2'] },
+    5: { name: 'golden', sun: '#ffcf96', sunI: 1.0, hemi: ['#f4ecff', '#5a4a2a', 0.45], pano: ['#ffd6a8', 0.95], grade: [0.8, 1.15, '#fff4e8'] },
+    6: { name: 'golden', sun: '#ffc68a', sunI: 0.95, grade: [0.8, 1.2, '#fff0dc'] },
+    7: { name: 'sunset', sun: '#ff9a5c', sunI: 0.85, hemi: ['#ffc0a0', '#4a3a3a', 0.5], pano: ['#ffb088', 0.9], grade: [0.8, 1.22, '#ffe4d2'], lamps: '#ffd890' },
+    8: { name: 'dusk', sun: '#d88070', sunI: 0.6, hemi: ['#8a90c8', '#352c3c', 0.6], pano: ['#a0a4d8', 0.62], grade: [0.86, 1.1, '#efeeff'], lamps: '#ffd890', mist: 0.05, light: '#ffcf8a' },
+    9: { name: 'night', sun: '#a4b4ff', sunI: 0.45, hemi: ['#7a86c8', '#1c1c28', 0.58], pano: ['#6a74b8', 0.42], grade: [0.95, 1.02, '#e8ebff'], lamps: '#ffd890', mist: 0.06, light: '#ffcf8a' },
+    10: { name: 'neon', sun: '#a89cff', sunI: 0.45, hemi: ['#8478d0', '#1a1430', 0.6], pano: ['#7a70c8', 0.45], grade: [0.95, 1.08, '#f2ecff'], lamps: 'neon', mist: 0.05, light: '#c8b0ff' },
+    11: { name: 'day' }, 12: { name: 'day' },
+    13: { name: 'evening', sun: '#ffc890', sunI: 0.8, hemi: ['#ffe2c0', '#6a5a48', 0.85], pano: ['#ffb890', 0.75], grade: [0.82, 1.12, '#fff0e0'] },
+    14: { name: 'night office', sun: '#b0c0ff', sunI: 0.55, hemi: ['#ffe8cc', '#5a4a3a', 0.95], pano: ['#5a6aa8', 0.45], grade: [0.86, 1.08, '#fff2e4'], light: '#ffd8a0' },
+    15: { name: 'beach', sun: '#ffd09a', sunI: 1.0, pano: ['#fff0d8', 1], grade: [0.8, 1.2, '#fff4e4'] },
+    16: { name: 'floodlights', sun: '#f2f5ff', sunI: 0.95, hemi: ['#c8d4ff', '#24342a', 0.65], pano: ['#5a68a8', 0.42], grade: [0.9, 1.12, '#f2f4ff'], mist: 0.03 },
+  };
+  const moodOf = n => MOODS[n] || {};
+
+  function applyMood(R, n, theme, zN, zS) {
+    const m = moodOf(n);
+    G3.mood = m;
+    if (m.sun) G3.sun.color = col(m.sun);
+    if (m.sunI) G3.sun.intensity *= m.sunI;
+    if (m.hemi) { G3.hemi.color = col(m.hemi[0]); G3.hemi.groundColor = col(m.hemi[1]); G3.hemi.intensity = m.hemi[2]; }
+    if (m.pano && G3.pano && G3.pano.visible) { G3.pano.material.color.setScalar(1.35 * m.pano[1]).multiply(col(m.pano[0])); }
+    // street lamps glow at dusk and night, with warm pools of light on the ground
+    if (m.lamps && theme === 'street') {
+      const pool = lampPoolTex();
+      let i = 0;
+      for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+        const c = m.lamps === 'neon' ? (i++ % 2 ? '#3fe8ff' : '#ff5ad8') : m.lamps;
+        const g = glow(c, 2.4, 0.85); g.position.set(s * 4.55, 2.0, z); R.add(g);
+        const d = decal(pool, c, 3.0, m.lamps === 'neon' ? 0.3 : 0.42); d.material.blending = THREE.AdditiveBlending; d.position.set(s * 4.1, 0.03, z); R.add(d);
+      }
+    }
+    // low drifting mist on cool mornings and at night
+    if (m.mist && Q.fx > 0.5) {
+      const tex = mistTex();
+      for (let k = 0; k < 5; k++) {
+        const p = new THREE.Mesh(G3.geo.plane, new THREE.MeshBasicMaterial({ map: tex, color: col(n >= 8 && n <= 10 ? '#aab4ff' : '#ffffff'), transparent: true, opacity: m.mist, depthWrite: false }));
+        p.rotation.x = -Math.PI / 2; p.scale.set(9, 6, 1);
+        const z0 = zN + (zS - zN) * (k + 0.5) / 5;
+        p.position.set(0, 0.12 + k * 0.02, z0); R.add(p);
+        if (G3.life) G3.life.upd.push(t => { p.position.x = Math.sin(t * 0.05 + k * 1.7) * 2.2; p.material.opacity = m.mist * (0.7 + 0.3 * Math.sin(t * 0.3 + k)); });
+      }
+    }
+  }
+  function lampPoolTex() {
+    if (G3.lampPool) return G3.lampPool;
+    return (G3.lampPool = canvasTex(128, 128, (g, w, h) => {
+      const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }));
+  }
+  function mistTex() {
+    if (G3.mistTex) return G3.mistTex;
+    const rnd = mulberry32(77);
+    return (G3.mistTex = canvasTex(256, 256, (g, w, h) => {
+      for (let i = 0; i < 40; i++) {
+        const x = w * (0.15 + rnd() * 0.7), y = h * (0.15 + rnd() * 0.7), r = 30 + rnd() * 60;
+        const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      }
+    }));
+  }
+
+  // ---- soft contact shadows under the batyr and every monster (they also ground things when shadow maps are off)
+  function blobTex() {
+    if (G3.blobTex) return G3.blobTex;
+    return (G3.blobTex = canvasTex(128, 128, (g, w, h) => {
+      const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,0.85)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.4)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }));
+  }
+  function blobShadow(size, op) { const d = decal(blobTex(), '#ffffff', size, op === undefined ? 0.42 : op); d.position.y = 0.012; d.renderOrder = 1; return d; }
+
+  // the batyr's shadow and, at night, a warm lantern glow that travels with him
+  function syncHeroAtmosphere(menu) {
+    if (!G3.heroBlob) { G3.heroBlob = blobShadow(1.25, 0.45); G3.dyn.add(G3.heroBlob); }
+    const play = !menu && (scene === 'play' || scene === 'dead' || scene === 'victory');
+    G3.heroBlob.visible = play;
+    if (play) G3.heroBlob.position.set(X3(player.x), 0.012, Z3(player.y));
+    const m = G3.mood || {}, want = play && m.light && QL !== 'low';
+    if (want && !G3.heroLight) { G3.heroLight = new THREE.PointLight(0xffcf8a, 0, 7, 1.6); G3.dyn.add(G3.heroLight); }
+    if (G3.heroLight) {
+      G3.heroLight.visible = !!want;
+      if (want) { G3.heroLight.color = col(m.light); G3.heroLight.intensity = 1.4 + Math.sin(G3.rt * 7) * 0.05; G3.heroLight.position.set(X3(player.x), 1.6, Z3(player.y) + 0.3); }
+    }
+  }
+
+  // ---- grass tufts in park rooms (and dune grass on the beach): dense along the hedges, sparse on the lawn, never on the path
+  function buildRoomGrass(R, theme, n, zN, zS) {
+    if (theme !== 'park' && theme !== 'beach') return;
+    const beach = theme === 'beach', nb = Math.round((beach ? 160 : 700) * Q.grass);
+    const pathX = py => W / 2 + Math.sin((py - ARENA.y) / 70 + n) * 60;
+    const field = makeGrassField(nb, r => {
+      const edge = r() < (beach ? 0.8 : 0.55);
+      const x = edge ? (r() < 0.5 ? -1 : 1) * (3.55 + r() * 0.45) : (r() - 0.5) * 7.6, z = zN + 0.2 + r() * (zS - zN - 0.4);
+      const px = x * CELL + W / 2, py = z * CELL + ACY;
+      if (obstacles.some(o => px > o.x - 6 && px < o.x + o.w + 6 && py > o.y - 6 && py < o.y + o.h + 6)) return null;
+      if (!beach && Math.abs(px - pathX(py)) < 26) return null;
+      return [x, z, edge ? 0.75 + r() * 0.4 : 0.45 + r() * 0.3];
+    }, beach, n * 13 + 1);
+    R.add(field);
+  }
+
+  // ---- coins and XP crystals fly from where they were picked up into the HUD; the counter pulses when they land
+  const flyers = [];
+  let coinPulse = 0, xpPulse = 0;
+  function flyToHud(p) {
+    if (flyers.length > 24 || (p.kind !== 'coin' && p.kind !== 'xp')) return;
+    const s = proj(p.x, 0.3, p.y);
+    flyers.push({ kind: p.kind, x0: s.x, y0: s.y, t: 0, dur: 0.42 + Math.random() * 0.12 });
+  }
+  function drawFlyers(dt) {
+    coinPulse = Math.max(0, coinPulse - dt * 3); xpPulse = Math.max(0, xpPulse - dt * 3);
+    for (const f of flyers) {
+      f.t += dt;
+      const k = clamp(f.t / f.dur, 0, 1), e = k * k * (3 - 2 * k);
+      const tx = f.kind === 'coin' ? 20 : 50 + 250 * clamp(run.xp / xpNeed(run.level), 0, 1), ty = (f.kind === 'coin' ? 49 : 22) + SAFE.t;
+      const x = f.x0 + (tx - f.x0) * e, y = f.y0 + (ty - f.y0) * e - Math.sin(k * Math.PI) * 60;
+      if (f.kind === 'coin') coinIcon(x, y, 5.5 + (1 - k) * 2);
+      else { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y, 0, x, y, 7); g.addColorStop(0, 'rgba(160,250,255,1)'); g.addColorStop(1, 'rgba(60,200,255,0)'); ctx.fillStyle = g; ctx.fillRect(x - 7, y - 7, 14, 14); ctx.restore(); }
+      if (k >= 1) { f.done = true; if (f.kind === 'coin') coinPulse = 1; else xpPulse = 1; }
+    }
+    for (let i = flyers.length - 1; i >= 0; i--) if (flyers[i].done) flyers.splice(i, 1);
   }
 })();
 </script>

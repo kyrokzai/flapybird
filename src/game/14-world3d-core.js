@@ -49,16 +49,17 @@
 
   // final colour pass: ACES tone mapping, sRGB, a touch of saturation/contrast and a vignette
   const GRADE_SHADER = {
-    uniforms: { tDiffuse: { value: null }, exposure: { value: 1.2 }, vign: { value: 0.42 }, sat: { value: 1.1 }, contrast: { value: 1.06 } },
+    uniforms: { tDiffuse: { value: null }, exposure: { value: 1.2 }, vign: { value: 0.42 }, sat: { value: 1.1 }, contrast: { value: 1.06 }, tint: { value: new THREE.Color(1, 1, 1) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: [
-      'uniform sampler2D tDiffuse; uniform float exposure, vign, sat, contrast; varying vec2 vUv;',
+      'uniform sampler2D tDiffuse; uniform float exposure, vign, sat, contrast; uniform vec3 tint; varying vec2 vUv;',
       'vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }',
       'void main(){',
       '  vec3 c = aces(texture2D(tDiffuse, vUv).rgb * exposure);',
       '  c = pow(c, vec3(1.0 / 2.2));',
       '  float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = mix(vec3(l), c, sat);',
       '  c = (c - 0.5) * contrast + 0.5;',
+      '  c *= tint;',
       '  vec2 q = vUv - 0.5; c *= 1.0 - vign * dot(q, q) * 1.6;',
       '  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);',
       '}'].join('\n'),

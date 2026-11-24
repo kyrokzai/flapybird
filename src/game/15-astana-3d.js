@@ -485,6 +485,7 @@
       }
       G3.doors = []; G3.gateGlow = null; G3.gateBeam = null;
       buildLife(R, 'menu', -6, 6, true);
+      G3.mood = null;
       Sound.setAmbience('menu');
       return;
     }
@@ -503,19 +504,7 @@
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: def.arena ? pitchTex(ROWS) : themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
 
-    if (theme === 'park') {
-      const nb = Math.round(380 * Q.grass), grass = new THREE.InstancedMesh(G3.geo.blade, grassMaterial(), nb);
-      const dm = new THREE.Object3D(); let k = 0;
-      for (let i = 0; i < nb * 3 && k < nb; i++) {
-        const x = (rnd() - 0.5) * 7.8, z = zN + rnd() * ROWS;
-        const px = x * CELL + W / 2, py = z * CELL + ACY;
-        if (obstacles.some(o => px > o.x - 4 && px < o.x + o.w + 4 && py > o.y - 4 && py < o.y + o.h + 4)) continue;
-        if (Math.abs(px - (W / 2 + Math.sin((py - ARENA.y) / 70 + n) * 60)) < 22) continue;
-        dm.position.set(x, 0, z); dm.rotation.set((rnd() - 0.5) * 0.5, rnd() * 3, (rnd() - 0.5) * 0.5); dm.scale.setScalar(0.7 + rnd() * 0.8); dm.updateMatrix();
-        grass.setMatrixAt(k, dm.matrix); grass.setColorAt(k, colC(th.tuft[rnd() < 0.6 ? 0 : 1]).clone()); k++;
-      }
-      grass.count = k; grass.receiveShadow = true; R.add(grass);
-    }
+    buildRoomGrass(R, theme, n, zN, zS);
 
     themeWalls(R, theme, zN, zS);
     for (const o of obstacles) R.add(def.arena ? arenaProp(o) : themeProp(theme, o.kind, o, X3(o.x + o.w / 2), Z3(o.y + o.h / 2)));
@@ -537,6 +526,7 @@
       b.material.map.repeat.set(1, h / 6); R.add(b);
     }
     buildLife(R, theme, zN, zS, false);
+    applyMood(R, n, theme, zN, zS);
     Sound.setAmbience(theme);
   }
 
