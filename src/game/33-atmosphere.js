@@ -23,6 +23,8 @@
   function applyMood(R, n, theme, zN, zS) {
     const m = moodOf(n);
     G3.mood = m;
+    if (!G3.rimUni) G3.rimUni = { uRimCol: { value: new THREE.Color(0) } };
+    G3.rimUni.uRimCol.value.set(m.light ? '#b4c0ff' : '#000000').multiplyScalar(m.light ? 0.5 : 0);   // dusk, night, neon: pale edges on the monsters
     if (m.sun) G3.sun.color = col(m.sun);
     if (m.sunI) G3.sun.intensity *= m.sunI;
     if (m.hemi) { G3.hemi.color = col(m.hemi[0]); G3.hemi.groundColor = col(m.hemi[1]); G3.hemi.intensity = m.hemi[2]; }
@@ -31,9 +33,10 @@
     if (m.lamps && theme === 'street') {
       const pool = lampPoolTex();
       let i = 0;
-      for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+      const hx = G3.models.prop_lamp ? 4.49 : 4.55, hy = G3.models.prop_lamp ? 2.33 : 2.0;   // under the lamp heads (same rows as in build3D)
+      for (let z = zN - 8; z < zS + 12; z += 2.2) for (const s of [-1, 1]) {
         const c = m.lamps === 'neon' ? (i++ % 2 ? '#3fe8ff' : '#ff5ad8') : m.lamps;
-        const g = glow(c, 2.4, 0.85); g.position.set(s * 4.55, 2.0, z); R.add(g);
+        const g = glow(c, 2.4, 0.85); g.position.set(s * hx, hy, z); R.add(g);
         const d = decal(pool, c, 3.0, m.lamps === 'neon' ? 0.3 : 0.42); d.material.blending = THREE.AdditiveBlending; d.position.set(s * 4.1, 0.03, z); R.add(d);
       }
     }

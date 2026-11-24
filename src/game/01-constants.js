@@ -25,5 +25,5 @@
   const Z3 = y => (y - ACY) / CELL;
   // model heights (3D units) used to place health bars and damage numbers
   const MS = 1.22;   // visual scale of characters (hitboxes are unchanged)
-  const MODEL_H = { w: 0.95, s: 0.66, j: 1.28, a: 1.65, m: 1.52, D: 2.7, J: 2.5, A: 2.1 };
+  const MODEL_H = { w: 0.95, s: 0.66, j: 1.65, a: 2.1, m: 1.9, D: 2.7, J: 2.5, A: 2.1 };
 

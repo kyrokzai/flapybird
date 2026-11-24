@@ -2,7 +2,7 @@
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB', prop_birch: 'PROP_BIRCH_GLB', lm_portal: 'LM_PORTAL_GLB', civ_woman: 'CIV_WOMAN_GLB',
     prop_gate: 'PROP_GATE_GLB', prop_chest: 'PROP_CHEST_GLB', prop_fence: 'PROP_FENCE_GLB', prop_hedge: 'PROP_HEDGE_GLB', prop_lamp: 'PROP_LAMP_GLB',
-    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
+    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
     prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
@@ -166,7 +166,7 @@
   ].join('\n');
   function addGhostModel(body) {
     const m = G3.models.albasty.clone();
-    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.25);
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.6);   // witches stand taller than the wolves
     if (!G3.ghostUni) G3.ghostUni = { uT: { value: 0 } };
     m.traverse(o => {
       if (!o.isMesh || o.material.userData.ghost) return;
@@ -177,7 +177,7 @@
       mt.needsUpdate = true;
     });
     body.add(m);
-    const gl = glow('#9fd0ff', 1.6, 0.35); gl.position.y = 0.7; body.add(gl);
+    const gl = glow('#9fd0ff', 2, 0.35); gl.position.y = 0.9; body.add(gl);
   }
 
   // Жезтырнақ model: hair and hem sway, arms lift forward before she throws her copper claws.
@@ -197,7 +197,7 @@
   ].join('\n');
   function addZhezModel(body) {
     const m = G3.models.zheztyrnak.clone();
-    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.2);
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.55);
     const uni = { uT: { value: 0 }, uAim: { value: 0 }, uPh: { value: Math.random() * 6 } };
     m.traverse(o => {
       if (!o.isMesh) return;
@@ -266,7 +266,7 @@
   ].join('\n');
   function addWitchModel(body) {
     const m = G3.models.mystan.clone();
-    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.25);
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.55);
     if (!G3.witchUni) G3.witchUni = { uT: { value: 0 } };
     m.traverse(o => {
       if (!o.isMesh || o.material.userData.witch) return;
@@ -275,7 +275,7 @@
       o.material.needsUpdate = true;
     });
     body.add(m);
-    const orb = glow('#c070ff', 0.8, 0.8); orb.position.set(0, 1.12, 0.37); body.add(orb);
+    const orb = glow('#c070ff', 0.95, 0.8); orb.position.set(0, 1.39, 0.46); body.add(orb);
     return orb;
   }
 
@@ -306,7 +306,7 @@
 
   function makeBatyr(model, bow) {
     const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
-    model.rotation.y = Math.PI / 2; model.scale.setScalar(1.48);
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(1.64);
     const uni = { uSwing: { value: 0 }, uWind: { value: 0 }, uAim: { value: 0 }, uBow: { value: bow ? 1 : 0 } };
     model.traverse(o => {
       if (!o.isMesh) return;
@@ -324,7 +324,7 @@
   // archer batyr with a real skeleton (auto-rigged): idle, run, aim loop (part of the archery clip), hit, death
   function makeBatyrRig(model) {
     const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
-    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.81);
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.9);
     model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
     up.add(model);
     const clips = model.userData.clips || [], mixer = new THREE.AnimationMixer(model), act = {};
@@ -375,6 +375,22 @@
     return legs;
   }
 
+  // rim light on characters: at dusk and at night dark fur and cloaks get a pale edge so they read against the dark road.
+  // One shared uniform, set per room by applyMood (black in daylight = no effect).
+  function addRim(mt) {
+    if (!mt || Array.isArray(mt) || !mt.isMeshStandardMaterial || mt.userData.rim) return;
+    mt.userData.rim = true;
+    if (!G3.rimUni) G3.rimUni = { uRimCol: { value: new THREE.Color(0) } };
+    const prev = mt.onBeforeCompile, prevKey = prev === THREE.Material.prototype.onBeforeCompile ? '' : prev.toString();
+    mt.onBeforeCompile = (sh, r) => {
+      prev.call(mt, sh, r);
+      Object.assign(sh.uniforms, G3.rimUni);
+      sh.fragmentShader = 'uniform vec3 uRimCol;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  totalEmissiveRadiance += uRimCol * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0);');
+    };
+    mt.customProgramCacheKey = () => prevKey + '|rim';   // the wrapped shaders differ per enemy kind: keep their programs apart
+    mt.needsUpdate = true;
+  }
   function makeEnemyModel(e) {
     const { mats, M } = kit();
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
@@ -532,7 +548,7 @@
         break;
       }
     }
-    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; addRim(o.material); } });
     m.ring = decal(G3.ringTex, '#ffe28a', 1.6, 0); g.add(m.ring);
     m.warn = decal(G3.ringTex, '#ff3b2f', e.r / CELL * 3.2, 0); g.add(m.warn);
     m.burn = glow('#ff8a20', 0.7, 0); m.burn.position.y = MODEL_H[e.type] * 0.6; g.add(m.burn);

@@ -84,7 +84,7 @@
   const Z3 = y => (y - ACY) / CELL;
   // model heights (3D units) used to place health bars and damage numbers
   const MS = 1.22;   // visual scale of characters (hitboxes are unchanged)
-  const MODEL_H = { w: 0.95, s: 0.66, j: 1.28, a: 1.65, m: 1.52, D: 2.7, J: 2.5, A: 2.1 };
+  const MODEL_H = { w: 0.95, s: 0.66, j: 1.65, a: 2.1, m: 1.9, D: 2.7, J: 2.5, A: 2.1 };
 
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
@@ -665,7 +665,7 @@
     { theme: 'street', place: { ru: 'Площадь у Акорды', kz: 'Ақорда алаңы', en: 'Akorda Square' }, lm: [['akorda', 0, 0, 1]], L: [
       '........', 'm......m', '..####..', '........', '.s.ss.s.', '........', '..Y..Y..', '........', '..j..j..', '........',
       '~~....~~', '........', '.w.ww.w.', '........', '#..##..#', '........', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Мечеть Хазрет Султан', kz: 'Әзірет Сұлтан мешіті', en: 'Hazrat Sultan Mosque' }, lm: [['mosque', 0, 0, 1]], L: [
+    { theme: 'street', place: { ru: 'Водно-зелёный бульвар', kz: 'Су-жасыл бульвары', en: 'Water-Green Boulevard' }, lm: [['towers', 0, 0, 1.1], ['baiterek', 10, 6, 0.8]], L: [
       '........', '...aa...', '........', '.~~..~~.', '.~~..~~.', '..w..w..', '........', '#..m...#', '........', '.ss..ss.', '........',
       '..#..#..', '........', 'j......j', '........', 'Y......Y', '........', '..a..a..', '........', '........', '........', '........'] },
     { theme: 'street', place: { ru: 'ЭКСПО, «Нұр Әлем»', kz: 'ЭКСПО, «Нұр Әлем»', en: 'EXPO, Nur Alem' }, lm: [['nuralem', 0, -2, 1.1]], L: [
@@ -2216,7 +2216,7 @@
     }, true);
   }
   // generated landmark models are normalised to ~1 unit around the origin: scale to a real-looking height and stand them on the ground
-  const LM_HEIGHT = { portal: 10, baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11, station: 5.5 };
+  const LM_HEIGHT = { portal: 10, baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, station: 5.5 };
   function landmarkModel(kind) {
     if (kind === 'towers' && G3.models.lm_towers) {
       // a cluster of emerald skyscrapers of different heights
@@ -2349,18 +2349,6 @@
         add(G3.geo.cyl, white, 0, 4.1, 0, 1.6, 1.0, 1.6);
         add(G3.geo.dome, mat('#3f7fd0', { m: 0.5, r: 0.3 }), 0, 4.6, 0, 1.7, 1.9, 1.7);
         add(G3.geo.cyl, gold, 0, 7.1, 0, 0.1, 1.4, 0.1); add(G3.geo.sphere, gold, 0, 7.9, 0, 0.3);
-        break;
-      }
-      case 'mosque': {
-        add(G3.geo.box, white, 0, 1.4, 0, 8, 2.8, 7);
-        add(G3.geo.cyl, white, 0, 3.2, 0, 2.6, 1, 2.6);
-        add(G3.geo.dome, mat('#dce9f6', { r: 0.4 }), 0, 3.7, 0, 2.8, 3, 2.8);
-        add(G3.geo.cyl, gold, 0, 7, 0, 0.08, 0.8, 0.08);
-        for (const x of [-4.6, 4.6]) for (const z of [-3.8, 3.8]) {
-          add(G3.geo.cyl, white, x, 4.5, z, 0.32, 9, 0.32);
-          add(G3.geo.cone, mat('#2f6fb0'), x, 9.5, z, 0.36, 1.2, 0.36);
-          add(G3.geo.sphere, gold, x, 10.2, z, 0.12);
-        }
         break;
       }
       case 'station': {
@@ -2518,7 +2506,7 @@
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
     G3.themeSun = th.sunPos;
 
-    const outer = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), mat(th.outer, { r: 1 }));
+    const outer = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), def.arena ? mat(th.outer, { r: 1 }) : outskirtGround(theme));
     outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.01, zN - 20); outer.receiveShadow = true; R.add(outer);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: def.arena ? pitchTex(ROWS) : themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
@@ -2531,7 +2519,7 @@
     // scenery beside the arena
     const lamps = [];
     if (def.arena) buildArenaScenery(R, zN, zS);
-    else for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+    else for (let z = zN - 8; z < zS + 12; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
       if (theme === 'park' && G3.models.prop_birch && rnd() < 0.45) { const t = propModel('prop_birch', 3 + rnd() * 1.4, 'h'); t.position.set(x + s * 0.6, 0, z + rnd()); t.rotation.y = rnd() * TAU; R.add(t); }
       else if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
@@ -2540,6 +2528,7 @@
       else if (theme === 'beach') R.add(themeProp('beach', 'stone', { seed: Math.floor(rnd() * 1e5) * 3 }, x, z));
     }
     if (lamps.length) R.add(propInstances('prop_lamp', lamps, [0.049, 0.0948]));
+    if (!def.arena) buildOutskirts(R, theme, n, zN, zS);
     // landmarks to the north, seen in the fly-over
     if (!(pano && theme === 'beach')) for (const [kind, x, dz, s] of def.lm) { const lm = landmarkModel(kind) || landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.multiplyScalar(s); R.add(lm); }
     const city = mulberry32(n * 13);
@@ -2780,7 +2769,7 @@
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB', prop_birch: 'PROP_BIRCH_GLB', lm_portal: 'LM_PORTAL_GLB', civ_woman: 'CIV_WOMAN_GLB',
     prop_gate: 'PROP_GATE_GLB', prop_chest: 'PROP_CHEST_GLB', prop_fence: 'PROP_FENCE_GLB', prop_hedge: 'PROP_HEDGE_GLB', prop_lamp: 'PROP_LAMP_GLB',
-    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_mosque: 'LM_MOSQUE_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
+    lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
     prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
   function loadModel(name, done) {
     const key = MODEL_KEYS[name];
@@ -2944,7 +2933,7 @@
   ].join('\n');
   function addGhostModel(body) {
     const m = G3.models.albasty.clone();
-    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.25);
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.6);   // witches stand taller than the wolves
     if (!G3.ghostUni) G3.ghostUni = { uT: { value: 0 } };
     m.traverse(o => {
       if (!o.isMesh || o.material.userData.ghost) return;
@@ -2955,7 +2944,7 @@
       mt.needsUpdate = true;
     });
     body.add(m);
-    const gl = glow('#9fd0ff', 1.6, 0.35); gl.position.y = 0.7; body.add(gl);
+    const gl = glow('#9fd0ff', 2, 0.35); gl.position.y = 0.9; body.add(gl);
   }
 
   // Жезтырнақ model: hair and hem sway, arms lift forward before she throws her copper claws.
@@ -2975,7 +2964,7 @@
   ].join('\n');
   function addZhezModel(body) {
     const m = G3.models.zheztyrnak.clone();
-    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.2);
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.55);
     const uni = { uT: { value: 0 }, uAim: { value: 0 }, uPh: { value: Math.random() * 6 } };
     m.traverse(o => {
       if (!o.isMesh) return;
@@ -3044,7 +3033,7 @@
   ].join('\n');
   function addWitchModel(body) {
     const m = G3.models.mystan.clone();
-    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.25);
+    m.rotation.y = Math.PI / 2; m.scale.setScalar(1.55);
     if (!G3.witchUni) G3.witchUni = { uT: { value: 0 } };
     m.traverse(o => {
       if (!o.isMesh || o.material.userData.witch) return;
@@ -3053,7 +3042,7 @@
       o.material.needsUpdate = true;
     });
     body.add(m);
-    const orb = glow('#c070ff', 0.8, 0.8); orb.position.set(0, 1.12, 0.37); body.add(orb);
+    const orb = glow('#c070ff', 0.95, 0.8); orb.position.set(0, 1.39, 0.46); body.add(orb);
     return orb;
   }
 
@@ -3084,7 +3073,7 @@
 
   function makeBatyr(model, bow) {
     const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
-    model.rotation.y = Math.PI / 2; model.scale.setScalar(1.48);
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(1.64);
     const uni = { uSwing: { value: 0 }, uWind: { value: 0 }, uAim: { value: 0 }, uBow: { value: bow ? 1 : 0 } };
     model.traverse(o => {
       if (!o.isMesh) return;
@@ -3102,7 +3091,7 @@
   // archer batyr with a real skeleton (auto-rigged): idle, run, aim loop (part of the archery clip), hit, death
   function makeBatyrRig(model) {
     const g = new THREE.Group(), up = new THREE.Group(); g.add(up);
-    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.81);
+    model.rotation.y = Math.PI / 2; model.scale.setScalar(0.9);
     model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
     up.add(model);
     const clips = model.userData.clips || [], mixer = new THREE.AnimationMixer(model), act = {};
@@ -3153,6 +3142,22 @@
     return legs;
   }
 
+  // rim light on characters: at dusk and at night dark fur and cloaks get a pale edge so they read against the dark road.
+  // One shared uniform, set per room by applyMood (black in daylight = no effect).
+  function addRim(mt) {
+    if (!mt || Array.isArray(mt) || !mt.isMeshStandardMaterial || mt.userData.rim) return;
+    mt.userData.rim = true;
+    if (!G3.rimUni) G3.rimUni = { uRimCol: { value: new THREE.Color(0) } };
+    const prev = mt.onBeforeCompile, prevKey = prev === THREE.Material.prototype.onBeforeCompile ? '' : prev.toString();
+    mt.onBeforeCompile = (sh, r) => {
+      prev.call(mt, sh, r);
+      Object.assign(sh.uniforms, G3.rimUni);
+      sh.fragmentShader = 'uniform vec3 uRimCol;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  totalEmissiveRadiance += uRimCol * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0);');
+    };
+    mt.customProgramCacheKey = () => prevKey + '|rim';   // the wrapped shaders differ per enemy kind: keep their programs apart
+    mt.needsUpdate = true;
+  }
   function makeEnemyModel(e) {
     const { mats, M } = kit();
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
@@ -3310,7 +3315,7 @@
         break;
       }
     }
-    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; addRim(o.material); } });
     m.ring = decal(G3.ringTex, '#ffe28a', 1.6, 0); g.add(m.ring);
     m.warn = decal(G3.ringTex, '#ff3b2f', e.r / CELL * 3.2, 0); g.add(m.warn);
     m.burn = glow('#ff8a20', 0.7, 0); m.burn.position.y = MODEL_H[e.type] * 0.6; g.add(m.burn);
@@ -4590,7 +4595,7 @@
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
   const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_gate', 'prop_hedge', 'prop_chest', 'prop_birch', 'prop_tree', 'civ_woman', 'prop_fence', 'prop_lamp', 'lm_portal', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
-    'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_mosque', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
+    'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
   const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'batyr_rig'], ['i', 'icons'], ['c', 'comic'], ['a', 'music_menu'], ['a', 'sfx'],
     ['sky', 'park'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'street'], ['sky', 'office'], ['sky', 'beach'], ...LOAD_ORDER.filter(n => !['batyr', 'batyr_rig', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
@@ -6316,6 +6321,8 @@
   function applyMood(R, n, theme, zN, zS) {
     const m = moodOf(n);
     G3.mood = m;
+    if (!G3.rimUni) G3.rimUni = { uRimCol: { value: new THREE.Color(0) } };
+    G3.rimUni.uRimCol.value.set(m.light ? '#b4c0ff' : '#000000').multiplyScalar(m.light ? 0.5 : 0);   // dusk, night, neon: pale edges on the monsters
     if (m.sun) G3.sun.color = col(m.sun);
     if (m.sunI) G3.sun.intensity *= m.sunI;
     if (m.hemi) { G3.hemi.color = col(m.hemi[0]); G3.hemi.groundColor = col(m.hemi[1]); G3.hemi.intensity = m.hemi[2]; }
@@ -6324,9 +6331,10 @@
     if (m.lamps && theme === 'street') {
       const pool = lampPoolTex();
       let i = 0;
-      for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+      const hx = G3.models.prop_lamp ? 4.49 : 4.55, hy = G3.models.prop_lamp ? 2.33 : 2.0;   // under the lamp heads (same rows as in build3D)
+      for (let z = zN - 8; z < zS + 12; z += 2.2) for (const s of [-1, 1]) {
         const c = m.lamps === 'neon' ? (i++ % 2 ? '#3fe8ff' : '#ff5ad8') : m.lamps;
-        const g = glow(c, 2.4, 0.85); g.position.set(s * 4.55, 2.0, z); R.add(g);
+        const g = glow(c, 2.4, 0.85); g.position.set(s * hx, hy, z); R.add(g);
         const d = decal(pool, c, 3.0, m.lamps === 'neon' ? 0.3 : 0.42); d.material.blending = THREE.AdditiveBlending; d.position.set(s * 4.1, 0.03, z); R.add(d);
       }
     }
@@ -6819,6 +6827,137 @@
     // whatever is left and never moves does not need its matrix recomputed every frame
     R.traverse(o => { if (!skip.has(o) && o !== R) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     return removed;
+  }
+  // =================================================================== surroundings: the city past the walls
+  // Seen in the fly-over, at the start of a room (the camera shows what lies south of the entrance) and on tall phones.
+  // A textured ground instead of a flat colour, the road / park path running on past both walls, trees, bushes and houses.
+  const OUT_TILE = 6;   // world units per tile of the outer ground texture
+  function outskirtGround(theme) {
+    const key = 'outG_' + theme; if (G3[key]) return G3[key];
+    const rnd = mulberry32(theme.length * 31 + 7);
+    const t = canvasTex(256, 256, (g, w, h) => {
+      const blot = (pal, k, r0, r1, a) => {
+        for (let i = 0; i < k; i++) {
+          const x = rnd() * w, y = rnd() * h, r = r0 + rnd() * (r1 - r0), c = pal[i % pal.length];
+          for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) {
+            const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); gr.addColorStop(0, c + a); gr.addColorStop(1, c + '00');
+            g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, 2 * r, 2 * r);
+          }
+        }
+      };
+      const specks = (k, a, b) => { for (let i = 0; i < k; i++) { g.fillStyle = rnd() < 0.5 ? a : b; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 1.5, 1 + rnd() * 1.5); } };
+      if (theme === 'park') {
+        // the same greens as the room lawn, so the hedge does not cut the park in two
+        g.fillStyle = '#7a983f'; g.fillRect(0, 0, w, h);
+        blot(['#6f8c3b', '#86a448', '#69853a', '#90a94e'], 60, 14, 46, '99');
+        g.lineWidth = 1;
+        for (let i = 0; i < 1400; i++) { const x = rnd() * w, y = rnd() * h; g.strokeStyle = rnd() < 0.6 ? 'rgba(70,110,40,0.55)' : 'rgba(180,210,120,0.45)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 2, y - 2 - rnd() * 3); g.stroke(); }
+        for (let i = 0; i < 26; i++) { g.fillStyle = ['#e0313a', '#f5c22e', '#ffffff', '#d85ac8'][i % 4]; g.beginPath(); g.arc(rnd() * w, rnd() * h, 1.2, 0, TAU); g.fill(); }
+      } else if (theme === 'street') {
+        // light square paving slabs, like the sidewalks in the room
+        const s = w / 8; g.fillStyle = '#8f8c86'; g.fillRect(0, 0, w, h);
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 168 + Math.floor(rnd() * 22); g.fillStyle = `rgb(${v},${v - 3},${v - 9})`; g.fillRect(x * s + 1, y * s + 1, s - 2, s - 2); }
+        specks(1800, 'rgba(255,255,255,0.08)', 'rgba(0,0,0,0.1)');
+      } else if (theme === 'office') {
+        const s = w / 8;
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { g.fillStyle = (x + y) % 2 ? '#5b626d' : '#636a76'; g.fillRect(x * s, y * s, s, s); }
+        specks(2000, 'rgba(255,255,255,0.05)', 'rgba(0,0,0,0.07)');
+      } else {
+        g.fillStyle = '#e2c68e'; g.fillRect(0, 0, w, h);
+        blot(['#d8b97c', '#ecd3a0', '#cfae70'], 40, 12, 40, '88');
+        specks(3000, 'rgba(255,255,255,0.14)', 'rgba(120,90,40,0.14)');
+      }
+    }, true);
+    t.repeat.set(140 / OUT_TILE, 140 / OUT_TILE);
+    return (G3[key] = mat('#ffffff', { map: t, r: theme === 'office' ? 0.8 : 1 }));
+  }
+
+  // the road (street) or the winding path (park) carried on past a wall: y0 = start in floor pixels from the north wall, len = length in floor pixels
+  function outskirtStrip(theme, n, y0, len) {
+    const S = 0.8, AW = ARENA.w;
+    const t = canvasTex(Math.round(AW * S), Math.round(len * S), g => {
+      g.scale(S, S);
+      if (theme === 'street') {
+        const r = mulberry32(n * 61 + y0);
+        g.fillStyle = '#4a4d52'; g.fillRect(0, 0, AW, len);
+        for (let i = 0; i < len * 7; i++) { g.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.12)'; g.fillRect(r() * AW, r() * len, 1 + r() * 2, 1 + r() * 2); }
+        for (const x0 of [0, AW - 40]) {
+          g.fillStyle = '#b9b6ae'; g.fillRect(x0, 0, 40, len);
+          g.strokeStyle = 'rgba(80,75,70,0.4)'; g.lineWidth = 1;
+          for (let y = 0; y < len; y += 13) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + 40, y); g.stroke(); }
+          g.fillStyle = '#8f8c86'; g.fillRect(x0 === 0 ? 38 : AW - 40, 0, 2, len);
+        }
+        g.fillStyle = '#f2c230'; g.fillRect(AW / 2 - 3, 0, 2, len); g.fillRect(AW / 2 + 1, 0, 2, len);
+        g.fillStyle = 'rgba(255,255,255,0.85)';
+        for (const lx of [100, 220]) for (let y = 6 - ((y0 % 34) + 34) % 34; y < len; y += 34) g.fillRect(lx - 1, y, 2.5, 18);
+        // a crossing a little way out, and a stop line
+        const zy = y0 < 0 ? len - 150 : 110;
+        for (let x = 46; x < AW - 46; x += 16) { g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x, zy, 9, 34); }
+      } else if (theme === 'park') {
+        // only the path: the lawn underneath is the outer ground
+        g.lineCap = 'round';
+        const path = () => { g.beginPath(); for (let y = -20; y <= len + 20; y += 8) { const x = AW / 2 + Math.sin((y0 + y) / 70 + n) * 60; y === -20 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); };
+        g.strokeStyle = '#b9ab8c'; g.lineWidth = 34; path();
+        g.strokeStyle = '#d8ccb0'; g.lineWidth = 28; path();
+        g.save(); g.setLineDash([6, 7]); g.strokeStyle = 'rgba(120,105,80,0.35)'; g.lineWidth = 26; path(); g.restore();
+      } else if (theme === 'office') {
+        // the light runner down the middle of the floor, with its gold edging
+        g.fillStyle = '#9aa0a8'; g.fillRect(AW / 2 - 34, 0, 68, len);
+        g.fillStyle = 'rgba(255,255,255,0.08)'; for (let y = 0; y < len; y += 8) g.fillRect(AW / 2 - 34, y, 68, 1);
+        g.fillStyle = '#c9a94a'; g.fillRect(AW / 2 - 35, 0, 2, len); g.fillRect(AW / 2 + 33, 0, 2, len);
+      } else {
+        // the wooden boardwalk across the sand
+        g.fillStyle = '#a77a4a'; g.fillRect(AW / 2 - 22, 0, 44, len);
+        g.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = 0; y < len; y += 12) g.fillRect(AW / 2 - 22, y, 44, 1.5);
+      }
+    });
+    const m = mat('#ffffff', { map: t, r: 1 });
+    if (theme !== 'street') m.alphaTest = 0.5;   // only the path / runner / boardwalk is painted, the rest shows the outer ground
+    return m;
+  }
+
+  function buildOutskirts(R, theme, n, zN, zS) {
+    const rnd = mulberry32(n * 7 + 101), k = Q.fx;
+    const pathX = z => Math.sin((z - zN) * CELL / 70 + n) * 60 / CELL;   // the park path, in world x, at depth z (continues the room floor)
+    const strip = (z0, z1) => {
+      const len = (z1 - z0) * CELL, m = outskirtStrip(theme, n, Math.round((z0 - zN) * CELL), len);
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(COLS, z1 - z0), m); p.rotation.x = -Math.PI / 2; p.position.set(0, 0.004, (z0 + z1) / 2); p.receiveShadow = true; R.add(p);
+    };
+    strip(zS, zS + 20); strip(zN - 12, zN - 0.3);
+
+    if (theme === 'park') {
+      // birch groves and round bushes on the lawns south and north of the walls, clear of the path
+      const trees = [], bush = mat('#3f6f2a', { r: 1, flat: true }), bush2 = mat('#4f8034', { r: 1, flat: true });
+      const spot = (z0, z1, xr, gap) => { for (let i = 0; i < 40; i++) { const z = z0 + rnd() * (z1 - z0), x = (rnd() * 2 - 1) * xr; if (Math.abs(x - pathX(z)) > gap) return [x, z]; } return null; };
+      for (let i = 0; i < Math.round(26 * k); i++) { const p = spot(zS + 1.2, zS + 18, 13, 1.6); if (p) trees.push({ x: p[0], z: p[1], ry: rnd() * TAU, h: 2.8 + rnd() * 1.8 }); }
+      for (let i = 0; i < Math.round(10 * k); i++) { const p = spot(zN - 10, zN - 2.2, 11, 1.8); if (p && Math.abs(p[0]) > 2.6) trees.push({ x: p[0], z: p[1], ry: rnd() * TAU, h: 3 + rnd() * 1.6 }); }
+      if (G3.models.prop_birch) R.add(propInstances('prop_birch', trees));
+      for (let i = 0; i < Math.round(34 * k); i++) {
+        const p = spot(zS + 0.9, zS + 16, 12, 1.2); if (!p) continue;
+        const s = 0.22 + rnd() * 0.16;
+        R.add(mesh(G3.geo.dodeca, rnd() < 0.5 ? bush : bush2, p[0], s * 0.8, p[1], s));
+        if (rnd() < 0.6) R.add(mesh(G3.geo.dodeca, bush, p[0] + s * 0.9, s * 0.6, p[1] + (rnd() - 0.5) * s, s * 0.75));
+      }
+    } else if (theme === 'street') {
+      // blocks of houses along both sides, roofs seen from above
+      const walls = ['#c9c2b4', '#8a96a8', '#b8a48c'].map((c, i) => { const t = windowsTex(c, '#fff0c0'); t.wrapS = t.wrapT = THREE.RepeatWrapping; return mat('#ffffff', { map: t, r: 0.6 }); });
+      const roof = mat('#5a5f66', { r: 0.9 }), roofEdge = mat('#3f4349', { r: 0.9 });
+      for (const s of [-1, 1]) for (let z = zN - 12; z < zS + 20;) {
+        const w = 2.6 + rnd() * 2, d = 3 + rnd() * 1.5, h = 3 + rnd() * 6, x = s * (7.2 + d / 2), zc = z + w / 2;
+        const geo = new THREE.BoxGeometry(d, h, w), uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * Math.max(1, Math.round(w / 1.25)), uv.getY(i) * h / 6);
+        const b = new THREE.Mesh(geo, walls[Math.floor(rnd() * 3)]); b.position.set(x, h / 2, zc); b.castShadow = b.receiveShadow = true; R.add(b);
+        R.add(mesh(G3.geo.box, roofEdge, x, h + 0.06, zc, d + 0.12, 0.12, w + 0.12));
+        R.add(mesh(G3.geo.box, roof, x, h + 0.13, zc, d - 0.3, 0.04, w - 0.3, false));
+        z += w + 0.5 + rnd() * 0.8;
+      }
+      // a few parked cars just past the south wall
+      if (G3.models.prop_car) for (const [x, dz] of [[-3.35, 2.2], [3.35, 4.6], [-3.35, 9]]) { const c = propModel('prop_car', 0.95, 'w'); c.position.set(x, 0, zS + dz); c.rotation.y = rnd() < 0.5 ? 0 : Math.PI; R.add(c); }
+    } else if (theme === 'beach') {
+      const palms = [];
+      for (let i = 0; i < Math.round(12 * k); i++) { const x = (rnd() * 2 - 1) * 12, z = zS + 1.5 + rnd() * 14; if (Math.abs(x) > 1.2) palms.push({ x, z, ry: rnd() * TAU, h: 2.4 + rnd() * 1.2 }); }
+      if (G3.models.prop_palm) R.add(propInstances('prop_palm', palms));
+    }
   }
 })();
 </script>

@@ -248,7 +248,7 @@
     }, true);
   }
   // generated landmark models are normalised to ~1 unit around the origin: scale to a real-looking height and stand them on the ground
-  const LM_HEIGHT = { portal: 10, baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11, station: 5.5 };
+  const LM_HEIGHT = { portal: 10, baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, station: 5.5 };
   function landmarkModel(kind) {
     if (kind === 'towers' && G3.models.lm_towers) {
       // a cluster of emerald skyscrapers of different heights
@@ -381,18 +381,6 @@
         add(G3.geo.cyl, white, 0, 4.1, 0, 1.6, 1.0, 1.6);
         add(G3.geo.dome, mat('#3f7fd0', { m: 0.5, r: 0.3 }), 0, 4.6, 0, 1.7, 1.9, 1.7);
         add(G3.geo.cyl, gold, 0, 7.1, 0, 0.1, 1.4, 0.1); add(G3.geo.sphere, gold, 0, 7.9, 0, 0.3);
-        break;
-      }
-      case 'mosque': {
-        add(G3.geo.box, white, 0, 1.4, 0, 8, 2.8, 7);
-        add(G3.geo.cyl, white, 0, 3.2, 0, 2.6, 1, 2.6);
-        add(G3.geo.dome, mat('#dce9f6', { r: 0.4 }), 0, 3.7, 0, 2.8, 3, 2.8);
-        add(G3.geo.cyl, gold, 0, 7, 0, 0.08, 0.8, 0.08);
-        for (const x of [-4.6, 4.6]) for (const z of [-3.8, 3.8]) {
-          add(G3.geo.cyl, white, x, 4.5, z, 0.32, 9, 0.32);
-          add(G3.geo.cone, mat('#2f6fb0'), x, 9.5, z, 0.36, 1.2, 0.36);
-          add(G3.geo.sphere, gold, x, 10.2, z, 0.12);
-        }
         break;
       }
       case 'station': {
@@ -550,7 +538,7 @@
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
     G3.themeSun = th.sunPos;
 
-    const outer = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), mat(th.outer, { r: 1 }));
+    const outer = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), def.arena ? mat(th.outer, { r: 1 }) : outskirtGround(theme));
     outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.01, zN - 20); outer.receiveShadow = true; R.add(outer);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), mat('#ffffff', { map: def.arena ? pitchTex(ROWS) : themeFloor(theme, n, obstacles), r: theme === 'office' ? 0.85 : 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.z = zc; ground.receiveShadow = true; R.add(ground);
@@ -563,7 +551,7 @@
     // scenery beside the arena
     const lamps = [];
     if (def.arena) buildArenaScenery(R, zN, zS);
-    else for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
+    else for (let z = zN - 8; z < zS + 12; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
       if (theme === 'park' && G3.models.prop_birch && rnd() < 0.45) { const t = propModel('prop_birch', 3 + rnd() * 1.4, 'h'); t.position.set(x + s * 0.6, 0, z + rnd()); t.rotation.y = rnd() * TAU; R.add(t); }
       else if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
@@ -572,6 +560,7 @@
       else if (theme === 'beach') R.add(themeProp('beach', 'stone', { seed: Math.floor(rnd() * 1e5) * 3 }, x, z));
     }
     if (lamps.length) R.add(propInstances('prop_lamp', lamps, [0.049, 0.0948]));
+    if (!def.arena) buildOutskirts(R, theme, n, zN, zS);
     // landmarks to the north, seen in the fly-over
     if (!(pano && theme === 'beach')) for (const [kind, x, dz, s] of def.lm) { const lm = landmarkModel(kind) || landmark(kind); lm.position.set(x, 0, zN - 16 - dz); lm.scale.multiplyScalar(s); R.add(lm); }
     const city = mulberry32(n * 13);
