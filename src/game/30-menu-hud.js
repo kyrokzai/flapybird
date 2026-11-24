@@ -220,6 +220,14 @@
     icoSpeaker(mx + mw * 3 / 4, y + h / 2, 14, Sound.sfx ? T.gold : T.dim, !Sound.sfx);
     ui.push({ x: mx, y: y - 4, w: mw / 2, h: h + 8, fn: () => { Sound.init(); Sound.setMusic(!Sound.music); } });
     ui.push({ x: mx + mw / 2, y: y - 4, w: mw / 2, h: h + 8, fn: () => { Sound.init(); Sound.setSfx(!Sound.sfx); } });
+    // install the game as an app (hidden once it runs as the installed app)
+    if (!isInstalledApp()) {
+      const ix = 172, pulse = REDUCED_MOTION ? 0 : 0.5 + 0.5 * Math.sin(pNow / 500);
+      ctx.save(); ctx.shadowColor = `rgba(255,200,90,${0.25 + pulse * 0.35})`; ctx.shadowBlur = 10; capsule(ix, y, 38, h); ctx.restore();
+      capsule(ix, y, 38, h);
+      icoInstall(ix + 19, y + h / 2, 15, T.goldLt);
+      ui.push({ x: ix - 2, y: y - 4, w: 42, h: h + 8, fn: doInstall });
+    }
     // settings (graphics quality)
     const gx = W - 48;
     capsule(gx, y, 36, h);
@@ -329,20 +337,54 @@
     }
   }
 
+  // ---- installing the game as an app: Chrome's own prompt when it is ready, otherwise step-by-step help for this browser
+  const isInstalledApp = () => !!(window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
+  function doInstall() {
+    Sound.click();
+    const p = installPrompt;
+    if (p) {
+      installPrompt = null; menuPopup = null;
+      try { Promise.resolve(p.prompt()).catch(() => { menuPopup = 'install'; }); } catch (e) { menuPopup = 'install'; }
+    } else menuPopup = 'install';
+  }
+  function installSteps() {
+    const ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
+    if (/Telegram|WhatsApp|Instagram|FBAN|FBAV|wv\)/.test(ua)) return 'inapp';
+    if (/SamsungBrowser/.test(ua)) return 'samsung';
+    return 'chrome';
+  }
+  function icoInstall(x, y, s, c) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s / 20, s / 20); ctx.strokeStyle = c; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    rr(ctx, -7, -12, 14, 24, 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, 4); ctx.moveTo(-4, 0); ctx.lineTo(0, 4); ctx.lineTo(4, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-2.5, 8.5); ctx.lineTo(2.5, 8.5); ctx.stroke();
+    ctx.restore();
+  }
+  function drawInstallPopup() {
+    const kind = installSteps(), steps = mt('inst_' + kind).split('|');
+    panel(24, 140, W - 48, 356);
+    icoInstall(W / 2, 182, 26, T.goldLt);
+    txt(mt('installTitle'), W / 2, 218, 20, T.gold, { f: 'head', weight: 700 });
+    steps.forEach((st, i) => {
+      const y = 256 + i * 56;
+      ctx.beginPath(); ctx.arc(52, y, 11, 0, TAU); ctx.fillStyle = 'rgba(220,183,94,0.18)'; ctx.fill(); ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2; ctx.stroke();
+      txt(String(i + 1), 52, y + 0.5, 12, T.goldLt, { weight: 800 });
+      wrap(st, 72, y - 6, W - 124, 15, 12.5, T.text, { align: 'left', weight: 600 });
+    });
+    button(W / 2 - 70, 432, 140, 42, mt('ok'), () => { menuPopup = null; Sound.click(); }, { size: 15 });
+  }
+
   // ---- settings popup: graphics quality (the same four modes as before)
   function drawSettingsPopup() {
-    const inst = !!installPrompt;
+    const inst = !isInstalledApp();
     panel(30, 190, W - 60, 268 + (inst ? 58 : 0));
     txt(tr('graphics'), W / 2, 226, 22, T.gold, { f: 'head', weight: 700 });
     ['auto', 'low', 'medium', 'high'].forEach((q, i) => {
       const on = Save.data.settings.quality === q;
       button(54, 250 + i * 46, W - 108, 38, tr('q' + q), () => { setQuality(q); Sound.click(); }, on ? { size: 14 } : { size: 14, col: '#2a3550', col2: '#151c2c' });
     });
-    if (inst) button(54, 440, W - 108, 42, mt('install'), () => {
-      const p = installPrompt; installPrompt = null; menuPopup = null;
-      Sound.click();
-      try { Promise.resolve(p.prompt()).catch(() => {}); } catch (e) { /* already shown */ }
-    }, { size: 14, col: '#2f6a3a', col2: '#163a1e' });
+    if (inst) button(54, 440, W - 108, 42, mt('install'), doInstall, { size: 14, col: '#2f6a3a', col2: '#163a1e', icon: (x, yy, s, c) => icoInstall(x, yy, s, c) });
     txt('×', W - 48, 208, 20, T.muted, { weight: 600 });
     ui.push({ x: W - 70, y: 190, w: 40, h: 36, fn: () => { menuPopup = null; Sound.click(); } });
   }
@@ -379,4 +421,5 @@
     else if (menuPopup === 'energy') withPop(drawEnergyPopup, true);
     else if (menuPopup === 'daily') withPop(drawDailyPopup, true);
     else if (menuPopup === 'settings') withPop(drawSettingsPopup, true);
+    else if (menuPopup === 'install') withPop(drawInstallPopup, true);
   }
