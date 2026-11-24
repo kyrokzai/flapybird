@@ -1,0 +1,1 @@
+window.COMIC_PACK=[];
