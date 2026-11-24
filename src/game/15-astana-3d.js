@@ -108,6 +108,7 @@
       } else {
         const v = r();
         if (v < 0.2 && G3.models.balbal) { const b = G3.models.balbal.clone(); b.scale.setScalar(1.05); g.add(b); }
+        else if (v < 0.55 && G3.models.prop_birch && r() < 0.55) { const t = propModel('prop_birch', 2.2 + r() * 0.6, 'h'); t.rotation.y = r() * TAU; g.add(t); }
         else if (v < 0.55 && G3.models.prop_tree) { const t = propModel('prop_tree', 1.5 + r() * 0.5, 'h'); t.rotation.y = r() * TAU; g.add(t); }
         else if (v < 0.55) { // tree
           add(G3.geo.cyl, M('#6b4a2e'), 0, 0.3, 0, 0.07, 0.6, 0.07);
@@ -247,7 +248,7 @@
     }, true);
   }
   // generated landmark models are normalised to ~1 unit around the origin: scale to a real-looking height and stand them on the ground
-  const LM_HEIGHT = { baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11, station: 5.5 };
+  const LM_HEIGHT = { portal: 10, baiterek: 14, khanshatyr: 14, nuralem: 9, akorda: 9, mosque: 11, station: 5.5 };
   function landmarkModel(kind) {
     if (kind === 'towers' && G3.models.lm_towers) {
       // a cluster of emerald skyscrapers of different heights
@@ -472,6 +473,7 @@
       }, true, 80));
       for (const o of MENU_OBS) R.add(o.kind === 'yurt' ? makeYurt(X3(o.x + 20), Z3(o.y + 20)) : makeRock(o, X3(o.x + 20), Z3(o.y + 20)));
       for (const [x, z, s] of [[-2.6, -4.2, 1.6], [2.8, -3.2, 1.3], [-3.4, 3.6, 1.2]]) R.add(makeYurt(x, z, s));
+      if (G3.models.prop_birch) for (const [x, z, h, ry] of [[-2.6, -8.5, 4.4, 0.4], [2.4, -10, 5, 2.1], [-3.8, -12, 5.4, 1.2]]) { const t = propModel('prop_birch', h, 'h'); t.position.set(x, 0, z); t.rotation.y = ry; R.add(t); }
       buildMenuScenery(R, menuPano);
       if (G3.models.horse) {
         const h = G3.models.horse.clone(); h.scale.setScalar(1.95); h.position.set(1.25, 0, -0.6); h.rotation.y = 0.35;
@@ -514,7 +516,8 @@
     if (def.arena) buildArenaScenery(R, zN, zS);
     else for (let z = zN; z < zS; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
-      if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
+      if (theme === 'park' && G3.models.prop_birch && rnd() < 0.45) { const t = propModel('prop_birch', 3 + rnd() * 1.4, 'h'); t.position.set(x + s * 0.6, 0, z + rnd()); t.rotation.y = rnd() * TAU; R.add(t); }
+      else if (theme === 'park') R.add(themeProp('park', 'stone', { seed: Math.floor(rnd() * 1e5) }, x, z + rnd()));
       else if (theme === 'street') { const p = mesh(G3.geo.cyl, mat('#2f3338', { m: 0.7 }), s * 4.7, 1.0, z, 0.04, 2.0, 0.04); R.add(p); const l = mesh(G3.geo.sphere, mat('#fff6d8', { e: '#ffe9a0', ei: 1.2 }), s * 4.55, 2.0, z, 0.1); R.add(l); }
       else if (theme === 'beach') R.add(themeProp('beach', 'stone', { seed: Math.floor(rnd() * 1e5) * 3 }, x, z));
     }
@@ -528,6 +531,7 @@
     }
     buildLife(R, theme, zN, zS, false);
     applyMood(R, n, theme, zN, zS);
+    if (!def.arena) addCivilians(R, n, theme, zN, zS);
     Sound.setAmbience(theme);
   }
 
