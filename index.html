@@ -50,6 +50,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <link rel="preload" href="assets/sky_menu.js" as="script">
 <link rel="preload" href="assets/batyr.js" as="script">
 <link rel="preload" href="assets/horse.js" as="script">
@@ -265,10 +266,10 @@
     if (G3.r) {
       // the menu is a light close-up scene: render it sharper (up to 2x) unless quality is low
       const pr = scene === 'menu' && QL !== 'low' ? Math.min(dpr, 2) : G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
-      G3.r.setPixelRatio(pr); G3.r.setSize(cssW, cssH, false);
+      G3.r.setPixelRatio(pr * (G3.resScale || 1)); G3.r.setSize(cssW, cssH, false);
       if (G3.composer) {
-        G3.composer.setPixelRatio(pr); G3.composer.setSize(cssW, cssH);
-        G3.fxaa.material.uniforms.resolution.value.set(1 / (cssW * pr), 1 / (cssH * pr));
+        G3.composer.setPixelRatio(pr * (G3.resScale || 1)); G3.composer.setSize(cssW, cssH);
+        G3.fxaa.material.uniforms.resolution.value.set(1 / (cssW * pr * (G3.resScale || 1)), 1 / (cssH * pr * (G3.resScale || 1)));
       }
     }
   }
@@ -2496,6 +2497,7 @@
       const b = mesh(G3.geo.box, mat('#ffffff', { map: windowsTex(city() < 0.5 ? '#8a96a8' : '#c8c0b0', '#fff0c0'), r: 0.5 }), x, h / 2, z, 2.5, h, 2.5, false);
       b.material.map.repeat.set(1, h / 6); R.add(b);
     }
+    mergeStatic(R, [...(G3.doors || []).map(d => d.pv), G3.gateGlow, G3.gateBeam]);
     buildLife(R, theme, zN, zS, false);
     applyMood(R, n, theme, zN, zS);
     if (!def.arena) addCivilians(R, n, theme, zN, zS);
@@ -4497,13 +4499,25 @@
       Save.data.settings.autoQuality = lower; Save.write(); applyQuality(lower);
     } else if (perf.checks >= 4) perf.done = true;
   }
+  // dynamic resolution: every 2 s, step the render scale down when frames are slow and back up when there is room (any quality mode)
+  const dres = { t: 0, n: 0 };
+  function watchRes(rdt) {
+    if (document.hidden || rdt >= 100) return;
+    dres.t += rdt; dres.n++;
+    if (dres.t < 2000) return;
+    const fps = dres.n * 1000 / dres.t; dres.t = 0; dres.n = 0;
+    const old = G3.resScale || 1;
+    if (fps < 45 && old > 0.6) G3.resScale = Math.max(0.6, old - 0.15);
+    else if (fps > 57 && old < 1) G3.resScale = Math.min(1, old + 0.1);
+    if (G3.resScale !== old) resize();
+  }
   function frame(now) {
     const rdt = Math.min(now - last, 100); last = now;
     if (hitStop > 0) hitStop -= rdt / 1000;
     else { if (slowT > 0) slowT -= rdt / 1000; acc += rdt * (slowT > 0 ? 0.3 : 1); }
     while (acc >= DT * 1000) { update(DT); acc -= DT * 1000; }
     render();
-    watchPerf(rdt);
+    watchPerf(rdt); watchRes(rdt);
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
@@ -6695,6 +6709,56 @@
         else { c.position.y = 0; c.rotation.y = base + Math.sin(t * 1.6 + ph) * 0.12; c.rotation.z = Math.sin(t * 2.3 + ph) * 0.03; }
       });
     }
+  }
+  // =================================================================== static batching: hundreds of small props become a handful of meshes (fewer draw calls on phones)
+  // Props are built from primitives with their own material each; meshes with identical-looking materials,
+  // the same shadow flags and the same vertex layout are baked into world space and merged into one.
+  function matKey(m) {
+    if (!m || Array.isArray(m) || !m.isMeshStandardMaterial || m.transparent || m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile || m.userData.wind) return null;
+    return [m.color.getHexString(), m.roughness.toFixed(2), m.metalness.toFixed(2), m.flatShading ? 1 : 0, m.emissive.getHexString(), m.emissiveIntensity.toFixed(2), m.side,
+      m.map ? m.map.uuid : '-', m.normalMap ? m.normalMap.uuid : '-', m.vertexColors ? 1 : 0, m.envMap ? 1 : 0, m.depthWrite ? 1 : 0].join('|');
+  }
+  function geoKey(g) {
+    const names = Object.keys(g.attributes).sort();
+    for (const n of names) { const a = g.attributes[n]; if (a.isInterleavedBufferAttribute || !(a.array instanceof Float32Array)) return null; }
+    if (g.morphAttributes && Object.keys(g.morphAttributes).length) return null;
+    return names.map(n => n + g.attributes[n].itemSize).join(',') + (g.index ? '#i' : '#n');
+  }
+  function mergeStatic(R, keep) {
+    if (!THREE.BufferGeometryUtils || !THREE.BufferGeometryUtils.mergeBufferGeometries) return 0;
+    R.updateMatrixWorld(true);
+    const skip = new Set();
+    for (const k of keep) if (k) k.traverse(o => skip.add(o));
+    const groups = new Map();
+    R.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || !o.visible) return;
+      const mk = matKey(o.material), gk = mk && geoKey(o.geometry);
+      if (!gk) return;
+      const key = mk + '/' + gk + '/' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(o);
+    });
+    let removed = 0;
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      const geos = list.map(o => {
+        const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld);
+        // a mirrored transform flips the winding: keep faces pointing outwards
+        if (o.matrixWorld.determinant() < 0 && g.index) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const t = ix[i]; ix[i] = ix[i + 2]; ix[i + 2] = t; } }
+        return g;
+      });
+      const merged = THREE.BufferGeometryUtils.mergeBufferGeometries(geos, false);
+      geos.forEach(g => g.dispose());
+      if (!merged) continue;
+      const m = new THREE.Mesh(merged, list[0].material);
+      m.castShadow = list[0].castShadow; m.receiveShadow = list[0].receiveShadow;
+      m.matrixAutoUpdate = false; m.updateMatrix();
+      for (const o of list) { o.parent.remove(o); removed++; }
+      R.add(m);
+    }
+    // whatever is left and never moves does not need its matrix recomputed every frame
+    R.traverse(o => { if (!skip.has(o) && o !== R) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
+    return removed;
   }
 })();
 </script>

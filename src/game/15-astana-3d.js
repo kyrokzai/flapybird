@@ -529,6 +529,7 @@
       const b = mesh(G3.geo.box, mat('#ffffff', { map: windowsTex(city() < 0.5 ? '#8a96a8' : '#c8c0b0', '#fff0c0'), r: 0.5 }), x, h / 2, z, 2.5, h, 2.5, false);
       b.material.map.repeat.set(1, h / 6); R.add(b);
     }
+    mergeStatic(R, [...(G3.doors || []).map(d => d.pv), G3.gateGlow, G3.gateBeam]);
     buildLife(R, theme, zN, zS, false);
     applyMood(R, n, theme, zN, zS);
     if (!def.arena) addCivilians(R, n, theme, zN, zS);

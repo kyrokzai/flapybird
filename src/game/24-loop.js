@@ -14,13 +14,25 @@
       Save.data.settings.autoQuality = lower; Save.write(); applyQuality(lower);
     } else if (perf.checks >= 4) perf.done = true;
   }
+  // dynamic resolution: every 2 s, step the render scale down when frames are slow and back up when there is room (any quality mode)
+  const dres = { t: 0, n: 0 };
+  function watchRes(rdt) {
+    if (document.hidden || rdt >= 100) return;
+    dres.t += rdt; dres.n++;
+    if (dres.t < 2000) return;
+    const fps = dres.n * 1000 / dres.t; dres.t = 0; dres.n = 0;
+    const old = G3.resScale || 1;
+    if (fps < 45 && old > 0.6) G3.resScale = Math.max(0.6, old - 0.15);
+    else if (fps > 57 && old < 1) G3.resScale = Math.min(1, old + 0.1);
+    if (G3.resScale !== old) resize();
+  }
   function frame(now) {
     const rdt = Math.min(now - last, 100); last = now;
     if (hitStop > 0) hitStop -= rdt / 1000;
     else { if (slowT > 0) slowT -= rdt / 1000; acc += rdt * (slowT > 0 ? 0.3 : 1); }
     while (acc >= DT * 1000) { update(DT); acc -= DT * 1000; }
     render();
-    watchPerf(rdt);
+    watchPerf(rdt); watchRes(rdt);
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
