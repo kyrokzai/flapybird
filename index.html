@@ -6,6 +6,13 @@
 <title>BATIR01</title>
 <meta name="description" content="BATIR01: браузерный 3D экшен-рогалик с лучником в казахском стиле.">
 <meta name="theme-color" content="#0b0f17">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BATIR01">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Cormorant+SC:wght@600;700&family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -214,7 +221,7 @@
     },
   };
   const tr = (k, n) => { const s = STR[lang][k] || STR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
-  function setLang(l) { lang = l; Save.data.settings.lang = l; Save.write(); document.documentElement.lang = l === 'kz' ? 'kk' : l; document.title = 'БАТЫР01'; }
+  function setLang(l) { lang = l; Save.data.settings.lang = l; Save.write(); document.documentElement.lang = l === 'kz' ? 'kk' : l; document.title = 'BATIR01'; }
   setLang(lang);
 
   // =================================================================== canvases
@@ -4368,6 +4375,10 @@
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });
   if (document.fonts && document.fonts.load) for (const f of [`800 20px "Montserrat"`, `600 20px "Montserrat"`, `700 20px "Cormorant SC"`, `900 20px "Cinzel"`]) document.fonts.load(f, "БҚӘ01").catch(() => {});
+  // installable app (PWA): offline cache + our own "install" button (Chrome's prompt is kept for it)
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; });
+  window.addEventListener('appinstalled', () => { installPrompt = null; });
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !TEST_MODE) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* sandboxed frame */ } }
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
   const LOAD_ORDER = ['batyr', 'batyr_rig', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_tree', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
@@ -4738,21 +4749,21 @@
       equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
       daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
       shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
-      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Легенды вышли на улицы', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Легенды вышли на улицы', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', install: 'Установить на телефон', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
     },
     kz: {
       tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
       equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
       daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
       shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
-      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Аңыздар көшеге шықты', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Аңыздар көшеге шықты', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', install: 'Телефонға орнату', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
     },
     en: {
       tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
       equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
       daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
       shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
-      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Legends unleashed', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Legends unleashed', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', install: 'Install the app', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
     },
   };
   const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -5249,7 +5260,7 @@
   }
   // =================================================================== main menu chrome (premium look): frames, logo, top bar, counters, PLAY, tab bar
   const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  let logoT0 = performance.now();
+  let logoT0 = performance.now(), installPrompt = null;
 
   // draw fn() shifted down by oy, moving the tap areas it registers with it
   function shiftUI(oy, fn) {
@@ -5580,12 +5591,17 @@
 
   // ---- settings popup: graphics quality (the same four modes as before)
   function drawSettingsPopup() {
-    panel(30, 190, W - 60, 268);
+    const inst = !!installPrompt;
+    panel(30, 190, W - 60, 268 + (inst ? 58 : 0));
     txt(tr('graphics'), W / 2, 226, 22, T.gold, { f: 'head', weight: 700 });
     ['auto', 'low', 'medium', 'high'].forEach((q, i) => {
       const on = Save.data.settings.quality === q;
       button(54, 250 + i * 46, W - 108, 38, tr('q' + q), () => { setQuality(q); Sound.click(); }, on ? { size: 14 } : { size: 14, col: '#2a3550', col2: '#151c2c' });
     });
+    if (inst) button(54, 440, W - 108, 42, mt('install'), () => {
+      const p = installPrompt; installPrompt = null; menuPopup = null;
+      try { p.prompt(); } catch (e) { /* already shown */ }
+    }, { size: 14, col: '#2f6a3a', col2: '#163a1e' });
     txt('×', W - 48, 208, 20, T.muted, { weight: 600 });
     ui.push({ x: W - 70, y: 190, w: 40, h: 36, fn: () => { menuPopup = null; Sound.click(); } });
   }

@@ -51,6 +51,6 @@
     },
   };
   const tr = (k, n) => { const s = STR[lang][k] || STR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
-  function setLang(l) { lang = l; Save.data.settings.lang = l; Save.write(); document.documentElement.lang = l === 'kz' ? 'kk' : l; document.title = 'БАТЫР01'; }
+  function setLang(l) { lang = l; Save.data.settings.lang = l; Save.write(); document.documentElement.lang = l === 'kz' ? 'kk' : l; document.title = 'BATIR01'; }
   setLang(lang);
 

@@ -1,6 +1,6 @@
   // =================================================================== main menu chrome (premium look): frames, logo, top bar, counters, PLAY, tab bar
   const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  let logoT0 = performance.now();
+  let logoT0 = performance.now(), installPrompt = null;
 
   // draw fn() shifted down by oy, moving the tap areas it registers with it
   function shiftUI(oy, fn) {
@@ -331,12 +331,17 @@
 
   // ---- settings popup: graphics quality (the same four modes as before)
   function drawSettingsPopup() {
-    panel(30, 190, W - 60, 268);
+    const inst = !!installPrompt;
+    panel(30, 190, W - 60, 268 + (inst ? 58 : 0));
     txt(tr('graphics'), W / 2, 226, 22, T.gold, { f: 'head', weight: 700 });
     ['auto', 'low', 'medium', 'high'].forEach((q, i) => {
       const on = Save.data.settings.quality === q;
       button(54, 250 + i * 46, W - 108, 38, tr('q' + q), () => { setQuality(q); Sound.click(); }, on ? { size: 14 } : { size: 14, col: '#2a3550', col2: '#151c2c' });
     });
+    if (inst) button(54, 440, W - 108, 42, mt('install'), () => {
+      const p = installPrompt; installPrompt = null; menuPopup = null;
+      try { p.prompt(); } catch (e) { /* already shown */ }
+    }, { size: 14, col: '#2f6a3a', col2: '#163a1e' });
     txt('×', W - 48, 208, 20, T.muted, { weight: 600 });
     ui.push({ x: W - 70, y: 190, w: 40, h: 36, fn: () => { menuPopup = null; Sound.click(); } });
   }
