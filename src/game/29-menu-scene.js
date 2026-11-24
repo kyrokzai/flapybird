@@ -1,4 +1,4 @@
-  const MENU_CAM = { fov: 32, dist: 5.8, y: 0.86, look: 1.12 };
+  const MENU_CAM = { fov: 32, dist: 6.1, y: 0.8, look: 0.98 };
   // =================================================================== realistic grass, ground and a soft-focus backdrop (menu close-up)
   // grass tufts are crossed alpha cards painted on a canvas: dozens of thin tapered blades, dark at the root, light at the tip
   const WIND_CARD = [

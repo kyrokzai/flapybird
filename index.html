@@ -49,6 +49,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
 <link rel="preload" href="assets/sky_menu.js" as="script">
 <link rel="preload" href="assets/batyr.js" as="script">
 <link rel="preload" href="assets/horse.js" as="script">
@@ -2730,7 +2731,9 @@
       try {
         const bin = Uint8Array.from(atob(window[key]), c => c.charCodeAt(0)).buffer;
         window[key] = null;
-        new THREE.GLTFLoader().parse(bin, '', gltf => {
+        const loader = new THREE.GLTFLoader();
+        if (window.MeshoptDecoder) loader.setMeshoptDecoder(window.MeshoptDecoder);   // meshopt-compressed models (the menu batyr)
+        loader.parse(bin, '', gltf => {
           G3.models[name] = gltf.scene; gltf.scene.userData.clips = gltf.animations;
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
           if (name === 'batyr') { G3.batyrScene = gltf.scene; const an = G3.r ? Math.min(8, G3.r.capabilities.getMaxAnisotropy()) : 1; gltf.scene.traverse(o => { if (o.isMesh) for (const t of [o.material.map, o.material.normalMap]) if (t) { t.anisotropy = an; t.needsUpdate = true; } }); }
@@ -5268,7 +5271,7 @@
       ctx.beginPath(); ctx.arc(p.x, p.y, 28 + pulse * 8, 0, TAU); ctx.stroke();
     }
   }
-  const MENU_CAM = { fov: 32, dist: 5.8, y: 0.86, look: 1.12 };
+  const MENU_CAM = { fov: 32, dist: 6.1, y: 0.8, look: 0.98 };
   // =================================================================== realistic grass, ground and a soft-focus backdrop (menu close-up)
   // grass tufts are crossed alpha cards painted on a canvas: dozens of thin tapered blades, dark at the root, light at the tip
   const WIND_CARD = [
