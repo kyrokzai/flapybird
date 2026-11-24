@@ -262,7 +262,8 @@
     K = canvas.width / W;
     if (G3.cam && (oldH !== H || Math.abs(oldT - SAFE.t) > 0.5)) fitCamera();
     if (G3.r) {
-      const pr = G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
+      // the menu is a light close-up scene: render it sharper (up to 2x) unless quality is low
+      const pr = scene === 'menu' && QL !== 'low' ? Math.min(dpr, 2) : G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
       G3.r.setPixelRatio(pr); G3.r.setSize(cssW, cssH, false);
       if (G3.composer) {
         G3.composer.setPixelRatio(pr); G3.composer.setSize(cssW, cssH);
@@ -2420,13 +2421,14 @@
       setSky('#34446c', '#f2a35a', '#4a3a2c', new THREE.Vector3(-0.38, 0.07, -1), '#ffc06e');
       const menuPano = setPano('menu', PANO_YAW.menu);
       G3.sun.position.set(-7, 5.5, -12); G3.sun.target.position.set(0, 0, 0); G3.sun.color = col('#ffc27a'); G3.sun.intensity = 2.3;
-      G3.fill.intensity = 1.6; G3.hemi.intensity = 0.35; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
+      G3.fill.intensity = 2.7; G3.fill.color = col('#ffe6c8'); G3.fill.position.set(-3.5, 4.5, 12); G3.hemi.intensity = 0.7; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
       const gt = groundTex(true); gt.repeat.set(30, 30);
       const outer = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, color: col('#9aa07a') })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.01; outer.receiveShadow = true; R.add(outer);
       // dense tufts around the batyr, thinning out with distance; low near the camera so they frame without hiding him
-      const nb = Math.round(1700 * Q.grass);
+      const nb = Math.round(750 * Q.grass);
       R.add(makeGrassField(nb, r => {
         const x = (r() - 0.5) * 16, z = -7 + r() * 14;
+        if (Math.abs(x) > 1.7 + (7.4 - z) * 0.22) return null;   // outside the close-up view: no point drawing it
         const dHero = Math.hypot(x, (z - 1.4) * 1.3);
         if (dHero < 0.75) return null;
         const short = dHero < 1.8 ? 0.45 + (dHero - 0.75) * 0.5 : 1;   // short grass at his boots
@@ -2731,7 +2733,7 @@
         new THREE.GLTFLoader().parse(bin, '', gltf => {
           G3.models[name] = gltf.scene; gltf.scene.userData.clips = gltf.animations;
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
-          if (name === 'batyr') G3.batyrScene = gltf.scene;
+          if (name === 'batyr') { G3.batyrScene = gltf.scene; const an = G3.r ? Math.min(8, G3.r.capabilities.getMaxAnisotropy()) : 1; gltf.scene.traverse(o => { if (o.isMesh) for (const t of [o.material.map, o.material.normalMap]) if (t) { t.anisotropy = an; t.needsUpdate = true; } }); }
           if (name === 'kydyr') makeKydyrPortrait();
           if (name === 'prop_tree' || name === 'prop_palm') gltf.scene.traverse(o => { if (o.isMesh) windMaterial(o.material, WIND_TREE); });
           if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_') || name.startsWith('prop_')) G3.dirty = true;
@@ -3785,6 +3787,7 @@
     if (G3.life) for (const u of G3.life.upd) u(G3.rt, fdt);
     tickFx(fdt); updateFx3D(fdt);
     const menu = scene === 'menu';
+    if (G3.wasMenu !== menu) { G3.wasMenu = menu; resize(); }
     // camera
     const c = G3.cam;
     if (menu) {
@@ -4390,7 +4393,9 @@
   // =================================================================== render
   function render() {
     polishTick();
+    const pt0 = performance.now();
     render3D();
+    const pt1 = performance.now();
     ui = [];
     ctx.setTransform(K, 0, 0, K, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -4424,6 +4429,8 @@
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }
     drawTransition();
     drawSplash();
+    const pt2 = performance.now(), P = G3.prof || (G3.prof = { gl: 0, ui: 0 });
+    P.gl = P.gl * 0.95 + (pt1 - pt0) * 0.05; P.ui = P.ui * 0.95 + (pt2 - pt1) * 0.05;
   }
 
   // =================================================================== input
@@ -4531,7 +4538,7 @@
     comic() { if (TEST_MODE) playComic(null); }, toast(t) { toasts.push({ text: t, t: 0 }); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
-    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
+    get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get prof() { return G3.prof; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
     get scene() { return scene; }, get modal() { return modal; },
     get room() { return run && run.room; }, get level() { return run && run.level; },
     get enemies() { return enemies.length; }, get roomClear() { return roomClear; }, get gateOpen() { return gateOpen; },
@@ -5795,10 +5802,10 @@
     if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     // cinematic grade over the 3D scene: dark top and bottom so the gold chrome reads
     // dusk grade: deep navy sky fading into the amber horizon (the concept's palette)
-    const sky = H * 0.62;
-    const tg = ctx.createLinearGradient(0, 0, 0, sky); tg.addColorStop(0, 'rgba(8,12,22,0.95)'); tg.addColorStop(0.35, 'rgba(14,24,44,0.72)'); tg.addColorStop(0.75, 'rgba(20,30,52,0.32)'); tg.addColorStop(1, 'rgba(20,30,52,0)');
+    const sky = 250 + SAFE.t;
+    const tg = ctx.createLinearGradient(0, 0, 0, sky); tg.addColorStop(0, 'rgba(8,12,22,0.9)'); tg.addColorStop(0.45, 'rgba(14,24,44,0.5)'); tg.addColorStop(1, 'rgba(20,30,52,0)');
     ctx.fillStyle = tg; ctx.fillRect(0, 0, W, sky);
-    const bgr = ctx.createLinearGradient(0, TAB_Y - 210, 0, TAB_Y); bgr.addColorStop(0, 'rgba(8,11,18,0)'); bgr.addColorStop(1, 'rgba(8,11,18,0.75)');
+    const bgr = ctx.createLinearGradient(0, TAB_Y - 170, 0, TAB_Y); bgr.addColorStop(0, 'rgba(8,11,18,0)'); bgr.addColorStop(1, 'rgba(8,11,18,0.7)');
     ctx.fillStyle = bgr; ctx.fillRect(0, TAB_Y - 210, W, 210);
     drawEmbers();
     shiftUI(SAFE.t, () => {

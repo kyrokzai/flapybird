@@ -6,6 +6,7 @@
     if (G3.life) for (const u of G3.life.upd) u(G3.rt, fdt);
     tickFx(fdt); updateFx3D(fdt);
     const menu = scene === 'menu';
+    if (G3.wasMenu !== menu) { G3.wasMenu = menu; resize(); }
     // camera
     const c = G3.cam;
     if (menu) {

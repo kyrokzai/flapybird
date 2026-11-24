@@ -27,7 +27,8 @@
     K = canvas.width / W;
     if (G3.cam && (oldH !== H || Math.abs(oldT - SAFE.t) > 0.5)) fitCamera();
     if (G3.r) {
-      const pr = G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
+      // the menu is a light close-up scene: render it sharper (up to 2x) unless quality is low
+      const pr = scene === 'menu' && QL !== 'low' ? Math.min(dpr, 2) : G3.usePost ? Math.min(dpr, 1.6, Q.pr) : Math.min(dpr, Q.pr);
       G3.r.setPixelRatio(pr); G3.r.setSize(cssW, cssH, false);
       if (G3.composer) {
         G3.composer.setPixelRatio(pr); G3.composer.setSize(cssW, cssH);

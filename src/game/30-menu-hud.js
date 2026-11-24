@@ -404,10 +404,10 @@
     if (!dailyShown && G3.heroSpear && splashA <= 0) { dailyShown = true; if (canClaimDaily() && !TEST_MODE) menuPopup = 'daily'; }
     // cinematic grade over the 3D scene: dark top and bottom so the gold chrome reads
     // dusk grade: deep navy sky fading into the amber horizon (the concept's palette)
-    const sky = H * 0.62;
-    const tg = ctx.createLinearGradient(0, 0, 0, sky); tg.addColorStop(0, 'rgba(8,12,22,0.95)'); tg.addColorStop(0.35, 'rgba(14,24,44,0.72)'); tg.addColorStop(0.75, 'rgba(20,30,52,0.32)'); tg.addColorStop(1, 'rgba(20,30,52,0)');
+    const sky = 250 + SAFE.t;
+    const tg = ctx.createLinearGradient(0, 0, 0, sky); tg.addColorStop(0, 'rgba(8,12,22,0.9)'); tg.addColorStop(0.45, 'rgba(14,24,44,0.5)'); tg.addColorStop(1, 'rgba(20,30,52,0)');
     ctx.fillStyle = tg; ctx.fillRect(0, 0, W, sky);
-    const bgr = ctx.createLinearGradient(0, TAB_Y - 210, 0, TAB_Y); bgr.addColorStop(0, 'rgba(8,11,18,0)'); bgr.addColorStop(1, 'rgba(8,11,18,0.75)');
+    const bgr = ctx.createLinearGradient(0, TAB_Y - 170, 0, TAB_Y); bgr.addColorStop(0, 'rgba(8,11,18,0)'); bgr.addColorStop(1, 'rgba(8,11,18,0.7)');
     ctx.fillStyle = bgr; ctx.fillRect(0, TAB_Y - 210, W, 210);
     drawEmbers();
     shiftUI(SAFE.t, () => {

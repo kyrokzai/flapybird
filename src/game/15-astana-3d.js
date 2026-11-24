@@ -455,13 +455,14 @@
       setSky('#34446c', '#f2a35a', '#4a3a2c', new THREE.Vector3(-0.38, 0.07, -1), '#ffc06e');
       const menuPano = setPano('menu', PANO_YAW.menu);
       G3.sun.position.set(-7, 5.5, -12); G3.sun.target.position.set(0, 0, 0); G3.sun.color = col('#ffc27a'); G3.sun.intensity = 2.3;
-      G3.fill.intensity = 1.6; G3.hemi.intensity = 0.35; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
+      G3.fill.intensity = 2.7; G3.fill.color = col('#ffe6c8'); G3.fill.position.set(-3.5, 4.5, 12); G3.hemi.intensity = 0.7; G3.hemi.color = col('#ffd9b0'); G3.hemi.groundColor = col('#4a3a2a');
       const gt = groundTex(true); gt.repeat.set(30, 30);
       const outer = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, color: col('#9aa07a') })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.01; outer.receiveShadow = true; R.add(outer);
       // dense tufts around the batyr, thinning out with distance; low near the camera so they frame without hiding him
-      const nb = Math.round(1700 * Q.grass);
+      const nb = Math.round(750 * Q.grass);
       R.add(makeGrassField(nb, r => {
         const x = (r() - 0.5) * 16, z = -7 + r() * 14;
+        if (Math.abs(x) > 1.7 + (7.4 - z) * 0.22) return null;   // outside the close-up view: no point drawing it
         const dHero = Math.hypot(x, (z - 1.4) * 1.3);
         if (dHero < 0.75) return null;
         const short = dHero < 1.8 ? 0.45 + (dHero - 0.75) * 0.5 : 1;   // short grass at his boots

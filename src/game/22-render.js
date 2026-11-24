@@ -1,7 +1,9 @@
   // =================================================================== render
   function render() {
     polishTick();
+    const pt0 = performance.now();
     render3D();
+    const pt1 = performance.now();
     ui = [];
     ctx.setTransform(K, 0, 0, K, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -35,5 +37,7 @@
     if (fade > 0) { ctx.fillStyle = `rgba(4,16,22,${fade})`; ctx.fillRect(0, 0, W, H); }
     drawTransition();
     drawSplash();
+    const pt2 = performance.now(), P = G3.prof || (G3.prof = { gl: 0, ui: 0 });
+    P.gl = P.gl * 0.95 + (pt1 - pt0) * 0.05; P.ui = P.ui * 0.95 + (pt2 - pt1) * 0.05;
   }
 

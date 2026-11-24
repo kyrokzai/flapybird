@@ -31,4 +31,5 @@
 - **Элиты** (`35-elites.js`): `maybeElite` в `spawnEnemy`, `eliteAbsorb`/`eliteTick`/`eliteDeath`; шанс `eliteChance()`. Баланс проверен симуляцией (новичок ~19%).
 - **Достижения и «Жол»** (`36-goals.js`, Save v6: `ach`, `frames`, `profile.frame`, `pass`): `ACH`, `achUpdate()`, `grant(rw)`; пропуск — `PASS` (30 ступеней по `PASS_STEP` славы с `pass.start`). Тосты — `toasts`.
 - **Комикс** (`37-comic.js`): `assets/comic.js` = `window.COMIC_PACK` (массив 4 data-URL, 9:16), тексты `COMIC_TEXT`, флаг `Save.data.introSeen`. Тест: `Mergen.comic()`.
+- **Батыр в меню** (`assets/batyr.js`): собран из исходника `Batyr3D.glb` (4096 px) — ~58 тыс. треугольников, цвет 2048 px, карта рельефа 1024 px (скрипт `tex.mjs`: weld → simplify 0.03 → textureCompress → quantize). Меню рендерится с pixel ratio до 2 (кроме «Низкой»), трава меню ставится только в поле зрения камеры. `Mergen.prof` — среднее время кадра 3D и 2D.
 - Качество графики: пресеты `QUALITY` (low/medium/high), `applyQuality()` переключает на лету. Тяжёлые эффекты масштабируй через `Q.grass` / `Q.fx` или проверку `QL`.

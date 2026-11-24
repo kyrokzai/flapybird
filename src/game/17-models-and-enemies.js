@@ -13,7 +13,7 @@
         new THREE.GLTFLoader().parse(bin, '', gltf => {
           G3.models[name] = gltf.scene; gltf.scene.userData.clips = gltf.animations;
           gltf.scene.traverse(o => { if (o.isMesh) { o.userData.keep = true; o.castShadow = true; G3.metalMats.add(o.material); if (G3.envRT) o.material.envMap = G3.envRT.texture; o.material.envMapIntensity = 0.7; } });
-          if (name === 'batyr') G3.batyrScene = gltf.scene;
+          if (name === 'batyr') { G3.batyrScene = gltf.scene; const an = G3.r ? Math.min(8, G3.r.capabilities.getMaxAnisotropy()) : 1; gltf.scene.traverse(o => { if (o.isMesh) for (const t of [o.material.map, o.material.normalMap]) if (t) { t.anisotropy = an; t.needsUpdate = true; } }); }
           if (name === 'kydyr') makeKydyrPortrait();
           if (name === 'prop_tree' || name === 'prop_palm') gltf.scene.traverse(o => { if (o.isMesh) windMaterial(o.material, WIND_TREE); });
           if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_') || name.startsWith('prop_')) G3.dirty = true;
