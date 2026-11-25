@@ -3127,11 +3127,12 @@
     if (m.hitT > 0) m.hitT -= dt;
     const aim = !o.menu && enemies.some(e => e.spawn <= 0);
     let want = o.dead ? 'death' : o.moving ? 'run' : m.hitT > 0 ? 'hit' : aim ? 'aim' : 'idle';
+    if (o.menu && o.clip && m.act[o.clip]) want = o.clip;
     if (!m.act[want]) want = 'idle';
     if (want !== m.cur && m.act[want]) {
       const from = m.act[m.cur], to = m.act[want];
       to.reset(); to.setEffectiveWeight(1); to.play();
-      if (from) from.crossFadeTo(to, want === 'hit' ? 0.08 : want === 'death' ? 0.12 : 0.2, false);
+      if (from) from.crossFadeTo(to, want === 'hit' ? 0.08 : want === 'death' ? 0.12 : o.menu ? 0.35 : 0.2, false);
       m.cur = want;
     }
     if (m.act.run) m.act.run.timeScale = o.runK || 1.15;
@@ -3157,6 +3158,7 @@
     RUbow: [0.85, 0.1, 0.45], RFbow: [1, 0.1, -0.3],                             // hand at the bow, taking an arrow
     RUfree: [-0.6, 0.1, 1], RFfree: [-0.2, 0.1, 1],                              // follow-through right after the release
     LT: [0.08, -1, -0.16], LC: [0.02, -1, -0.12], RT: [-0.08, -1, 0.16], RC: [-0.02, -1, 0.12],   // feet apart, knees straight
+    LUrest: [0.12, -1, -0.32], LFrest: [0.25, -1, -0.12], RUrest: [0.12, -1, 0.32], RFrest: [0.25, -1, 0.12],   // arms hanging, menu stance
     LUlow: [0.5, -0.85, -0.2], LFlow: [0.7, -0.6, 0], RUlow: [0.1, -1, 0.25], RFlow: [0.3, -0.9, 0.1],   // bow lowered, nothing to shoot
   };
   const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pd = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pw = new THREE.Quaternion(), _pp = new THREE.Quaternion(), _gq = new THREE.Quaternion(), _idq = new THREE.Quaternion();
@@ -3170,8 +3172,27 @@
     bone.quaternion.copy(_pp.invert().multiply(_pq.multiply(_pw)));
     bone.updateMatrixWorld(true);
   }
+  function standLegs(m, w) {
+    const B = m.bones;
+    pointBone(B.LT, B.LC, AP.LT, w); pointBone(B.LC, B.LFt, AP.LC, w); pointBone(B.RT, B.RC, AP.RT, w); pointBone(B.RC, B.RFt, AP.RC, w);
+    m.g.getWorldPosition(_pb); B.LFt.getWorldPosition(_pa); let low = _pa.y; B.RFt.getWorldPosition(_pa); low = Math.min(low, _pa.y);
+    if (m.footY === undefined) m.footY = 0.06;   // ankle height above the ground
+    m.up.position.y += (m.footY - (low - _pb.y)) / m.g.scale.y * w;
+    m.g.updateMatrixWorld(true);
+  }
   function archerPose(m, o, dt) {
-    const B = m.bones, ready = !o.moving && !o.dead && !o.menu;
+    const B = m.bones;
+    if (o.menu) {
+      // main menu: the clip the player picked plays as is; "stance" is the borrowed run frame straightened into a calm pose
+      m.bow.g.visible = false;
+      m.menuW = (m.menuW || 0) + ((m.cur === 'idle' ? 1 : 0) - (m.menuW || 0)) * Math.min(1, dt * 8);
+      if (m.menuW < 0.02) return;
+      m.g.updateMatrixWorld(true); m.g.getWorldQuaternion(_gq);
+      standLegs(m, m.menuW);
+      for (const [b, c, d] of [[B.LU, B.LF, AP.LUrest], [B.LF, B.LH, AP.LFrest], [B.RU, B.RF, AP.RUrest], [B.RF, B.RH, AP.RFrest]]) pointBone(b, c, d, m.menuW);
+      return;
+    }
+    const ready = !o.moving && !o.dead;
     m.aimW += ((ready ? 1 : 0) - m.aimW) * Math.min(1, dt * 12);
     m.aimK += ((enemies.some(e => e.spawn <= 0) ? 1 : 0) - m.aimK) * Math.min(1, dt * 6);
     m.bow.g.visible = m.aimW > 0.4;
@@ -3184,12 +3205,7 @@
     else if (t < 0.55) { const k = (t - 0.25) / 0.3; ru = mixDir(AP.RUfree, AP.RUbow, k); rf = mixDir(AP.RFfree, AP.RFbow, k); draw = 0; }
     else { const k = (t - 0.55) / 0.45; ru = mixDir(AP.RUbow, AP.RUdrawn, k); rf = mixDir(AP.RFbow, AP.RFdrawn, k); draw = k; }
     const a = m.aimK, w = m.aimW;
-    // stand on both feet (the borrowed run frame has a knee up), then put the soles back on the ground
-    pointBone(B.LT, B.LC, AP.LT, w); pointBone(B.LC, B.LFt, AP.LC, w); pointBone(B.RT, B.RC, AP.RT, w); pointBone(B.RC, B.RFt, AP.RC, w);
-    m.g.getWorldPosition(_pb); B.LFt.getWorldPosition(_pa); let low = _pa.y; B.RFt.getWorldPosition(_pa); low = Math.min(low, _pa.y);
-    if (m.footY === undefined) m.footY = 0.06;   // ankle height above the ground
-    m.up.position.y += (m.footY - (low - _pb.y)) / m.g.scale.y * w;
-    m.g.updateMatrixWorld(true);
+    standLegs(m, w);   // stand on both feet (the borrowed run frame has a knee up), soles back on the ground
     pointBone(B.LU, B.LF, mixDir(AP.LUlow, AP.LU, a), w); pointBone(B.LF, B.LH, mixDir(AP.LFlow, AP.LF, a), w);
     pointBone(B.RU, B.RF, mixDir(AP.RUlow, ru, a), w); pointBone(B.RF, B.RH, mixDir(AP.RFlow, rf, a), w);
     // the bow sits in the left hand, the string follows the right hand while drawing
@@ -3985,7 +4001,8 @@
     if (G3.pano) G3.pano.position.set(c.position.x, 0, c.position.z);
     // hero
     // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
-    if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
+    // the menu batyr: the owner's rigged comic warrior with his dances (assets/batyr.js); an older static model still works
+    if (G3.models.batyr && !G3.heroSpear) { const rigged = (G3.models.batyr.userData.clips || []).length > 0; G3.heroSpear = rigged ? makeBatyrRig(G3.models.batyr, true) : makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
     if (G3.models.hero && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.hero, true); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_rig && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.batyr_rig); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_bow && !G3.heroBow) { G3.heroBow = makeBatyr(G3.models.batyr_bow, true); G3.dyn.add(G3.heroBow.g); }
@@ -3998,7 +4015,7 @@
     if (menu) {
       hm.g.visible = !!G3.heroSpear; hm.g.position.set(0, 0.2, 1.4); hm.g.scale.setScalar(1);
       hm.g.rotation.y = -(Math.PI / 2 - 0.15);
-      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0, dt: fdt });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0, dt: fdt, clip: menuAnimId() });
     } else {
       hm.g.visible = (hm.rig || scene !== 'dead') && !(player.inv > 0 && player.hp > 0 && Math.floor(time * 20) % 2 === 0);
       hm.g.position.set(X3(player.x), 0, Z3(player.y)); hm.g.scale.setScalar(1.18);
@@ -4712,7 +4729,7 @@
     survival() { if (TEST_MODE) newRun('survival'); }, get wave() { return run && run.wave; }, arenaTime(s) { if (TEST_MODE && run) run.timeLeft = s; },
     tp(x, y) { if (TEST_MODE && player) { player.x = x; player.y = y; } }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
-    comic() { if (TEST_MODE) playComic(null); }, toast(t) { toasts.push({ text: t, t: 0 }); },
+    comic() { if (TEST_MODE) playComic(null); }, menuAnim(id) { if (TEST_MODE) Save.data.settings.menuAnim = id; return menuAnimId(); }, toast(t) { toasts.push({ text: t, t: 0 }); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
     get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get prof() { return G3.prof; }, get models() { return Object.keys(G3.models); }, get g3() { return TEST_MODE ? G3 : null; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
@@ -5866,6 +5883,32 @@
     });
   }
 
+  // ---- the batyr's animations on the main screen (clips of the owner's rigged model); the pick is remembered
+  const MENU_ANIMS = [
+    { id: 'idle', name: { ru: 'Стойка', kz: 'Тұрыс', en: 'Stance' } },
+    { id: 'dance_05', name: { ru: 'Танец 1', kz: 'Би 1', en: 'Dance 1' } },
+    { id: 'dance_02', name: { ru: 'Танец 2', kz: 'Би 2', en: 'Dance 2' } },
+    { id: 'box_02', name: { ru: 'Бокс', kz: 'Бокс', en: 'Boxing' } },
+    { id: 'run', name: { ru: 'Бег', kz: 'Жүгіру', en: 'Run' } },
+  ];
+  const menuAnims = () => { const h = G3.heroSpear; return h && h.rig ? MENU_ANIMS.filter(a => h.act[a.id]) : []; };
+  function menuAnimId() { const l = menuAnims(), id = Save.data.settings.menuAnim; return (l.find(a => a.id === id) || l[0] || {}).id; }
+  function drawAnimSwitch(y) {
+    const l = menuAnims(); if (l.length < 2) return;
+    const cur = Math.max(0, l.findIndex(a => a.id === menuAnimId())), x = 32, r = 21, down = isPressed(x - 26, y - 26, 52, 70);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r * (down ? 0.94 : 1), 0, TAU); ctx.fillStyle = 'rgba(8,11,18,0.74)'; ctx.fill();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = T.gold; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r - 4, 0, TAU); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(220,183,94,0.35)'; ctx.stroke();
+    ctx.restore();
+    icoNote(x - 1, y, 17, T.goldLt || T.gold);
+    // which clip, and dots for how many there are
+    const nm = l[cur].name[lang] || l[cur].name.ru;
+    txt(nm, x, y + r + 11, fitText(nm, 62, 10, 700), T.text, { weight: 700, shadow: 'rgba(0,0,0,0.9)', blur: 5, dy: 0 });
+    l.forEach((_, i) => { ctx.beginPath(); ctx.arc(x - (l.length - 1) * 3.5 + i * 7, y + r + 22, i === cur ? 2.2 : 1.5, 0, TAU); ctx.fillStyle = i === cur ? T.gold : 'rgba(255,236,200,0.4)'; ctx.fill(); });
+    ui.push({ x: x - 26, y: y - 26, w: 56, h: 74, fn: () => { Sound.init(); Sound.click(); Save.data.settings.menuAnim = l[(cur + 1) % l.length].id; Save.write(); } });
+  }
+
   // ---- Battle tab: logo, PLAY, hint, record
   function drawFightTab() {
     const top = SAFE.t;
@@ -5881,6 +5924,7 @@
     }
     // ornament knot above the button
     diamond(W / 2, py - 9, 7); diamond(W / 2, py - 9, 3, '#151b28');
+    drawAnimSwitch(Math.round((top + 250 + extra * 30 + py) / 2));
     button(px, py, pw, ph, tr('play'), () => { Sound.init(); Sound.click(); startGame(); },
       { shape: 'hex', size: 22, icon: (x, y, s, c) => icoSwords(x, y, s * 0.95, c), sub: '⚡' + RUN_COST });
     // sheen sweeping across the plate

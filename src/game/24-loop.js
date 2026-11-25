@@ -73,7 +73,7 @@
     survival() { if (TEST_MODE) newRun('survival'); }, get wave() { return run && run.wave; }, arenaTime(s) { if (TEST_MODE && run) run.timeLeft = s; },
     tp(x, y) { if (TEST_MODE && player) { player.x = x; player.y = y; } }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
-    comic() { if (TEST_MODE) playComic(null); }, toast(t) { toasts.push({ text: t, t: 0 }); },
+    comic() { if (TEST_MODE) playComic(null); }, menuAnim(id) { if (TEST_MODE) Save.data.settings.menuAnim = id; return menuAnimId(); }, toast(t) { toasts.push({ text: t, t: 0 }); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
     get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get prof() { return G3.prof; }, get models() { return Object.keys(G3.models); }, get g3() { return TEST_MODE ? G3 : null; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },

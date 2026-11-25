@@ -355,11 +355,12 @@
     if (m.hitT > 0) m.hitT -= dt;
     const aim = !o.menu && enemies.some(e => e.spawn <= 0);
     let want = o.dead ? 'death' : o.moving ? 'run' : m.hitT > 0 ? 'hit' : aim ? 'aim' : 'idle';
+    if (o.menu && o.clip && m.act[o.clip]) want = o.clip;
     if (!m.act[want]) want = 'idle';
     if (want !== m.cur && m.act[want]) {
       const from = m.act[m.cur], to = m.act[want];
       to.reset(); to.setEffectiveWeight(1); to.play();
-      if (from) from.crossFadeTo(to, want === 'hit' ? 0.08 : want === 'death' ? 0.12 : 0.2, false);
+      if (from) from.crossFadeTo(to, want === 'hit' ? 0.08 : want === 'death' ? 0.12 : o.menu ? 0.35 : 0.2, false);
       m.cur = want;
     }
     if (m.act.run) m.act.run.timeScale = o.runK || 1.15;
@@ -385,6 +386,7 @@
     RUbow: [0.85, 0.1, 0.45], RFbow: [1, 0.1, -0.3],                             // hand at the bow, taking an arrow
     RUfree: [-0.6, 0.1, 1], RFfree: [-0.2, 0.1, 1],                              // follow-through right after the release
     LT: [0.08, -1, -0.16], LC: [0.02, -1, -0.12], RT: [-0.08, -1, 0.16], RC: [-0.02, -1, 0.12],   // feet apart, knees straight
+    LUrest: [0.12, -1, -0.32], LFrest: [0.25, -1, -0.12], RUrest: [0.12, -1, 0.32], RFrest: [0.25, -1, 0.12],   // arms hanging, menu stance
     LUlow: [0.5, -0.85, -0.2], LFlow: [0.7, -0.6, 0], RUlow: [0.1, -1, 0.25], RFlow: [0.3, -0.9, 0.1],   // bow lowered, nothing to shoot
   };
   const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pd = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pw = new THREE.Quaternion(), _pp = new THREE.Quaternion(), _gq = new THREE.Quaternion(), _idq = new THREE.Quaternion();
@@ -398,8 +400,27 @@
     bone.quaternion.copy(_pp.invert().multiply(_pq.multiply(_pw)));
     bone.updateMatrixWorld(true);
   }
+  function standLegs(m, w) {
+    const B = m.bones;
+    pointBone(B.LT, B.LC, AP.LT, w); pointBone(B.LC, B.LFt, AP.LC, w); pointBone(B.RT, B.RC, AP.RT, w); pointBone(B.RC, B.RFt, AP.RC, w);
+    m.g.getWorldPosition(_pb); B.LFt.getWorldPosition(_pa); let low = _pa.y; B.RFt.getWorldPosition(_pa); low = Math.min(low, _pa.y);
+    if (m.footY === undefined) m.footY = 0.06;   // ankle height above the ground
+    m.up.position.y += (m.footY - (low - _pb.y)) / m.g.scale.y * w;
+    m.g.updateMatrixWorld(true);
+  }
   function archerPose(m, o, dt) {
-    const B = m.bones, ready = !o.moving && !o.dead && !o.menu;
+    const B = m.bones;
+    if (o.menu) {
+      // main menu: the clip the player picked plays as is; "stance" is the borrowed run frame straightened into a calm pose
+      m.bow.g.visible = false;
+      m.menuW = (m.menuW || 0) + ((m.cur === 'idle' ? 1 : 0) - (m.menuW || 0)) * Math.min(1, dt * 8);
+      if (m.menuW < 0.02) return;
+      m.g.updateMatrixWorld(true); m.g.getWorldQuaternion(_gq);
+      standLegs(m, m.menuW);
+      for (const [b, c, d] of [[B.LU, B.LF, AP.LUrest], [B.LF, B.LH, AP.LFrest], [B.RU, B.RF, AP.RUrest], [B.RF, B.RH, AP.RFrest]]) pointBone(b, c, d, m.menuW);
+      return;
+    }
+    const ready = !o.moving && !o.dead;
     m.aimW += ((ready ? 1 : 0) - m.aimW) * Math.min(1, dt * 12);
     m.aimK += ((enemies.some(e => e.spawn <= 0) ? 1 : 0) - m.aimK) * Math.min(1, dt * 6);
     m.bow.g.visible = m.aimW > 0.4;
@@ -412,12 +433,7 @@
     else if (t < 0.55) { const k = (t - 0.25) / 0.3; ru = mixDir(AP.RUfree, AP.RUbow, k); rf = mixDir(AP.RFfree, AP.RFbow, k); draw = 0; }
     else { const k = (t - 0.55) / 0.45; ru = mixDir(AP.RUbow, AP.RUdrawn, k); rf = mixDir(AP.RFbow, AP.RFdrawn, k); draw = k; }
     const a = m.aimK, w = m.aimW;
-    // stand on both feet (the borrowed run frame has a knee up), then put the soles back on the ground
-    pointBone(B.LT, B.LC, AP.LT, w); pointBone(B.LC, B.LFt, AP.LC, w); pointBone(B.RT, B.RC, AP.RT, w); pointBone(B.RC, B.RFt, AP.RC, w);
-    m.g.getWorldPosition(_pb); B.LFt.getWorldPosition(_pa); let low = _pa.y; B.RFt.getWorldPosition(_pa); low = Math.min(low, _pa.y);
-    if (m.footY === undefined) m.footY = 0.06;   // ankle height above the ground
-    m.up.position.y += (m.footY - (low - _pb.y)) / m.g.scale.y * w;
-    m.g.updateMatrixWorld(true);
+    standLegs(m, w);   // stand on both feet (the borrowed run frame has a knee up), soles back on the ground
     pointBone(B.LU, B.LF, mixDir(AP.LUlow, AP.LU, a), w); pointBone(B.LF, B.LH, mixDir(AP.LFlow, AP.LF, a), w);
     pointBone(B.RU, B.RF, mixDir(AP.RUlow, ru, a), w); pointBone(B.RF, B.RH, mixDir(AP.RFlow, rf, a), w);
     // the bow sits in the left hand, the string follows the right hand while drawing

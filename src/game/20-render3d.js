@@ -42,7 +42,8 @@
     if (G3.pano) G3.pano.position.set(c.position.x, 0, c.position.z);
     // hero
     // spearman batyr poses in the menu, the archer batyr fights; the procedural hero is the fallback
-    if (G3.models.batyr && !G3.heroSpear) { G3.heroSpear = makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
+    // the menu batyr: the owner's rigged comic warrior with his dances (assets/batyr.js); an older static model still works
+    if (G3.models.batyr && !G3.heroSpear) { const rigged = (G3.models.batyr.userData.clips || []).length > 0; G3.heroSpear = rigged ? makeBatyrRig(G3.models.batyr, true) : makeBatyr(G3.models.batyr, false); G3.dyn.add(G3.heroSpear.g); }
     if (G3.models.hero && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.hero, true); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_rig && !G3.heroBow) { G3.heroBow = makeBatyrRig(G3.models.batyr_rig); G3.dyn.add(G3.heroBow.g); }
     if (G3.models.batyr_bow && !G3.heroBow) { G3.heroBow = makeBatyr(G3.models.batyr_bow, true); G3.dyn.add(G3.heroBow.g); }
@@ -55,7 +56,7 @@
     if (menu) {
       hm.g.visible = !!G3.heroSpear; hm.g.position.set(0, 0.2, 1.4); hm.g.scale.setScalar(1);
       hm.g.rotation.y = -(Math.PI / 2 - 0.15);
-      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0, dt: fdt });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { menu: true, moving: false, pull: 0, dt: fdt, clip: menuAnimId() });
     } else {
       hm.g.visible = (hm.rig || scene !== 'dead') && !(player.inv > 0 && player.hp > 0 && Math.floor(time * 20) % 2 === 0);
       hm.g.position.set(X3(player.x), 0, Z3(player.y)); hm.g.scale.setScalar(1.18);

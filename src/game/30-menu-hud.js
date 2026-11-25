@@ -291,6 +291,32 @@
     });
   }
 
+  // ---- the batyr's animations on the main screen (clips of the owner's rigged model); the pick is remembered
+  const MENU_ANIMS = [
+    { id: 'idle', name: { ru: 'Стойка', kz: 'Тұрыс', en: 'Stance' } },
+    { id: 'dance_05', name: { ru: 'Танец 1', kz: 'Би 1', en: 'Dance 1' } },
+    { id: 'dance_02', name: { ru: 'Танец 2', kz: 'Би 2', en: 'Dance 2' } },
+    { id: 'box_02', name: { ru: 'Бокс', kz: 'Бокс', en: 'Boxing' } },
+    { id: 'run', name: { ru: 'Бег', kz: 'Жүгіру', en: 'Run' } },
+  ];
+  const menuAnims = () => { const h = G3.heroSpear; return h && h.rig ? MENU_ANIMS.filter(a => h.act[a.id]) : []; };
+  function menuAnimId() { const l = menuAnims(), id = Save.data.settings.menuAnim; return (l.find(a => a.id === id) || l[0] || {}).id; }
+  function drawAnimSwitch(y) {
+    const l = menuAnims(); if (l.length < 2) return;
+    const cur = Math.max(0, l.findIndex(a => a.id === menuAnimId())), x = 32, r = 21, down = isPressed(x - 26, y - 26, 52, 70);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r * (down ? 0.94 : 1), 0, TAU); ctx.fillStyle = 'rgba(8,11,18,0.74)'; ctx.fill();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = T.gold; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r - 4, 0, TAU); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(220,183,94,0.35)'; ctx.stroke();
+    ctx.restore();
+    icoNote(x - 1, y, 17, T.goldLt || T.gold);
+    // which clip, and dots for how many there are
+    const nm = l[cur].name[lang] || l[cur].name.ru;
+    txt(nm, x, y + r + 11, fitText(nm, 62, 10, 700), T.text, { weight: 700, shadow: 'rgba(0,0,0,0.9)', blur: 5, dy: 0 });
+    l.forEach((_, i) => { ctx.beginPath(); ctx.arc(x - (l.length - 1) * 3.5 + i * 7, y + r + 22, i === cur ? 2.2 : 1.5, 0, TAU); ctx.fillStyle = i === cur ? T.gold : 'rgba(255,236,200,0.4)'; ctx.fill(); });
+    ui.push({ x: x - 26, y: y - 26, w: 56, h: 74, fn: () => { Sound.init(); Sound.click(); Save.data.settings.menuAnim = l[(cur + 1) % l.length].id; Save.write(); } });
+  }
+
   // ---- Battle tab: logo, PLAY, hint, record
   function drawFightTab() {
     const top = SAFE.t;
@@ -306,6 +332,7 @@
     }
     // ornament knot above the button
     diamond(W / 2, py - 9, 7); diamond(W / 2, py - 9, 3, '#151b28');
+    drawAnimSwitch(Math.round((top + 250 + extra * 30 + py) / 2));
     button(px, py, pw, ph, tr('play'), () => { Sound.init(); Sound.click(); startGame(); },
       { shape: 'hex', size: 22, icon: (x, y, s, c) => icoSwords(x, y, s * 0.95, c), sub: '⚡' + RUN_COST });
     // sheen sweeping across the plate
