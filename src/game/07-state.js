@@ -42,6 +42,20 @@
     newRun(mode);
   }
 
+  // ---- resuming a story run: phones sometimes reload the page (memory), so the run is saved at the start of every room
+  function snapRun() {
+    if (SIM.on || !run || run.mode !== 'story' || run.room < 2 || run.room > TOTAL_ROOMS) return;
+    Save.data.runSnap = { room: run.room, level: run.level, xp: run.xp, kills: run.kills, coins: run.coins, gems: run.gems, sk: Object.assign({}, run.sk), bombs: run.bombs,
+      bossKills: run.bossKills, t: run.t, revived: !!run.revived, hp: player.hp, maxHp: player.maxHp, crit: player.crit, critMul: player.critMul, at: Date.now() };
+    Save.write();
+  }
+  function resumeRun() {
+    const s = Save.data.runSnap; if (!s) return;
+    newRun('story');
+    Object.assign(run, { room: s.room, level: s.level, xp: s.xp, kills: s.kills, coins: s.coins, gems: s.gems, sk: Object.assign({}, s.sk), bombs: s.bombs, bossKills: s.bossKills, t: s.t, revived: s.revived, pendingLv: 0 });
+    Object.assign(player, { maxHp: s.maxHp, hp: Math.max(1, Math.min(s.hp, s.maxHp)), crit: s.crit, critMul: s.critMul });
+    buildRoom(s.room);
+  }
   function newRun(mode) {
     const S = statsTotal();   // talents + equipped gear
     const maxHp = Math.round(150 * (1 + S.hp));

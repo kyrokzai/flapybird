@@ -332,6 +332,12 @@
     }
     // ornament knot above the button
     diamond(W / 2, py - 9, 7); diamond(W / 2, py - 9, 3, '#151b28');
+    // an unfinished story run (the page was reloaded mid-run): carry on from the room it was in
+    const snap = Save.data.runSnap;
+    if (snap && snap.room > 1 && snap.room <= TOTAL_ROOMS) {
+      const cw = 236, cx = (W - cw) / 2 + 6, cy = py - 62;
+      button(cx, cy, cw, 42, mt('resume', snap.room), () => { Sound.init(); Sound.click(); resumeRun(); }, { col: '#2f6a3a', col2: '#143018', size: 14, icon: (x, y, s, c) => icoSwords(x, y, s * 0.85, c) });
+    }
     drawAnimSwitch(Math.round((top + 250 + extra * 30 + py) / 2));
     button(px, py, pw, ph, tr('play'), () => { Sound.init(); Sound.click(); startGame(); },
       { shape: 'hex', size: 22, icon: (x, y, s, c) => icoSwords(x, y, s * 0.95, c), sub: '⚡' + RUN_COST });

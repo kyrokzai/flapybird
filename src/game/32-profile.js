@@ -53,6 +53,7 @@
   function recordRun(won) {
     if (SIM.on || !run || run.recorded) return;
     run.recorded = true;
+    if (run.mode !== 'survival') Save.data.runSnap = null;   // the run is over: nothing to resume
     const st = Save.data.stats;
     st.runs++; if (won) st.wins++;
     if (isSurv()) { st.arenaRuns++; if (won) st.arenaWins++; } else if (won && !run.revived) st.noRevWins++;

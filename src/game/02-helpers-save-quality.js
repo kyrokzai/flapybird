@@ -1,6 +1,6 @@
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 6;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 7;
   const Save = {
     data: null,
     defaults() {
@@ -18,6 +18,7 @@
         ach: {}, frames: ['gold'], pass: { season: 1, start: 0, claimed: [] }, introSeen: false,
         glory: 0,
         tickets: { n: 1, day: '' },
+        runSnap: null,   // the story run as it was at the start of its current room (resumed after the page reloads)
       };
     },
     load() {
@@ -54,6 +55,8 @@
       // v5 → v6: achievements, frames, season pass (counts glory from now on), comic intro flag
       if ((d.v || 0) < 6) { out.pass.start = out.glory || 0; if (!Array.isArray(out.frames)) out.frames = ['gold']; if (out.gear.items.some(i => i.r >= 3)) out.stats.legend = 1; }
       if ((d.v || 0) < 5) { out.glory = (d.best || 0) * 25 + (out.bestWave || 0) * 18; out.stats.rooms = Math.max(0, (d.best || 1) - 1); }
+      // v6 → v7: a snapshot of the unfinished story run
+      if ((d.v || 0) < 7) out.runSnap = null;
       out.v = SAVE_VERSION;
       return out;
     },

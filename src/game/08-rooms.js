@@ -31,6 +31,7 @@
     player.x = W / 2; player.y = AY2 - 30; player.volleys = []; player.fireCd = 0.4;
     // supply crate: one per room
     { const sp = freeSpotAwayFromPlayer(110); crates.push({ x: sp.x, y: sp.y }); }
+    snapRun();
     player.eagle.x = player.x - 20; player.eagle.y = player.y - 30;
     G3.dirty = true; flowT = 0;
     const boss = enemies.find(e => e.boss);

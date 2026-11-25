@@ -316,6 +316,7 @@
       new THREE.TextureLoader().load(window[key], tex => {
         window[key] = null;
         tex.encoding = THREE.sRGBEncoding; tex.mapping = THREE.EquirectangularReflectionMapping;
+        tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;   // a backdrop: no mip chain (a third less GPU memory)
         G3.skyTex[name] = tex; G3.dirty = true; done && done();
       }, undefined, () => done && done());
     };
@@ -330,6 +331,8 @@
     }
     G3.pano.visible = !!tex; G3.sky.visible = !tex;
     if (!tex) return false;
+    // free the GPU copy of the previous room's sky (the image stays, it uploads again if that act comes back)
+    const prev = G3.pano.material.map; if (prev && prev !== tex && G3.skyTex.menu !== prev && !(G3.skyBlur && Object.values(G3.skyBlur).includes(prev))) prev.dispose();
     G3.pano.material.map = name === 'menu' ? blurredTex(tex, name) : tex; G3.pano.material.color.setScalar(name === 'menu' ? 0.62 : 1.35); G3.pano.material.needsUpdate = true;
     G3.pano.rotation.y = yaw || 0;
     const rt = G3.pmrem.fromEquirectangular(tex);

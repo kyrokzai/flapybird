@@ -88,7 +88,7 @@
 
   // =================================================================== helpers
   // one versioned save object; bump SAVE_VERSION and add a step in upgrade() when the format changes
-  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 6;
+  const SAVE_KEY = 'batyr01.save', SAVE_VERSION = 7;
   const Save = {
     data: null,
     defaults() {
@@ -106,6 +106,7 @@
         ach: {}, frames: ['gold'], pass: { season: 1, start: 0, claimed: [] }, introSeen: false,
         glory: 0,
         tickets: { n: 1, day: '' },
+        runSnap: null,   // the story run as it was at the start of its current room (resumed after the page reloads)
       };
     },
     load() {
@@ -142,6 +143,8 @@
       // v5 → v6: achievements, frames, season pass (counts glory from now on), comic intro flag
       if ((d.v || 0) < 6) { out.pass.start = out.glory || 0; if (!Array.isArray(out.frames)) out.frames = ['gold']; if (out.gear.items.some(i => i.r >= 3)) out.stats.legend = 1; }
       if ((d.v || 0) < 5) { out.glory = (d.best || 0) * 25 + (out.bestWave || 0) * 18; out.stats.rooms = Math.max(0, (d.best || 1) - 1); }
+      // v6 → v7: a snapshot of the unfinished story run
+      if ((d.v || 0) < 7) out.runSnap = null;
       out.v = SAVE_VERSION;
       return out;
     },
@@ -194,7 +197,7 @@
       again: 'ЕЩЁ РАЗ', menu: 'В меню',
       upAtk: 'Сила', upAtkD: 'Атака +8%', upHp: 'Здоровье', upHpD: 'Здоровье +10%', lvl: 'ур.', max: 'МАКС',
       clear: 'КОМНАТА ЗАЧИЩЕНА!', clearSub: 'Идите к воротам', blocked: 'Блок!', loading: 'Загрузка…',
-      best: 'Рекорд: комната {n} / 15', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
+      best: 'Рекорд: комната {n} / 20', hint: 'Двигайтесь пальцем · стойте, чтобы стрелять',
       graphics: 'Графика', qauto: 'Авто', qlow: 'Низкая', qmedium: 'Средняя', qhigh: 'Высокая',
       revive: 'ВОСКРЕСНУТЬ?', reviveText: 'Батыр ещё может подняться!', reviveBtn: 'ВОСКРЕСНУТЬ · {n} ₸', reviveNeed: 'Нужно {n} ₸', reviveNo: 'Отказаться',
     },
@@ -210,7 +213,7 @@
       again: 'ТАҒЫ ДА', menu: 'Мәзір',
       upAtk: 'Күш', upAtkD: 'Шабуыл +8%', upHp: 'Денсаулық', upHpD: 'Денсаулық +10%', lvl: 'дең.', max: 'МАКС',
       clear: 'БӨЛМЕ ТАЗАРТЫЛДЫ!', clearSub: 'Қақпаға барыңыз', blocked: 'Қорғалды!', loading: 'Жүктелуде…',
-      best: 'Рекорд: {n}-бөлме / 15', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
+      best: 'Рекорд: {n}-бөлме / 20', hint: 'Саусақпен жүріңіз · тоқтасаңыз, атасыз',
       graphics: 'Графика', qauto: 'Авто', qlow: 'Төмен', qmedium: 'Орта', qhigh: 'Жоғары',
       revive: 'ҚАЙТА ТҰРУ?', reviveText: 'Батыр әлі де тұра алады!', reviveBtn: 'ҚАЙТА ТҰРУ · {n} ₸', reviveNeed: '{n} ₸ керек', reviveNo: 'Бас тарту',
     },
@@ -226,7 +229,7 @@
       again: 'PLAY AGAIN', menu: 'Menu',
       upAtk: 'Might', upAtkD: 'Attack +8%', upHp: 'Health', upHpD: 'Health +10%', lvl: 'lv.', max: 'MAX',
       clear: 'ROOM CLEARED!', clearSub: 'Head to the gate', blocked: 'Blocked!', loading: 'Loading…',
-      best: 'Best: room {n} / 15', hint: 'Drag to move · stand still to shoot',
+      best: 'Best: room {n} / 20', hint: 'Drag to move · stand still to shoot',
       graphics: 'Graphics', qauto: 'Auto', qlow: 'Low', qmedium: 'Medium', qhigh: 'High',
       revive: 'REVIVE?', reviveText: 'The batyr can still rise!', reviveBtn: 'REVIVE · {n} ₸', reviveNeed: 'Need {n} ₸', reviveNo: 'No thanks',
     },
@@ -788,6 +791,20 @@
     newRun(mode);
   }
 
+  // ---- resuming a story run: phones sometimes reload the page (memory), so the run is saved at the start of every room
+  function snapRun() {
+    if (SIM.on || !run || run.mode !== 'story' || run.room < 2 || run.room > TOTAL_ROOMS) return;
+    Save.data.runSnap = { room: run.room, level: run.level, xp: run.xp, kills: run.kills, coins: run.coins, gems: run.gems, sk: Object.assign({}, run.sk), bombs: run.bombs,
+      bossKills: run.bossKills, t: run.t, revived: !!run.revived, hp: player.hp, maxHp: player.maxHp, crit: player.crit, critMul: player.critMul, at: Date.now() };
+    Save.write();
+  }
+  function resumeRun() {
+    const s = Save.data.runSnap; if (!s) return;
+    newRun('story');
+    Object.assign(run, { room: s.room, level: s.level, xp: s.xp, kills: s.kills, coins: s.coins, gems: s.gems, sk: Object.assign({}, s.sk), bombs: s.bombs, bossKills: s.bossKills, t: s.t, revived: s.revived, pendingLv: 0 });
+    Object.assign(player, { maxHp: s.maxHp, hp: Math.max(1, Math.min(s.hp, s.maxHp)), crit: s.crit, critMul: s.critMul });
+    buildRoom(s.room);
+  }
   function newRun(mode) {
     const S = statsTotal();   // talents + equipped gear
     const maxHp = Math.round(150 * (1 + S.hp));
@@ -838,6 +855,7 @@
     player.x = W / 2; player.y = AY2 - 30; player.volleys = []; player.fireCd = 0.4;
     // supply crate: one per room
     { const sp = freeSpotAwayFromPlayer(110); crates.push({ x: sp.x, y: sp.y }); }
+    snapRun();
     player.eagle.x = player.x - 20; player.eagle.y = player.y - 30;
     G3.dirty = true; flowT = 0;
     const boss = enemies.find(e => e.boss);
@@ -2337,6 +2355,7 @@
       new THREE.TextureLoader().load(window[key], tex => {
         window[key] = null;
         tex.encoding = THREE.sRGBEncoding; tex.mapping = THREE.EquirectangularReflectionMapping;
+        tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;   // a backdrop: no mip chain (a third less GPU memory)
         G3.skyTex[name] = tex; G3.dirty = true; done && done();
       }, undefined, () => done && done());
     };
@@ -2351,6 +2370,8 @@
     }
     G3.pano.visible = !!tex; G3.sky.visible = !tex;
     if (!tex) return false;
+    // free the GPU copy of the previous room's sky (the image stays, it uploads again if that act comes back)
+    const prev = G3.pano.material.map; if (prev && prev !== tex && G3.skyTex.menu !== prev && !(G3.skyBlur && Object.values(G3.skyBlur).includes(prev))) prev.dispose();
     G3.pano.material.map = name === 'menu' ? blurredTex(tex, name) : tex; G3.pano.material.color.setScalar(name === 'menu' ? 0.62 : 1.35); G3.pano.material.needsUpdate = true;
     G3.pano.rotation.y = yaw || 0;
     const rt = G3.pmrem.fromEquirectangular(tex);
@@ -4759,8 +4780,8 @@
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !TEST_MODE) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* sandboxed frame */ } }
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'hero', 'horse', 'yurt', 'balbal', 'stp_palisade', 'stp_torch', 'stp_banner', 'stp_gate', 'stp_yurtbig', 'stp_boulder', 'stp_menhir', 'stp_tamga', 'stp_cart', 'stp_deadtree', 'stp_bush', 'stp_skull', 'stp_bones', 'stp_wheel', 'stp_cauldron', 'prop_gate', 'prop_hedge', 'prop_chest', 'prop_birch', 'prop_tree', 'civ_woman', 'prop_fence', 'prop_lamp', 'lm_portal', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
-    'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
+  // QARATUN: only what the steppe, the menu and the arena show (the old city props stay in assets/ but are not loaded — memory on phones)
+  const LOAD_ORDER = ['batyr', 'hero', 'horse', 'yurt', 'balbal', 'stp_palisade', 'stp_torch', 'stp_banner', 'stp_gate', 'stp_yurtbig', 'stp_boulder', 'stp_menhir', 'stp_tamga', 'stp_cart', 'stp_deadtree', 'stp_bush', 'stp_skull', 'stp_bones', 'stp_wheel', 'stp_cauldron', 'prop_gate', 'prop_chest', 'prop_birch', 'lm_portal', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty', 'mystan', 'dau', 'lm_akorda', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
   const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'hero'], ['i', 'icons'], ['c', 'comic'], ['a', 'music_menu'], ['a', 'sfx'],
     ['sky', 'steppe_gold'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'steppe_night'], ['sky', 'steppe_blood'], ['sky', 'steppe_dark'], ['sky', 'street'], ...LOAD_ORDER.filter(n => !['batyr', 'hero', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
@@ -5135,21 +5156,21 @@
       equip: 'НАДЕТЬ', unequip: 'СНЯТЬ', upgrade: 'УЛУЧШИТЬ', merge: 'ОБЪЕДИНИТЬ 3 → {n}', needMerge: 'Для объединения нужно 3 одинаковых', ok: 'ОТЛИЧНО',
       daily: 'Ежедневная награда', day: 'День {n}', claim: 'ЗАБРАТЬ', claimed: 'Получено', questsToday: 'Задания на сегодня', allQuests: 'Все задания: сундук + 20',
       shop: 'Лавка', chest: 'Сундук', energyPlus: 'Энергия +20', noEnergy: 'Мало энергии', nextEnergy: '+1 энергия через {n}', rewards: 'Награды',
-      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Восстание древнего зла', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', install: 'Установить на телефон', wavesDone: 'Отбито волн', installTitle: 'Установить игру', inst_chrome: 'Нажмите меню ⋮ вверху справа в Chrome|Выберите «Установить приложение» или «Добавить на главный экран»|Подтвердите «Установить» — значок QARATUN появится на экране', inst_samsung: 'Нажмите меню ≡ внизу справа|Выберите «Добавить страницу на» → «Главный экран»|Значок QARATUN появится на экране', inst_ios: 'Откройте игру в Safari|Нажмите «Поделиться» (квадрат со стрелкой)|Выберите «На экран Домой» → «Добавить»', inst_inapp: 'Вы открыли игру внутри мессенджера|Нажмите ⋮ и выберите «Открыть в Chrome»|В Chrome нажмите эту кнопку ещё раз', defaultName: 'Батыр', profile: 'Профиль', rating: 'Рейтинг', glory: 'славы', tapAvatar: 'нажмите, чтобы сменить', rename: 'ИМЯ', enterName: 'Имя батыра (до 16 букв)', toNext: 'ещё {n}', you: 'вы', stRuns: 'Забегов', stWins: 'Побед', stKills: 'Врагов повержено', stBosses: 'Боссов', stRooms: 'Комнат пройдено', stCoins: 'Монет собрано', stBest: 'Лучшая глава', stWave: 'Лучшая волна', stArena: 'Арен сыграно', stTime: 'Время в игре', hShort: 'ч', mShort: 'мин', ratingNote: 'Слава копится за каждый забег. Обгоните героев эпоса! Таблица с друзьями появится в онлайн-версии.', tickets: 'Билеты на арену', ticket: 'билет', ticketHow: 'Один билет — каждый день бесплатно, ещё по одному за каждого босса в главе и за все ежедневные задания.', buyTicket: 'Билет', arenaLocked: 'Арена откроется после победы над Дәу', arenaWin: 'АРЕНА ПОКОРЕНА!', arenaWinText: 'Батыр выстоял все 3 минуты', tabPass: 'Жол', pass: 'Жол', season: 'сезон', passNext: 'ещё {n} славы до следующей награды', passDone: 'Все награды сезона открыты!', claimAll: 'ЗАБРАТЬ ВСЁ', newSeason: 'НОВЫЙ СЕЗОН', achievements: 'Достижения', frame: 'РАМКА', intro: 'ИСТОРИЯ', next: 'Далее', toBattle: 'В БОЙ!', skip: 'Пропустить', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
+      noChest: 'Дойдите до 5-й комнаты, чтобы получить сундук', tutMove: 'Проведите пальцем — батыр пойдёт', tutStop: 'Остановитесь — батыр стреляет сам!', tutGood: 'Отлично! Зачистите комнату', tagline: 'Восстание древнего зла', resume: 'Продолжить · комната {n}', wave: 'Волна', sec: 'с', survival: 'Арена выживания', survSub: 'волны без конца', arena: 'АРЕНА', waveClear: 'ВОЛНА ОТБИТА!', waveClearSub: 'Монеты на поле — соберите', arenaName: 'Астана Арена · выживание', arenaRec: 'арена: волна {n}', noChestSurv: 'Каждые 5 волн — сундук', install: 'Установить на телефон', wavesDone: 'Отбито волн', installTitle: 'Установить игру', inst_chrome: 'Нажмите меню ⋮ вверху справа в Chrome|Выберите «Установить приложение» или «Добавить на главный экран»|Подтвердите «Установить» — значок QARATUN появится на экране', inst_samsung: 'Нажмите меню ≡ внизу справа|Выберите «Добавить страницу на» → «Главный экран»|Значок QARATUN появится на экране', inst_ios: 'Откройте игру в Safari|Нажмите «Поделиться» (квадрат со стрелкой)|Выберите «На экран Домой» → «Добавить»', inst_inapp: 'Вы открыли игру внутри мессенджера|Нажмите ⋮ и выберите «Открыть в Chrome»|В Chrome нажмите эту кнопку ещё раз', defaultName: 'Батыр', profile: 'Профиль', rating: 'Рейтинг', glory: 'славы', tapAvatar: 'нажмите, чтобы сменить', rename: 'ИМЯ', enterName: 'Имя батыра (до 16 букв)', toNext: 'ещё {n}', you: 'вы', stRuns: 'Забегов', stWins: 'Побед', stKills: 'Врагов повержено', stBosses: 'Боссов', stRooms: 'Комнат пройдено', stCoins: 'Монет собрано', stBest: 'Лучшая глава', stWave: 'Лучшая волна', stArena: 'Арен сыграно', stTime: 'Время в игре', hShort: 'ч', mShort: 'мин', ratingNote: 'Слава копится за каждый забег. Обгоните героев эпоса! Таблица с друзьями появится в онлайн-версии.', tickets: 'Билеты на арену', ticket: 'билет', ticketHow: 'Один билет — каждый день бесплатно, ещё по одному за каждого босса в главе и за все ежедневные задания.', buyTicket: 'Билет', arenaLocked: 'Арена откроется после победы над Дәу', arenaWin: 'АРЕНА ПОКОРЕНА!', arenaWinText: 'Батыр выстоял все 3 минуты', tabPass: 'Жол', pass: 'Жол', season: 'сезон', passNext: 'ещё {n} славы до следующей награды', passDone: 'Все награды сезона открыты!', claimAll: 'ЗАБРАТЬ ВСЁ', newSeason: 'НОВЫЙ СЕЗОН', achievements: 'Достижения', frame: 'РАМКА', intro: 'ИСТОРИЯ', next: 'Далее', toBattle: 'В БОЙ!', skip: 'Пропустить', emptySlot: 'пусто', equipped: 'надето', bagFull: 'Сумка полна', none: 'Пока ничего', newItem: 'Новый предмет!', wait: 'Подождать',
     },
     kz: {
       tabFight: 'Шайқас', tabGear: 'Жабдық', tabTalents: 'Таланттар', tabQuests: 'Тапсырмалар', bag: 'Қоржын', bonuses: 'Жабдық пен таланттар бонусы',
       equip: 'КИЮ', unequip: 'ШЕШУ', upgrade: 'ЖАҚСАРТУ', merge: '3 → {n} БІРІКТІРУ', needMerge: 'Біріктіру үшін 3 бірдей зат керек', ok: 'ТАМАША',
       daily: 'Күнделікті сыйлық', day: '{n}-күн', claim: 'АЛУ', claimed: 'Алынды', questsToday: 'Бүгінгі тапсырмалар', allQuests: 'Барлық тапсырма: сандық + 20',
       shop: 'Дүкен', chest: 'Сандық', energyPlus: 'Қуат +20', noEnergy: 'Қуат аз', nextEnergy: '+1 қуат {n} кейін', rewards: 'Сыйлықтар',
-      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Ежелгі зұлымдық оянды', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', install: 'Телефонға орнату', wavesDone: 'Тойтарылған толқын', installTitle: 'Ойынды орнату', inst_chrome: 'Chrome-да жоғарғы оң жақтағы ⋮ мәзірін басыңыз|«Қолданбаны орнату» немесе «Басты экранға қосу» таңдаңыз|«Орнату» басыңыз — QARATUN белгішесі экранда пайда болады', inst_samsung: 'Төменгі оң жақтағы ≡ мәзірін басыңыз|«Бетті қосу» → «Басты экран» таңдаңыз|QARATUN белгішесі экранда пайда болады', inst_ios: 'Ойынды Safari-де ашыңыз|«Бөлісу» батырмасын басыңыз|«Басты экранға» → «Қосу» таңдаңыз', inst_inapp: 'Ойын мессенджер ішінде ашылған|⋮ басып, «Chrome-да ашу» таңдаңыз|Chrome-да осы батырманы қайта басыңыз', defaultName: 'Батыр', profile: 'Профиль', rating: 'Рейтинг', glory: 'даңқ', tapAvatar: 'ауыстыру үшін басыңыз', rename: 'ЕСІМ', enterName: 'Батыр есімі (16 әріпке дейін)', toNext: 'тағы {n}', you: 'сіз', stRuns: 'Жорықтар', stWins: 'Жеңістер', stKills: 'Жеңілген жаулар', stBosses: 'Бастар', stRooms: 'Өтілген бөлмелер', stCoins: 'Жиналған тиын', stBest: 'Үздік тарау', stWave: 'Үздік толқын', stArena: 'Ареналар', stTime: 'Ойын уақыты', hShort: 'сағ', mShort: 'мин', ratingNote: 'Даңқ әр жорықта жиналады. Эпос батырларын озыңыз! Достармен кесте онлайн нұсқада болады.', tickets: 'Арена билеттері', ticket: 'билет', ticketHow: 'Күн сайын бір билет тегін, тағы біреуі — тараудағы әр басты жеңгені үшін және барлық күнделікті тапсырма үшін.', buyTicket: 'Билет', arenaLocked: 'Арена Дәуді жеңгеннен кейін ашылады', arenaWin: 'АРЕНА БАҒЫНДЫ!', arenaWinText: 'Батыр 3 минут бойы төтеп берді', tabPass: 'Жол', pass: 'Жол', season: 'маусым', passNext: 'келесі сыйлыққа тағы {n} даңқ', passDone: 'Маусымның барлық сыйлығы ашық!', claimAll: 'БӘРІН АЛУ', newSeason: 'ЖАҢА МАУСЫМ', achievements: 'Жетістіктер', frame: 'ЖАҚТАУ', intro: 'ТАРИХ', next: 'Әрі қарай', toBattle: 'ШАЙҚАСҚА!', skip: 'Өткізу', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
+      noChest: 'Сандық алу үшін 5-бөлмеге жетіңіз', tutMove: 'Саусақпен жүргізіңіз — батыр жүреді', tutStop: 'Тоқтаңыз — батыр өзі атады!', tutGood: 'Тамаша! Бөлмені тазартыңыз', tagline: 'Ежелгі зұлымдық оянды', resume: 'Жалғастыру · {n}-бөлме', wave: 'Толқын', sec: 'с', survival: 'Тірі қалу аренасы', survSub: 'шексіз толқындар', arena: 'АРЕНА', waveClear: 'ТОЛҚЫН ТОЙТАРЫЛДЫ!', waveClearSub: 'Алаңдағы тиындарды жинаңыз', arenaName: 'Астана Арена · тірі қалу', arenaRec: 'арена: {n}-толқын', noChestSurv: 'Әр 5 толқын — сандық', install: 'Телефонға орнату', wavesDone: 'Тойтарылған толқын', installTitle: 'Ойынды орнату', inst_chrome: 'Chrome-да жоғарғы оң жақтағы ⋮ мәзірін басыңыз|«Қолданбаны орнату» немесе «Басты экранға қосу» таңдаңыз|«Орнату» басыңыз — QARATUN белгішесі экранда пайда болады', inst_samsung: 'Төменгі оң жақтағы ≡ мәзірін басыңыз|«Бетті қосу» → «Басты экран» таңдаңыз|QARATUN белгішесі экранда пайда болады', inst_ios: 'Ойынды Safari-де ашыңыз|«Бөлісу» батырмасын басыңыз|«Басты экранға» → «Қосу» таңдаңыз', inst_inapp: 'Ойын мессенджер ішінде ашылған|⋮ басып, «Chrome-да ашу» таңдаңыз|Chrome-да осы батырманы қайта басыңыз', defaultName: 'Батыр', profile: 'Профиль', rating: 'Рейтинг', glory: 'даңқ', tapAvatar: 'ауыстыру үшін басыңыз', rename: 'ЕСІМ', enterName: 'Батыр есімі (16 әріпке дейін)', toNext: 'тағы {n}', you: 'сіз', stRuns: 'Жорықтар', stWins: 'Жеңістер', stKills: 'Жеңілген жаулар', stBosses: 'Бастар', stRooms: 'Өтілген бөлмелер', stCoins: 'Жиналған тиын', stBest: 'Үздік тарау', stWave: 'Үздік толқын', stArena: 'Ареналар', stTime: 'Ойын уақыты', hShort: 'сағ', mShort: 'мин', ratingNote: 'Даңқ әр жорықта жиналады. Эпос батырларын озыңыз! Достармен кесте онлайн нұсқада болады.', tickets: 'Арена билеттері', ticket: 'билет', ticketHow: 'Күн сайын бір билет тегін, тағы біреуі — тараудағы әр басты жеңгені үшін және барлық күнделікті тапсырма үшін.', buyTicket: 'Билет', arenaLocked: 'Арена Дәуді жеңгеннен кейін ашылады', arenaWin: 'АРЕНА БАҒЫНДЫ!', arenaWinText: 'Батыр 3 минут бойы төтеп берді', tabPass: 'Жол', pass: 'Жол', season: 'маусым', passNext: 'келесі сыйлыққа тағы {n} даңқ', passDone: 'Маусымның барлық сыйлығы ашық!', claimAll: 'БӘРІН АЛУ', newSeason: 'ЖАҢА МАУСЫМ', achievements: 'Жетістіктер', frame: 'ЖАҚТАУ', intro: 'ТАРИХ', next: 'Әрі қарай', toBattle: 'ШАЙҚАСҚА!', skip: 'Өткізу', emptySlot: 'бос', equipped: 'киілген', bagFull: 'Қоржын толы', none: 'Әзірге ештеңе жоқ', newItem: 'Жаңа зат!', wait: 'Күту',
     },
     en: {
       tabFight: 'Battle', tabGear: 'Gear', tabTalents: 'Talents', tabQuests: 'Quests', bag: 'Bag', bonuses: 'Gear and talent bonuses',
       equip: 'EQUIP', unequip: 'UNEQUIP', upgrade: 'UPGRADE', merge: 'MERGE 3 → {n}', needMerge: 'Merging needs 3 identical items', ok: 'GREAT',
       daily: 'Daily reward', day: 'Day {n}', claim: 'CLAIM', claimed: 'Claimed', questsToday: "Today's quests", allQuests: 'All quests: chest + 20',
       shop: 'Shop', chest: 'Chest', energyPlus: 'Energy +20', noEnergy: 'Not enough energy', nextEnergy: '+1 energy in {n}', rewards: 'Rewards',
-      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Rise of the ancient evil', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', install: 'Install the app', wavesDone: 'Waves survived', installTitle: 'Install the game', inst_chrome: 'Tap the ⋮ menu at the top right in Chrome|Choose “Install app” or “Add to Home screen”|Confirm “Install” — the QARATUN icon appears on your screen', inst_samsung: 'Tap the ≡ menu at the bottom right|Choose “Add page to” → “Home screen”|The QARATUN icon appears on your screen', inst_ios: 'Open the game in Safari|Tap Share (the square with an arrow)|Choose “Add to Home Screen” → “Add”', inst_inapp: 'The game is open inside a messenger|Tap ⋮ and choose “Open in Chrome”|In Chrome, tap this button again', defaultName: 'Batyr', profile: 'Profile', rating: 'Rating', glory: 'glory', tapAvatar: 'tap to change', rename: 'NAME', enterName: 'Batyr name (up to 16 letters)', toNext: '{n} more', you: 'you', stRuns: 'Runs', stWins: 'Wins', stKills: 'Monsters slain', stBosses: 'Bosses', stRooms: 'Rooms cleared', stCoins: 'Coins collected', stBest: 'Best chapter', stWave: 'Best wave', stArena: 'Arenas played', stTime: 'Time played', hShort: 'h', mShort: 'min', ratingNote: 'Glory builds up with every run. Overtake the heroes of the epics! A table with friends comes with the online version.', tickets: 'Arena tickets', ticket: 'ticket', ticketHow: 'One free ticket every day, plus one for each boss in the chapter and one for finishing all daily quests.', buyTicket: 'Ticket', arenaLocked: 'The arena opens after you defeat Dau', arenaWin: 'ARENA CONQUERED!', arenaWinText: 'The batyr held out for all 3 minutes', tabPass: 'Road', pass: 'Road', season: 'season', passNext: '{n} glory to the next reward', passDone: 'All season rewards unlocked!', claimAll: 'CLAIM ALL', newSeason: 'NEW SEASON', achievements: 'Achievements', frame: 'FRAME', intro: 'STORY', next: 'Next', toBattle: 'TO BATTLE!', skip: 'Skip', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
+      noChest: 'Reach room 5 to earn a chest', tutMove: 'Swipe to move the batyr', tutStop: 'Stop — the batyr shoots by himself!', tutGood: 'Great! Clear the room', tagline: 'Rise of the ancient evil', resume: 'Continue · room {n}', wave: 'Wave', sec: 's', survival: 'Survival Arena', survSub: 'endless waves', arena: 'ARENA', waveClear: 'WAVE CLEARED!', waveClearSub: 'Coins on the pitch — grab them', arenaName: 'Astana Arena · survival', arenaRec: 'arena: wave {n}', noChestSurv: 'A chest every 5 waves', install: 'Install the app', wavesDone: 'Waves survived', installTitle: 'Install the game', inst_chrome: 'Tap the ⋮ menu at the top right in Chrome|Choose “Install app” or “Add to Home screen”|Confirm “Install” — the QARATUN icon appears on your screen', inst_samsung: 'Tap the ≡ menu at the bottom right|Choose “Add page to” → “Home screen”|The QARATUN icon appears on your screen', inst_ios: 'Open the game in Safari|Tap Share (the square with an arrow)|Choose “Add to Home Screen” → “Add”', inst_inapp: 'The game is open inside a messenger|Tap ⋮ and choose “Open in Chrome”|In Chrome, tap this button again', defaultName: 'Batyr', profile: 'Profile', rating: 'Rating', glory: 'glory', tapAvatar: 'tap to change', rename: 'NAME', enterName: 'Batyr name (up to 16 letters)', toNext: '{n} more', you: 'you', stRuns: 'Runs', stWins: 'Wins', stKills: 'Monsters slain', stBosses: 'Bosses', stRooms: 'Rooms cleared', stCoins: 'Coins collected', stBest: 'Best chapter', stWave: 'Best wave', stArena: 'Arenas played', stTime: 'Time played', hShort: 'h', mShort: 'min', ratingNote: 'Glory builds up with every run. Overtake the heroes of the epics! A table with friends comes with the online version.', tickets: 'Arena tickets', ticket: 'ticket', ticketHow: 'One free ticket every day, plus one for each boss in the chapter and one for finishing all daily quests.', buyTicket: 'Ticket', arenaLocked: 'The arena opens after you defeat Dau', arenaWin: 'ARENA CONQUERED!', arenaWinText: 'The batyr held out for all 3 minutes', tabPass: 'Road', pass: 'Road', season: 'season', passNext: '{n} glory to the next reward', passDone: 'All season rewards unlocked!', claimAll: 'CLAIM ALL', newSeason: 'NEW SEASON', achievements: 'Achievements', frame: 'FRAME', intro: 'STORY', next: 'Next', toBattle: 'TO BATTLE!', skip: 'Skip', emptySlot: 'empty', equipped: 'equipped', bagFull: 'Bag is full', none: 'Nothing yet', newItem: 'New item!', wait: 'Wait',
     },
   };
   const mt = (k, n) => { const s = MSTR[lang][k] || MSTR.ru[k] || k; return n === undefined ? s : s.replace('{n}', n); };
@@ -5981,6 +6002,12 @@
     }
     // ornament knot above the button
     diamond(W / 2, py - 9, 7); diamond(W / 2, py - 9, 3, '#151b28');
+    // an unfinished story run (the page was reloaded mid-run): carry on from the room it was in
+    const snap = Save.data.runSnap;
+    if (snap && snap.room > 1 && snap.room <= TOTAL_ROOMS) {
+      const cw = 236, cx = (W - cw) / 2 + 6, cy = py - 62;
+      button(cx, cy, cw, 42, mt('resume', snap.room), () => { Sound.init(); Sound.click(); resumeRun(); }, { col: '#2f6a3a', col2: '#143018', size: 14, icon: (x, y, s, c) => icoSwords(x, y, s * 0.85, c) });
+    }
     drawAnimSwitch(Math.round((top + 250 + extra * 30 + py) / 2));
     button(px, py, pw, ph, tr('play'), () => { Sound.init(); Sound.click(); startGame(); },
       { shape: 'hex', size: 22, icon: (x, y, s, c) => icoSwords(x, y, s * 0.95, c), sub: '⚡' + RUN_COST });
@@ -6359,6 +6386,7 @@
   function recordRun(won) {
     if (SIM.on || !run || run.recorded) return;
     run.recorded = true;
+    if (run.mode !== 'survival') Save.data.runSnap = null;   // the run is over: nothing to resume
     const st = Save.data.stats;
     st.runs++; if (won) st.wins++;
     if (isSurv()) { st.arenaRuns++; if (won) st.arenaWins++; } else if (won && !run.revived) st.noRevWins++;

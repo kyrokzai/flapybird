@@ -3,7 +3,7 @@
 import sys
 from PIL import Image, ImageFilter, ImageOps
 src, out, hz = sys.argv[1], sys.argv[2], float(sys.argv[3])
-W, H = 3072, 1536
+W, H = 2048, 1024
 half = W // 2
 im = Image.open(src).convert('RGB')
 ih = round(im.height * half / im.width)
