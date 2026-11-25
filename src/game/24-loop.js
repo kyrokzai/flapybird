@@ -31,8 +31,10 @@
     if (hitStop > 0) hitStop -= rdt / 1000;
     else { if (slowT > 0) slowT -= rdt / 1000; acc += rdt * (slowT > 0 ? 0.3 : 1); }
     while (acc >= DT * 1000) { update(DT); acc -= DT * 1000; }
-    render();
+    // anything that resizes the canvases runs before drawing: a resize wipes them, and a wiped canvas left until the next frame blinks black
     watchPerf(rdt); watchRes(rdt);
+    if (needResize) { needResize = false; resize(); }
+    render();
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); acc = 0; });

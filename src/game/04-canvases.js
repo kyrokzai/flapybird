@@ -22,8 +22,10 @@
     SAFE.b = Math.max(0, (parseFloat(cs.getPropertyValue('--sab')) || 0) - off) / scale;
     wrapEl.style.width = cssW + 'px'; wrapEl.style.height = cssH + 'px';
     for (const c of [canvas, glCanvas]) { c.style.width = cssW + 'px'; c.style.height = cssH + 'px'; }
-    canvas.width = Math.round(W * scale * dpr);
-    canvas.height = Math.round(H * scale * dpr);
+    // assigning a canvas size wipes it, even to the same value: only touch it when it really changes
+    const cw = Math.round(W * scale * dpr), ch = Math.round(H * scale * dpr);
+    if (canvas.width !== cw) canvas.width = cw;
+    if (canvas.height !== ch) canvas.height = ch;
     K = canvas.width / W;
     if (G3.cam && (oldH !== H || Math.abs(oldT - SAFE.t) > 0.5)) fitCamera();
     if (G3.r) {
@@ -36,11 +38,14 @@
       }
     }
   }
-  window.addEventListener('resize', () => resize());
+  // browser resizes (rotation, Safari bars) are applied at the start of the next frame, right before drawing,
+  // so the wiped canvases are never shown on screen (that was a black blink)
+  let needResize = false;
+  window.addEventListener('resize', () => { needResize = true; });
   // phones settle their viewport late (toolbars, notch, home-screen launch): measure again a little later
-  window.addEventListener('orientationchange', () => setTimeout(resize, 250));
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => resize());
-  window.addEventListener('pageshow', () => { setTimeout(resize, 300); setTimeout(resize, 1200); });
+  window.addEventListener('orientationchange', () => setTimeout(() => { needResize = true; }, 250));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { needResize = true; });
+  window.addEventListener('pageshow', () => { setTimeout(() => { needResize = true; }, 300); setTimeout(() => { needResize = true; }, 1200); });
 
   function rr(g, x, y, w, h, r) {
     g.beginPath();
