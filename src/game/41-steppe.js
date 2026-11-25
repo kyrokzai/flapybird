@@ -269,11 +269,11 @@
     line(-X, zN - 0.15, -X, zS + 0.15); line(X, zN - 0.15, X, zS + 0.15);
     // the owner's palisade sections laid along the lines (one instanced mesh per material), else coded stakes
     if (stpHas('palisade')) {
-      const segs = [], lay = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n2 = Math.max(1, Math.round(L / 1.55)); for (let i = 0; i < n2; i++) { const t = (i + 0.5) / n2; segs.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, ry: Math.abs(x1 - x0) > Math.abs(z1 - z0) ? Math.PI / 2 : 0, l: L / n2 * 1.03, h: 1.15 + rnd() * 0.12, w: 0.16 }); } };
+      const segs = [], lay = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n2 = Math.max(1, Math.round(L / 2.0)); for (let i = 0; i < n2; i++) { const t = (i + 0.5) / n2; segs.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, ry: Math.abs(x1 - x0) > Math.abs(z1 - z0) ? Math.PI / 2 : 0, l: L / n2 * 1.03, h: 1.15 + rnd() * 0.12, w: 0.16 }); } };
       lay(-X, zN - 0.15, -1.25, zN - 0.15); lay(1.25, zN - 0.15, X, zN - 0.15);
       lay(-X, zS + 0.15, pathXs - 0.75, zS + 0.15); lay(pathXs + 0.75, zS + 0.15, X, zS + 0.15);
       lay(-X, zN - 0.15, -X, zS + 0.15); lay(X, zN - 0.15, X, zS + 0.15);
-      R.add(propInstances('stp_palisade', segs));
+      { const pal = propInstances('stp_palisade', segs); pal.traverse(m => { if (m.isMesh) m.castShadow = QL === 'high'; }); R.add(pal); }
       places.length = 0;
     }
     // the stakes: shafts and sharpened tips, one instanced mesh each
@@ -328,15 +328,15 @@
       else if (k < 0.95 && stpHas('bones') && rnd() < 0.5) { o = stpModel('bones', 0.8 + rnd() * 0.4, 'w'); o.rotation.y = rnd() * TAU; }
       else if (k < 0.95) { const w = new THREE.Group(), wh = makeCartWheel(v); if (stpHas('wheel')) { wh.rotation.z = Math.PI / 2 - 0.12; wh.position.y = 0.06; } else { wh.rotation.x = -Math.PI / 2 + 0.15; wh.position.y = 0.05; } w.add(wh); w.rotation.y = rnd() * TAU; o = w; }
       else o = makeBush(v, rnd);
-      o.position.x = x; o.position.z = z; R.add(o);
+      o.position.x = x; o.position.z = z; o.traverse(m => { if (m.isMesh) m.castShadow = false; }); R.add(o);   // decor past the palisade casts no shadow (one render pass less for it)
     }
   }
   function steppeScenery(R, theme, n, zN, zS) {
     const rnd = mulberry32(n * 91 + 5), v = svar(theme);
     const dyn = steppeWalls(R, theme, zN, zS);
     steppePonds(R, theme, dyn);
-    steppeScatter(R, theme, rnd, -13, -4.9, zN - 9, zS + 12, Math.round(26 * Q.fx + 10), null);
-    steppeScatter(R, theme, rnd, 4.9, 13, zN - 9, zS + 12, Math.round(26 * Q.fx + 10), null);
+    steppeScatter(R, theme, rnd, -12, -4.9, zN - 9, zS + 12, Math.round(16 * Q.fx + 6), null);
+    steppeScatter(R, theme, rnd, 4.9, 12, zN - 9, zS + 12, Math.round(16 * Q.fx + 6), null);
     // eclipse: the cracks in the floor glow and pulse
     if (G3.stpCracks) {
       const m = new THREE.MeshBasicMaterial({ map: G3.stpCracks, color: col(STP.blood.glow), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });

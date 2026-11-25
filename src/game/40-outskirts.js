@@ -101,8 +101,8 @@
     if (isSteppe(theme)) {
       // the steppe runs on: scattered stones, bushes, skulls and yurts south and north of the palisade, dry grass at the entrance
       const avoid = (x, z) => Math.abs(x - pathX(z)) < 1.3 || (z < zN && Math.abs(x) < 3.2);
-      steppeScatter(R, theme, rnd, -13, 13, zS + 1, zS + 18, Math.round(30 * k + 8), avoid);
-      steppeScatter(R, theme, rnd, -13, 13, zN - 12, zN - 1.5, Math.round(16 * k + 4), avoid);
+      steppeScatter(R, theme, rnd, -12, 12, zS + 1, zS + 16, Math.round(18 * k + 6), avoid);
+      steppeScatter(R, theme, rnd, -12, 12, zN - 11, zN - 1.5, Math.round(10 * k + 3), avoid);
       const tn = STP[svar(theme)].tint, gf = makeGrassField(Math.round(380 * Q.grass), r2 => { const x = (r2() - 0.5) * 16, z = zS + 0.4 + r2() * 9; return Math.abs(x - pathX(z)) < 0.9 ? null : [x, z, 0.7 + r2() * 0.6]; }, true, n * 5 + 3);
       if (gf.instanceColor) { const a = gf.instanceColor.array; for (let i = 0; i < a.length; i += 3) { a[i] *= tn[0]; a[i + 1] *= tn[1]; a[i + 2] *= tn[2]; } }
       R.add(gf);

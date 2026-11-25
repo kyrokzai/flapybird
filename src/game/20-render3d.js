@@ -78,11 +78,9 @@
     syncHeroAtmosphere(menu);
     const ens = menu ? [] : enemies;
     syncEnemies(ens, fdt);
-    syncList(menu ? [] : arrows, G3.arrowsM, makeArrowModel, (a, m) => { m.g.position.set(X3(a.x), 0.55, Z3(a.y)); m.g.rotation.y = -a.ang; });
-    syncList(menu ? [] : bullets, G3.bulletsM, makeBulletModel, (b, m) => {
-      m.g.position.set(X3(b.x), b.kind === 'boulder' ? 0.35 : 0.45, Z3(b.y));
-      if (b.kind === 'claw') m.g.rotation.y = -Math.atan2(b.vy, b.vx); else { m.g.rotation.y += 0.15; m.g.rotation.x += 0.1; }
-    });
+    drawArrows(menu ? [] : arrows);   // all ordinary arrows in a few draw calls; only the eagle's feathers keep their own models
+    syncList(menu ? [] : arrows.filter(a => a.kind === 'feather'), G3.arrowsM, makeArrowModel, (a, m) => { m.g.position.set(X3(a.x), 0.55, Z3(a.y)); m.g.rotation.y = -a.ang; });
+    drawBullets(menu ? [] : bullets);   // enemy shots, batched like the arrows
     syncList(menu ? [] : pickups, G3.pickM, makePickupModel, (p, m) => {
       if (m.bonus) {
         m.g.position.set(X3(p.x), 0, Z3(p.y));

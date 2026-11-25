@@ -35,6 +35,13 @@
     if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
     return t;
   }
+  // the same, sharing one material per colour and opacity (for things that come and go by the hundred, like enemy shots)
+  function glowShared(hex, size, op) {
+    const k = hex + '|' + (op === undefined ? 1 : op);
+    G3.glowMats = G3.glowMats || {};
+    const m = G3.glowMats[k] || (G3.glowMats[k] = new THREE.SpriteMaterial({ map: G3.glowTex, color: col(hex), transparent: true, opacity: op === undefined ? 1 : op, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const s = new THREE.Sprite(m); s.scale.set(size, size, 1); return s;
+  }
   function glow(hex, size, op) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: G3.glowTex, color: col(hex), transparent: true, opacity: op === undefined ? 1 : op, depthWrite: false, blending: THREE.AdditiveBlending }));
     s.scale.set(size, size, 1);

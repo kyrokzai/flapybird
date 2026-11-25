@@ -681,6 +681,7 @@
     m.warn.material.opacity = e.wind ? 0.45 + Math.sin(time * 18) * 0.25 : 0;
     m.burn.material.opacity = e.burn > 0 ? 0.6 + Math.sin(time * 25) * 0.25 : 0;
     m.slow.material.opacity = e.slow > 0 ? 0.45 : 0;
+    for (const o of [m.ring, m.warn, m.burn, m.slow]) o.visible = o.material.opacity > 0.01;   // a transparent decal is still a draw call: hide the unused ones
     updateEliteVisuals(e, m);
     setFlash(m, e.flash > 0);
     const moving = Math.hypot(e.vx, e.vy) > 5, a = e.anim;

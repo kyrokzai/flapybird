@@ -1,4 +1,47 @@
   // ---- projectiles & pickups
+  // ---- the batyr's arrows, drawn in bulk: one instanced mesh per part and one point cloud for their glows.
+  // Late in a run multishot, fire, ice and ricochets put dozens of arrows in the air; each used to be its own 7-part model
+  // with fresh glow materials and a shadow — too much for phones on high graphics.
+  const ARROW_MAX = 320;
+  const arwPart = (x, y, z, rx, ry, rz, sx, sy, sz) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+  const ARW = {
+    shaft: arwPart(0, 0, 0, 0, 0, Math.PI / 2, 0.014, 0.5, 0.014), tip: arwPart(0.28, 0, 0, 0, 0, -Math.PI / 2, 0.032, 0.09, 0.032),
+    fl: [arwPart(-0.22, 0, 0.022, 0, 0, 0, 0.1, 0.04, 0.008), arwPart(-0.22, 0, -0.022, 0, 0, 0, 0.1, 0.04, 0.008)], trail: arwPart(-0.62, 0, 0, -Math.PI / 2, 0, 0, 0.9, 0.09, 1),
+    cTrail: { n: new THREE.Color('#fff0c0'), h: new THREE.Color('#ff5030'), f: new THREE.Color('#ffa040'), i: new THREE.Color('#a0e8ff') },
+    cGlow: { n: new THREE.Color('#fff2c0').multiplyScalar(0.45), f: new THREE.Color('#ff8a20').multiplyScalar(0.9), i: new THREE.Color('#8fe0ff').multiplyScalar(0.9) },
+  };
+  const _aw = new THREE.Matrix4(), _ap = new THREE.Matrix4(), _aq = new THREE.Quaternion(), _av = new THREE.Vector3(), _as = new THREE.Vector3(), _aUp = new THREE.Vector3(0, 1, 0);
+  function arrowBatch() {
+    if (G3.arrowBatch) return G3.arrowBatch;
+    const mk = (geo, mt, n) => { const m = new THREE.InstancedMesh(geo, mt, n); m.count = 0; m.frustumCulled = false; m.castShadow = false; m.userData.keep = true; G3.dyn.add(m); return m; };
+    const B = { shaft: mk(G3.geo.cyl, G3.pm.shaft, ARROW_MAX), tip: mk(G3.geo.cone, G3.pm.tip, ARROW_MAX), fl: mk(G3.geo.box, G3.pm.fletch, ARROW_MAX * 2),
+      trail: mk(G3.geo.plane, new THREE.MeshBasicMaterial({ map: lifeTextures().trail, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending }), ARROW_MAX) };
+    B.trail.setColorAt(0, ARW.cTrail.n);
+    const geo = new THREE.BufferGeometry(); B.gp = new Float32Array(ARROW_MAX * 2 * 3); B.gc = new Float32Array(ARROW_MAX * 2 * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(B.gp, 3)); geo.setAttribute('color', new THREE.BufferAttribute(B.gc, 3));
+    B.pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.55, map: G3.glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    B.pts.frustumCulled = false; G3.dyn.add(B.pts);
+    return (G3.arrowBatch = B);
+  }
+  function drawArrows(list) {
+    const B = arrowBatch(); let n = 0, ng = 0;
+    const glowAt = (x, z, c) => { B.gp[ng * 3] = x; B.gp[ng * 3 + 1] = 0.55; B.gp[ng * 3 + 2] = z; B.gc[ng * 3] = c.r; B.gc[ng * 3 + 1] = c.g; B.gc[ng * 3 + 2] = c.b; ng++; };
+    for (const a of list) {
+      if (a.kind === 'feather' || n >= ARROW_MAX) continue;
+      const k = a.heavy ? 1.75 : 1.35, x = X3(a.x), z = Z3(a.y), ca = Math.cos(a.ang), sa = Math.sin(a.ang);
+      _aw.compose(_av.set(x, 0.55, z), _aq.setFromAxisAngle(_aUp, -a.ang), _as.set(k, k, k));
+      B.shaft.setMatrixAt(n, _ap.multiplyMatrices(_aw, ARW.shaft)); B.tip.setMatrixAt(n, _ap.multiplyMatrices(_aw, ARW.tip));
+      B.fl.setMatrixAt(n * 2, _ap.multiplyMatrices(_aw, ARW.fl[0])); B.fl.setMatrixAt(n * 2 + 1, _ap.multiplyMatrices(_aw, ARW.fl[1]));
+      B.trail.setMatrixAt(n, _ap.multiplyMatrices(_aw, ARW.trail)); B.trail.setColorAt(n, a.heavy ? ARW.cTrail.h : a.fire ? ARW.cTrail.f : a.ice ? ARW.cTrail.i : ARW.cTrail.n);
+      glowAt(x - 0.05 * k * ca, z - 0.05 * k * sa, ARW.cGlow.n);
+      if (a.fire || a.ice) glowAt(x + 0.1 * k * ca, z + 0.1 * k * sa, a.fire ? ARW.cGlow.f : ARW.cGlow.i);
+      n++;
+    }
+    B.shaft.count = B.tip.count = B.trail.count = n; B.fl.count = n * 2;
+    for (const m of [B.shaft, B.tip, B.fl, B.trail]) m.instanceMatrix.needsUpdate = true;
+    B.trail.instanceColor.needsUpdate = true;
+    B.pts.geometry.setDrawRange(0, ng); B.pts.geometry.attributes.position.needsUpdate = true; B.pts.geometry.attributes.color.needsUpdate = true;
+  }
   function makeArrowModel(a) {
     const g = new THREE.Group();
     if (a.kind === 'feather') {
@@ -17,15 +60,49 @@
     }
     return { g };
   }
+  // ---- enemy shots in bulk too: one instanced mesh per look (orbs per element, claws, stones) and one point cloud for their glows
+  const BUL_MAX = 240, BUL_GLOW = { fire: new THREE.Color('#ff6a10').multiplyScalar(0.6), ghost: new THREE.Color('#7fb8ff').multiplyScalar(0.6), magic: new THREE.Color('#9a40ff').multiplyScalar(0.6), claw: new THREE.Color('#ff9a3a').multiplyScalar(0.5) };
+  const _be = new THREE.Euler();
+  function bulletBatch() {
+    if (G3.bulletBatch) return G3.bulletBatch;
+    const B = { meshes: {} };
+    const geo = new THREE.BufferGeometry(); B.gp = new Float32Array(BUL_MAX * 3); B.gc = new Float32Array(BUL_MAX * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(B.gp, 3)); geo.setAttribute('color', new THREE.BufferAttribute(B.gc, 3));
+    B.pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.75, map: G3.glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    B.pts.frustumCulled = false; G3.dyn.add(B.pts);
+    return (G3.bulletBatch = B);
+  }
+  function bulletMesh(B, key, geo, mt) {
+    let m = B.meshes[key];
+    if (!m) { m = B.meshes[key] = new THREE.InstancedMesh(geo, mt, BUL_MAX); m.frustumCulled = false; m.castShadow = false; m.userData.keep = true; m.userData.n = 0; G3.dyn.add(m); }
+    return m;
+  }
+  function drawBullets(list) {
+    const B = bulletBatch(); let ng = 0;
+    for (const k in B.meshes) B.meshes[k].userData.n = 0;
+    for (const b of list) {
+      const x = X3(b.x), z = Z3(b.y), sp = (time * 6 + b.x * 0.1) % TAU;
+      let m, y = 0.45;
+      if (b.kind === 'claw') { m = bulletMesh(B, 'claw', G3.geo.cone, G3.pm.claw); _aw.compose(_av.set(x, y, z), _aq.setFromEuler(_be.set(0, -Math.atan2(b.vy, b.vx), -Math.PI / 2)), _as.set(0.05, 0.24, 0.035)); }
+      else if (b.kind === 'rock' || b.kind === 'boulder') { const s = b.r / CELL * 1.35; y = b.kind === 'boulder' ? 0.35 : 0.45; m = bulletMesh(B, b.kind, G3.geo.dodeca, G3.pm[b.kind]); _aw.compose(_av.set(x, y, z), _aq.setFromEuler(_be.set(sp * 0.7, sp, 0)), _as.set(s, s, s)); }
+      else { const s = b.r / CELL * 1.35, key = G3.pm[b.kind] ? b.kind : 'magic'; m = bulletMesh(B, 'orb_' + key, G3.geo.sLow, G3.pm[key]); _aw.compose(_av.set(x, y, z), _aq.set(0, 0, 0, 1), _as.set(s, s, s)); }
+      if (m.userData.n >= BUL_MAX) continue;
+      m.setMatrixAt(m.userData.n++, _aw);
+      const gc = BUL_GLOW[b.kind === 'claw' ? 'claw' : b.kind] || (b.kind === 'rock' || b.kind === 'boulder' ? null : BUL_GLOW.magic);
+      if (gc && ng < BUL_MAX) { B.gp[ng * 3] = x; B.gp[ng * 3 + 1] = y; B.gp[ng * 3 + 2] = z; B.gc[ng * 3] = gc.r; B.gc[ng * 3 + 1] = gc.g; B.gc[ng * 3 + 2] = gc.b; ng++; }
+    }
+    for (const k in B.meshes) { const m = B.meshes[k]; m.count = m.userData.n; m.instanceMatrix.needsUpdate = true; }
+    B.pts.geometry.setDrawRange(0, ng); B.pts.geometry.attributes.position.needsUpdate = true; B.pts.geometry.attributes.color.needsUpdate = true;
+  }
   function makeBulletModel(b) {
     const g = new THREE.Group(), s = b.r / CELL * 1.35;
     switch (b.kind) {
-      case 'claw': { const c = mesh(G3.geo.cone, G3.pm.claw, 0, 0, 0, 0.05, 0.24, 0.035); c.rotation.z = -Math.PI / 2; g.add(c); g.add(glow('#ff9a3a', 0.35, 0.5)); break; }
+      case 'claw': { const c = mesh(G3.geo.cone, G3.pm.claw, 0, 0, 0, 0.05, 0.24, 0.035, false); c.rotation.z = -Math.PI / 2; g.add(c); g.add(glowShared('#ff9a3a', 0.35, 0.5)); break; }
       case 'rock': case 'boulder': g.add(mesh(G3.geo.dodeca, b.kind === 'rock' ? G3.pm.rock : G3.pm.boulder, 0, 0, 0, s)); break;
       default: {
         const pmat = G3.pm[b.kind] || G3.pm.magic;
         g.add(mesh(G3.geo.sLow, pmat, 0, 0, 0, s, s, s, false));
-        g.add(glow(b.kind === 'fire' ? '#ff6a10' : b.kind === 'ghost' ? '#7fb8ff' : '#9a40ff', s * 3.2, 0.6));
+        g.add(glowShared(b.kind === 'fire' ? '#ff6a10' : b.kind === 'ghost' ? '#7fb8ff' : '#9a40ff', s * 3.2, 0.6));
       }
     }
     return { g };

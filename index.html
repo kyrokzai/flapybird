@@ -984,12 +984,14 @@
 
   // =================================================================== effects
   function burst(x, y, col, n, spd, size) {
+    n = Math.min(n, Math.max(0, Math.round(700 * Q.fx) - particles.length));   // a cap: with many arrows and ricochets the sparks used to pile up
     for (let i = 0; i < n; i++) {
       const a = Math.random() * TAU, s = rand(0.3, 1) * spd;
       particles.push({ x, y, h: rand(0.2, 0.7), vh: rand(0.5, 3), vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.7), max: 0.7, col, size: size * rand(0.6, 1.2) });
     }
   }
-  function floatText(x, y, t, col, size, h) { texts.push({ x: x + rand(-6, 6), y, h: h || 1.1, rise: 0, t, col, size, life: 0.8, pop: size >= 17 }); }
+  function floatText(x, y, t, col, size, h) { if (texts.length > 36) texts.splice(0, texts.length - 36);   // damage numbers are drawn on the 2D canvas: keep the newest few dozen
+    texts.push({ x: x + rand(-6, 6), y, h: h || 1.1, rise: 0, t, col, size, life: 0.8, pop: size >= 17 }); }
 
   // =================================================================== combat: player
   function pickTarget() {
@@ -1692,6 +1694,13 @@
     t.anisotropy = G3.r ? Math.min(8, G3.r.capabilities.getMaxAnisotropy()) : 1;
     if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
     return t;
+  }
+  // the same, sharing one material per colour and opacity (for things that come and go by the hundred, like enemy shots)
+  function glowShared(hex, size, op) {
+    const k = hex + '|' + (op === undefined ? 1 : op);
+    G3.glowMats = G3.glowMats || {};
+    const m = G3.glowMats[k] || (G3.glowMats[k] = new THREE.SpriteMaterial({ map: G3.glowTex, color: col(hex), transparent: true, opacity: op === undefined ? 1 : op, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const s = new THREE.Sprite(m); s.scale.set(size, size, 1); return s;
   }
   function glow(hex, size, op) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: G3.glowTex, color: col(hex), transparent: true, opacity: op === undefined ? 1 : op, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -3541,6 +3550,7 @@
     m.warn.material.opacity = e.wind ? 0.45 + Math.sin(time * 18) * 0.25 : 0;
     m.burn.material.opacity = e.burn > 0 ? 0.6 + Math.sin(time * 25) * 0.25 : 0;
     m.slow.material.opacity = e.slow > 0 ? 0.45 : 0;
+    for (const o of [m.ring, m.warn, m.burn, m.slow]) o.visible = o.material.opacity > 0.01;   // a transparent decal is still a draw call: hide the unused ones
     updateEliteVisuals(e, m);
     setFlash(m, e.flash > 0);
     const moving = Math.hypot(e.vx, e.vy) > 5, a = e.anim;
@@ -3631,6 +3641,49 @@
   }
 
   // ---- projectiles & pickups
+  // ---- the batyr's arrows, drawn in bulk: one instanced mesh per part and one point cloud for their glows.
+  // Late in a run multishot, fire, ice and ricochets put dozens of arrows in the air; each used to be its own 7-part model
+  // with fresh glow materials and a shadow — too much for phones on high graphics.
+  const ARROW_MAX = 320;
+  const arwPart = (x, y, z, rx, ry, rz, sx, sy, sz) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+  const ARW = {
+    shaft: arwPart(0, 0, 0, 0, 0, Math.PI / 2, 0.014, 0.5, 0.014), tip: arwPart(0.28, 0, 0, 0, 0, -Math.PI / 2, 0.032, 0.09, 0.032),
+    fl: [arwPart(-0.22, 0, 0.022, 0, 0, 0, 0.1, 0.04, 0.008), arwPart(-0.22, 0, -0.022, 0, 0, 0, 0.1, 0.04, 0.008)], trail: arwPart(-0.62, 0, 0, -Math.PI / 2, 0, 0, 0.9, 0.09, 1),
+    cTrail: { n: new THREE.Color('#fff0c0'), h: new THREE.Color('#ff5030'), f: new THREE.Color('#ffa040'), i: new THREE.Color('#a0e8ff') },
+    cGlow: { n: new THREE.Color('#fff2c0').multiplyScalar(0.45), f: new THREE.Color('#ff8a20').multiplyScalar(0.9), i: new THREE.Color('#8fe0ff').multiplyScalar(0.9) },
+  };
+  const _aw = new THREE.Matrix4(), _ap = new THREE.Matrix4(), _aq = new THREE.Quaternion(), _av = new THREE.Vector3(), _as = new THREE.Vector3(), _aUp = new THREE.Vector3(0, 1, 0);
+  function arrowBatch() {
+    if (G3.arrowBatch) return G3.arrowBatch;
+    const mk = (geo, mt, n) => { const m = new THREE.InstancedMesh(geo, mt, n); m.count = 0; m.frustumCulled = false; m.castShadow = false; m.userData.keep = true; G3.dyn.add(m); return m; };
+    const B = { shaft: mk(G3.geo.cyl, G3.pm.shaft, ARROW_MAX), tip: mk(G3.geo.cone, G3.pm.tip, ARROW_MAX), fl: mk(G3.geo.box, G3.pm.fletch, ARROW_MAX * 2),
+      trail: mk(G3.geo.plane, new THREE.MeshBasicMaterial({ map: lifeTextures().trail, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending }), ARROW_MAX) };
+    B.trail.setColorAt(0, ARW.cTrail.n);
+    const geo = new THREE.BufferGeometry(); B.gp = new Float32Array(ARROW_MAX * 2 * 3); B.gc = new Float32Array(ARROW_MAX * 2 * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(B.gp, 3)); geo.setAttribute('color', new THREE.BufferAttribute(B.gc, 3));
+    B.pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.55, map: G3.glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    B.pts.frustumCulled = false; G3.dyn.add(B.pts);
+    return (G3.arrowBatch = B);
+  }
+  function drawArrows(list) {
+    const B = arrowBatch(); let n = 0, ng = 0;
+    const glowAt = (x, z, c) => { B.gp[ng * 3] = x; B.gp[ng * 3 + 1] = 0.55; B.gp[ng * 3 + 2] = z; B.gc[ng * 3] = c.r; B.gc[ng * 3 + 1] = c.g; B.gc[ng * 3 + 2] = c.b; ng++; };
+    for (const a of list) {
+      if (a.kind === 'feather' || n >= ARROW_MAX) continue;
+      const k = a.heavy ? 1.75 : 1.35, x = X3(a.x), z = Z3(a.y), ca = Math.cos(a.ang), sa = Math.sin(a.ang);
+      _aw.compose(_av.set(x, 0.55, z), _aq.setFromAxisAngle(_aUp, -a.ang), _as.set(k, k, k));
+      B.shaft.setMatrixAt(n, _ap.multiplyMatrices(_aw, ARW.shaft)); B.tip.setMatrixAt(n, _ap.multiplyMatrices(_aw, ARW.tip));
+      B.fl.setMatrixAt(n * 2, _ap.multiplyMatrices(_aw, ARW.fl[0])); B.fl.setMatrixAt(n * 2 + 1, _ap.multiplyMatrices(_aw, ARW.fl[1]));
+      B.trail.setMatrixAt(n, _ap.multiplyMatrices(_aw, ARW.trail)); B.trail.setColorAt(n, a.heavy ? ARW.cTrail.h : a.fire ? ARW.cTrail.f : a.ice ? ARW.cTrail.i : ARW.cTrail.n);
+      glowAt(x - 0.05 * k * ca, z - 0.05 * k * sa, ARW.cGlow.n);
+      if (a.fire || a.ice) glowAt(x + 0.1 * k * ca, z + 0.1 * k * sa, a.fire ? ARW.cGlow.f : ARW.cGlow.i);
+      n++;
+    }
+    B.shaft.count = B.tip.count = B.trail.count = n; B.fl.count = n * 2;
+    for (const m of [B.shaft, B.tip, B.fl, B.trail]) m.instanceMatrix.needsUpdate = true;
+    B.trail.instanceColor.needsUpdate = true;
+    B.pts.geometry.setDrawRange(0, ng); B.pts.geometry.attributes.position.needsUpdate = true; B.pts.geometry.attributes.color.needsUpdate = true;
+  }
   function makeArrowModel(a) {
     const g = new THREE.Group();
     if (a.kind === 'feather') {
@@ -3649,15 +3702,49 @@
     }
     return { g };
   }
+  // ---- enemy shots in bulk too: one instanced mesh per look (orbs per element, claws, stones) and one point cloud for their glows
+  const BUL_MAX = 240, BUL_GLOW = { fire: new THREE.Color('#ff6a10').multiplyScalar(0.6), ghost: new THREE.Color('#7fb8ff').multiplyScalar(0.6), magic: new THREE.Color('#9a40ff').multiplyScalar(0.6), claw: new THREE.Color('#ff9a3a').multiplyScalar(0.5) };
+  const _be = new THREE.Euler();
+  function bulletBatch() {
+    if (G3.bulletBatch) return G3.bulletBatch;
+    const B = { meshes: {} };
+    const geo = new THREE.BufferGeometry(); B.gp = new Float32Array(BUL_MAX * 3); B.gc = new Float32Array(BUL_MAX * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(B.gp, 3)); geo.setAttribute('color', new THREE.BufferAttribute(B.gc, 3));
+    B.pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.75, map: G3.glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    B.pts.frustumCulled = false; G3.dyn.add(B.pts);
+    return (G3.bulletBatch = B);
+  }
+  function bulletMesh(B, key, geo, mt) {
+    let m = B.meshes[key];
+    if (!m) { m = B.meshes[key] = new THREE.InstancedMesh(geo, mt, BUL_MAX); m.frustumCulled = false; m.castShadow = false; m.userData.keep = true; m.userData.n = 0; G3.dyn.add(m); }
+    return m;
+  }
+  function drawBullets(list) {
+    const B = bulletBatch(); let ng = 0;
+    for (const k in B.meshes) B.meshes[k].userData.n = 0;
+    for (const b of list) {
+      const x = X3(b.x), z = Z3(b.y), sp = (time * 6 + b.x * 0.1) % TAU;
+      let m, y = 0.45;
+      if (b.kind === 'claw') { m = bulletMesh(B, 'claw', G3.geo.cone, G3.pm.claw); _aw.compose(_av.set(x, y, z), _aq.setFromEuler(_be.set(0, -Math.atan2(b.vy, b.vx), -Math.PI / 2)), _as.set(0.05, 0.24, 0.035)); }
+      else if (b.kind === 'rock' || b.kind === 'boulder') { const s = b.r / CELL * 1.35; y = b.kind === 'boulder' ? 0.35 : 0.45; m = bulletMesh(B, b.kind, G3.geo.dodeca, G3.pm[b.kind]); _aw.compose(_av.set(x, y, z), _aq.setFromEuler(_be.set(sp * 0.7, sp, 0)), _as.set(s, s, s)); }
+      else { const s = b.r / CELL * 1.35, key = G3.pm[b.kind] ? b.kind : 'magic'; m = bulletMesh(B, 'orb_' + key, G3.geo.sLow, G3.pm[key]); _aw.compose(_av.set(x, y, z), _aq.set(0, 0, 0, 1), _as.set(s, s, s)); }
+      if (m.userData.n >= BUL_MAX) continue;
+      m.setMatrixAt(m.userData.n++, _aw);
+      const gc = BUL_GLOW[b.kind === 'claw' ? 'claw' : b.kind] || (b.kind === 'rock' || b.kind === 'boulder' ? null : BUL_GLOW.magic);
+      if (gc && ng < BUL_MAX) { B.gp[ng * 3] = x; B.gp[ng * 3 + 1] = y; B.gp[ng * 3 + 2] = z; B.gc[ng * 3] = gc.r; B.gc[ng * 3 + 1] = gc.g; B.gc[ng * 3 + 2] = gc.b; ng++; }
+    }
+    for (const k in B.meshes) { const m = B.meshes[k]; m.count = m.userData.n; m.instanceMatrix.needsUpdate = true; }
+    B.pts.geometry.setDrawRange(0, ng); B.pts.geometry.attributes.position.needsUpdate = true; B.pts.geometry.attributes.color.needsUpdate = true;
+  }
   function makeBulletModel(b) {
     const g = new THREE.Group(), s = b.r / CELL * 1.35;
     switch (b.kind) {
-      case 'claw': { const c = mesh(G3.geo.cone, G3.pm.claw, 0, 0, 0, 0.05, 0.24, 0.035); c.rotation.z = -Math.PI / 2; g.add(c); g.add(glow('#ff9a3a', 0.35, 0.5)); break; }
+      case 'claw': { const c = mesh(G3.geo.cone, G3.pm.claw, 0, 0, 0, 0.05, 0.24, 0.035, false); c.rotation.z = -Math.PI / 2; g.add(c); g.add(glowShared('#ff9a3a', 0.35, 0.5)); break; }
       case 'rock': case 'boulder': g.add(mesh(G3.geo.dodeca, b.kind === 'rock' ? G3.pm.rock : G3.pm.boulder, 0, 0, 0, s)); break;
       default: {
         const pmat = G3.pm[b.kind] || G3.pm.magic;
         g.add(mesh(G3.geo.sLow, pmat, 0, 0, 0, s, s, s, false));
-        g.add(glow(b.kind === 'fire' ? '#ff6a10' : b.kind === 'ghost' ? '#7fb8ff' : '#9a40ff', s * 3.2, 0.6));
+        g.add(glowShared(b.kind === 'fire' ? '#ff6a10' : b.kind === 'ghost' ? '#7fb8ff' : '#9a40ff', s * 3.2, 0.6));
       }
     }
     return { g };
@@ -4128,11 +4215,9 @@
     syncHeroAtmosphere(menu);
     const ens = menu ? [] : enemies;
     syncEnemies(ens, fdt);
-    syncList(menu ? [] : arrows, G3.arrowsM, makeArrowModel, (a, m) => { m.g.position.set(X3(a.x), 0.55, Z3(a.y)); m.g.rotation.y = -a.ang; });
-    syncList(menu ? [] : bullets, G3.bulletsM, makeBulletModel, (b, m) => {
-      m.g.position.set(X3(b.x), b.kind === 'boulder' ? 0.35 : 0.45, Z3(b.y));
-      if (b.kind === 'claw') m.g.rotation.y = -Math.atan2(b.vy, b.vx); else { m.g.rotation.y += 0.15; m.g.rotation.x += 0.1; }
-    });
+    drawArrows(menu ? [] : arrows);   // all ordinary arrows in a few draw calls; only the eagle's feathers keep their own models
+    syncList(menu ? [] : arrows.filter(a => a.kind === 'feather'), G3.arrowsM, makeArrowModel, (a, m) => { m.g.position.set(X3(a.x), 0.55, Z3(a.y)); m.g.rotation.y = -a.ang; });
+    drawBullets(menu ? [] : bullets);   // enemy shots, batched like the arrows
     syncList(menu ? [] : pickups, G3.pickM, makePickupModel, (p, m) => {
       if (m.bonus) {
         m.g.position.set(X3(p.x), 0, Z3(p.y));
@@ -4832,7 +4917,7 @@
     survival() { if (TEST_MODE) newRun('survival'); }, get wave() { return run && run.wave; }, arenaTime(s) { if (TEST_MODE && run) run.timeLeft = s; },
     tp(x, y) { if (TEST_MODE && player) { player.x = x; player.y = y; } }, get bombs() { return run && run.bombs; },
     goto(n) { if (!TEST_MODE) return; if (scene !== 'play') newRun(); run.room = n; buildRoom(n); },
-    comic() { if (TEST_MODE) playComic(null); }, menuAnim(id) { if (TEST_MODE) Save.data.settings.menuAnim = id; return menuAnimId(); }, toast(t) { toasts.push({ text: t, t: 0 }); },
+    comic() { if (TEST_MODE) playComic(null); }, skill(id, n) { if (TEST_MODE && run) run.sk[id] = n; }, get counts() { return { arrows: arrows.length, bullets: bullets.length, particles: particles.length, texts: texts.length, fx: fx.length }; }, menuAnim(id) { if (TEST_MODE) Save.data.settings.menuAnim = id; return menuAnimId(); }, toast(t) { toasts.push({ text: t, t: 0 }); },
     tab(t, pop) { if (TEST_MODE) { scene = 'menu'; menuTab = t; menuPopup = pop || null; if (pop === 'item') selItem = gearItems()[0]; } },
     end(won) { if (TEST_MODE && scene === 'play') endRun(!!won); },
     get save() { return TEST_MODE ? Save.data : null; }, get music() { return Sound.mode; }, get prof() { return G3.prof; }, get models() { return Object.keys(G3.models); }, get g3() { return TEST_MODE ? G3 : null; }, get audio() { return { samples: Object.keys(Sound.samples).length, tracks: Object.keys(Sound.tracks), playing: Sound.cur && Sound.cur.name }; }, get tut() { return Object.assign({ active: tutActive(), intro: introT }, tut); },
@@ -7191,8 +7276,8 @@
     if (isSteppe(theme)) {
       // the steppe runs on: scattered stones, bushes, skulls and yurts south and north of the palisade, dry grass at the entrance
       const avoid = (x, z) => Math.abs(x - pathX(z)) < 1.3 || (z < zN && Math.abs(x) < 3.2);
-      steppeScatter(R, theme, rnd, -13, 13, zS + 1, zS + 18, Math.round(30 * k + 8), avoid);
-      steppeScatter(R, theme, rnd, -13, 13, zN - 12, zN - 1.5, Math.round(16 * k + 4), avoid);
+      steppeScatter(R, theme, rnd, -12, 12, zS + 1, zS + 16, Math.round(18 * k + 6), avoid);
+      steppeScatter(R, theme, rnd, -12, 12, zN - 11, zN - 1.5, Math.round(10 * k + 3), avoid);
       const tn = STP[svar(theme)].tint, gf = makeGrassField(Math.round(380 * Q.grass), r2 => { const x = (r2() - 0.5) * 16, z = zS + 0.4 + r2() * 9; return Math.abs(x - pathX(z)) < 0.9 ? null : [x, z, 0.7 + r2() * 0.6]; }, true, n * 5 + 3);
       if (gf.instanceColor) { const a = gf.instanceColor.array; for (let i = 0; i < a.length; i += 3) { a[i] *= tn[0]; a[i + 1] *= tn[1]; a[i + 2] *= tn[2]; } }
       R.add(gf);
@@ -7501,11 +7586,11 @@
     line(-X, zN - 0.15, -X, zS + 0.15); line(X, zN - 0.15, X, zS + 0.15);
     // the owner's palisade sections laid along the lines (one instanced mesh per material), else coded stakes
     if (stpHas('palisade')) {
-      const segs = [], lay = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n2 = Math.max(1, Math.round(L / 1.55)); for (let i = 0; i < n2; i++) { const t = (i + 0.5) / n2; segs.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, ry: Math.abs(x1 - x0) > Math.abs(z1 - z0) ? Math.PI / 2 : 0, l: L / n2 * 1.03, h: 1.15 + rnd() * 0.12, w: 0.16 }); } };
+      const segs = [], lay = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n2 = Math.max(1, Math.round(L / 2.0)); for (let i = 0; i < n2; i++) { const t = (i + 0.5) / n2; segs.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, ry: Math.abs(x1 - x0) > Math.abs(z1 - z0) ? Math.PI / 2 : 0, l: L / n2 * 1.03, h: 1.15 + rnd() * 0.12, w: 0.16 }); } };
       lay(-X, zN - 0.15, -1.25, zN - 0.15); lay(1.25, zN - 0.15, X, zN - 0.15);
       lay(-X, zS + 0.15, pathXs - 0.75, zS + 0.15); lay(pathXs + 0.75, zS + 0.15, X, zS + 0.15);
       lay(-X, zN - 0.15, -X, zS + 0.15); lay(X, zN - 0.15, X, zS + 0.15);
-      R.add(propInstances('stp_palisade', segs));
+      { const pal = propInstances('stp_palisade', segs); pal.traverse(m => { if (m.isMesh) m.castShadow = QL === 'high'; }); R.add(pal); }
       places.length = 0;
     }
     // the stakes: shafts and sharpened tips, one instanced mesh each
@@ -7560,15 +7645,15 @@
       else if (k < 0.95 && stpHas('bones') && rnd() < 0.5) { o = stpModel('bones', 0.8 + rnd() * 0.4, 'w'); o.rotation.y = rnd() * TAU; }
       else if (k < 0.95) { const w = new THREE.Group(), wh = makeCartWheel(v); if (stpHas('wheel')) { wh.rotation.z = Math.PI / 2 - 0.12; wh.position.y = 0.06; } else { wh.rotation.x = -Math.PI / 2 + 0.15; wh.position.y = 0.05; } w.add(wh); w.rotation.y = rnd() * TAU; o = w; }
       else o = makeBush(v, rnd);
-      o.position.x = x; o.position.z = z; R.add(o);
+      o.position.x = x; o.position.z = z; o.traverse(m => { if (m.isMesh) m.castShadow = false; }); R.add(o);   // decor past the palisade casts no shadow (one render pass less for it)
     }
   }
   function steppeScenery(R, theme, n, zN, zS) {
     const rnd = mulberry32(n * 91 + 5), v = svar(theme);
     const dyn = steppeWalls(R, theme, zN, zS);
     steppePonds(R, theme, dyn);
-    steppeScatter(R, theme, rnd, -13, -4.9, zN - 9, zS + 12, Math.round(26 * Q.fx + 10), null);
-    steppeScatter(R, theme, rnd, 4.9, 13, zN - 9, zS + 12, Math.round(26 * Q.fx + 10), null);
+    steppeScatter(R, theme, rnd, -12, -4.9, zN - 9, zS + 12, Math.round(16 * Q.fx + 6), null);
+    steppeScatter(R, theme, rnd, 4.9, 12, zN - 9, zS + 12, Math.round(16 * Q.fx + 6), null);
     // eclipse: the cracks in the floor glow and pulse
     if (G3.stpCracks) {
       const m = new THREE.MeshBasicMaterial({ map: G3.stpCracks, color: col(STP.blood.glow), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
