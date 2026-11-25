@@ -1,4 +1,16 @@
   // ---- per-frame sync & render
+  // into battle: the menu batyr (88k triangles, 2048 px), the horse and the menu sky leave video memory; they upload again by themselves
+  // when the menu is drawn next (phones reload the page when memory runs out)
+  function freeMenuGpu() {
+    const free = root => root && root.traverse(o => {
+      if (!o.isMesh) return;
+      if (o.geometry) o.geometry.dispose();
+      for (const t of [o.material.map, o.material.normalMap, o.material.emissiveMap]) if (t) t.dispose();
+    });
+    free(G3.heroSpear && G3.heroSpear.g); free(G3.models.horse); free(G3.models.prop_birch);
+    if (G3.skyTex.menu) G3.skyTex.menu.dispose();
+    if (G3.skyBlur) for (const t of Object.values(G3.skyBlur)) t.dispose();
+  }
   function render3D() {
     const now3 = performance.now(), fdt = Math.min(0.05, (now3 - (G3.lastT || now3)) / 1000); G3.lastT = now3; G3.rt += fdt;
     build3D();
@@ -6,7 +18,7 @@
     if (G3.life) for (const u of G3.life.upd) u(G3.rt, fdt);
     tickFx(fdt); updateFx3D(fdt);
     const menu = scene === 'menu';
-    if (G3.wasMenu !== menu) { G3.wasMenu = menu; resize(); }
+    if (G3.wasMenu !== menu) { G3.wasMenu = menu; resize(); if (!menu) freeMenuGpu(); }
     // camera
     const c = G3.cam;
     if (menu) {

@@ -221,9 +221,11 @@
   function addFx(kind, x, y, o) { fx.push(Object.assign({ kind, x, y, t: 0, max: 0.5, col: '#ffe08a', size: 1 }, o || {})); }
   function updateFx3D(dt) {
     if (!G3.fxPool) G3.fxPool = [];
-    while (G3.fxPool.length < fx.length) {
+    // a bounded pool with one shared beam geometry: late in a run there are many effects at once, and each used to bring its own
+    if (!G3.fxBeamGeo) G3.fxBeamGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 20, 1, true);
+    while (G3.fxPool.length < Math.min(fx.length, 48)) {
       const ring = decal(G3.ringTex, '#ffffff', 1, 0); ring.material.blending = THREE.AdditiveBlending;
-      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 20, 1, true), new THREE.MeshBasicMaterial({ map: lifeTextures().beam, color: 0xffffff, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+      const pillar = new THREE.Mesh(G3.fxBeamGeo, new THREE.MeshBasicMaterial({ map: lifeTextures().beam, color: 0xffffff, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
       const wisp = glow('#ffffff', 1, 0);
       G3.dyn.add(ring, pillar, wisp); G3.fxPool.push({ ring, pillar, wisp });
     }

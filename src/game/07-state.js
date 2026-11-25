@@ -38,6 +38,7 @@
       newRun(mode); return;
     }
     if (!spendEnergy()) { scene = 'menu'; menuTab = 'fight'; menuPopup = 'energy'; Sound.click(); return; }
+    settleSnap();
     if (COMIC.ready && !Save.data.introSeen && !TEST_MODE) { scene = 'menu'; playComic(() => newRun(mode)); return; }   // the story begins with the comic, once
     newRun(mode);
   }
@@ -48,6 +49,16 @@
     Save.data.runSnap = { room: run.room, level: run.level, xp: run.xp, kills: run.kills, coins: run.coins, gems: run.gems, sk: Object.assign({}, run.sk), bombs: run.bombs,
       bossKills: run.bossKills, t: run.t, revived: !!run.revived, hp: player.hp, maxHp: player.maxHp, crit: player.crit, critMul: player.critMul, at: Date.now() };
     Save.write();
+  }
+  // a new run started over an unfinished one: its loot is paid out as if the batyr had fallen in that room
+  function settleSnap() {
+    const s = Save.data.runSnap; if (!s) return;
+    Save.data.runSnap = null;
+    bank += s.coins || 0; Save.data.gems += s.gems || 0;
+    for (const minR of s.room >= 10 ? [0, 0] : s.room >= 5 ? [0] : []) addItem(rollItem(minR));
+    if (s.room > best) best = s.room;
+    saveProgress();
+    toasts.push({ text: mt('lootSaved', s.coins || 0), t: 0 });
   }
   function resumeRun() {
     const s = Save.data.runSnap; if (!s) return;
