@@ -44,11 +44,11 @@
     j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ', en: 'Zheztyrnak' }, hp: 38, r: 12, speed: 48, dmg: 10, xp: 10, coin: 3, ai: 'shooter' },
     a: { name: { ru: 'Албасты', kz: 'Албасты', en: 'Albasty' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
     m: { name: { ru: 'Мыстан', kz: 'Мыстан', en: 'Mystan' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
-    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 420, r: 28, speed: 46, dmg: 15, xp: 70, coin: 35, ai: 'boss', boss: true,
+    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 360, r: 28, speed: 46, dmg: 15, xp: 70, coin: 35, ai: 'boss', boss: true,
          pats: ['walk', 'stomp', 'walk', 'charge', 'walk', 'boulders', 'charge'] },
-    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір', en: 'Zhalmauyz Kempir' }, hp: 750, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
+    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір', en: 'Zhalmauyz Kempir' }, hp: 650, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
          pats: ['walk', 'spiral', 'teleport', 'summon', 'walk', 'teleport', 'spiral', 'teleport'] },
-    A: { name: { ru: 'Айдахар', kz: 'Айдаһар', en: 'Aydahar' }, hp: 1150, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
+    A: { name: { ru: 'Айдахар', kz: 'Айдаһар', en: 'Aydahar' }, hp: 1000, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
          pats: ['walk', 'breath', 'charge', 'rings', 'walk', 'wolves', 'breath', 'charge'] },
   };
 
@@ -111,7 +111,7 @@
       '........', '.m.jj.m.', '........', '..####..', '........', 'a......a', '.w.ww.w.', '........', '..Y..Y..', '........', '~~.jj.~~', '........', '.s.ss.s.', '........', '#..mm..#', '........', '........', '........', '........', '........'] },
     { theme: 'steppe_dark', place: { ru: 'Тропа духов', kz: 'Аруақтар соқпағы', en: 'Path of Spirits' }, lm: [], L: [
       '........', 'aa....aa', '........', '#.m..m.#', '........', '.j.jj.j.', '........', '.~~..~~.', '........', 'w.wssw.w', '........', '..Y..Y..', '........', '.m....m.', '........', '........', '........', '........', '........', '........'] },
-    { theme: 'steppe_dark', place: { ru: 'Сердце Қара түн', kz: 'Қара түн жүрегі', en: 'Heart of Qara Tun' }, lm: [['portal', 0, 2, 1.4]], bossMul: 2,
+    { theme: 'steppe_dark', place: { ru: 'Сердце Қара түн', kz: 'Қара түн жүрегі', en: 'Heart of Qara Tun' }, lm: [['portal', 0, 2, 1.4]], bossMul: 1.8,
       bossName: { ru: 'Чёрный Айдахар', kz: 'Қара Айдаһар', en: 'Black Aydahar' }, L: [
       '........', '........', '...A....', '........', '........', '#......#', '........', '..~..~..', '........', '#......#', '........', '........', '........', '........', '........', '........'] },
   );

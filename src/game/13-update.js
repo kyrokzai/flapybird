@@ -189,7 +189,7 @@
           eg.cd = 1.15 - 0.2 * sk('eagle');
           const a = angTo(eg, t);
           arrows.push({ x: eg.x, y: eg.y, vx: Math.cos(a) * 480, vy: Math.sin(a) * 480, ang: a, dmg: atk() * (0.5 + 0.25 * sk('eagle')), kind: 'feather',
-            pierce: 0, rico: 0, wall: 0, hit: new Set(), life: 1.4, fire: false, ice: false });
+            pierce: 0, rico: 0, wall: 0, hit: new Set(), life: SHOT_RANGE / 480, fire: false, ice: false });
         }
       }
     }
@@ -225,7 +225,7 @@
               const dd = Math.hypot(o2.x - a.x, o2.y - a.y);
               if (dd < nd) { nd = dd; nb = o2; }
             }
-            if (nb) { a.rico--; a.dmg *= 0.7; const an = angTo(a, nb); a.vx = Math.cos(an) * 560; a.vy = Math.sin(an) * 560; a.life = 1; break; }
+            if (nb) { a.rico--; a.dmg *= 0.7; const an = angTo(a, nb); a.vx = Math.cos(an) * 560; a.vy = Math.sin(an) * 560; a.life = 0.5; break; }
           }
           a.dead = true; break;
         }

@@ -4,6 +4,7 @@
     for (const e of enemies) {
       if (e.spawn > 0 || e.dead) continue;
       const d = dist(player, e);
+      if (d > SHOT_RANGE) continue;   // out of reach: walk closer
       const los = lineOfSight(player, e);
       if ((los && !bestLos) || (los === bestLos && d < bestD)) { bestE = e; bestD = d; bestLos = los; }
     }
@@ -14,7 +15,7 @@
   function spawnArrow(x, y, ang, dmg, kind) {
     arrows.push({
       x, y, vx: Math.cos(ang) * 560, vy: Math.sin(ang) * 560, ang, dmg, kind: kind || 'arrow',
-      pierce: sk('pierce') + (heavyOn() ? 2 : 0), rico: sk('rico'), wall: sk('wall') * 2, hit: new Set(), life: 1.6,
+      pierce: sk('pierce') + (heavyOn() ? 2 : 0), rico: sk('rico'), wall: sk('wall') * 2, hit: new Set(), life: SHOT_RANGE / 560,
       fire: sk('fire') > 0, ice: sk('ice') > 0, heavy: heavyOn(),
     });
   }

@@ -32,8 +32,8 @@
     const m = 34;
     if (p.x < ARENA.x + m) fx += 0.7; if (p.x > AX2 - m) fx -= 0.7; if (p.y < ARENA.y + m) fy += 0.7; if (p.y > AY2 - m) fy -= 0.7;
     let l = Math.hypot(fx, fy);
-    // nothing to dodge but no clear shot: walk around cover toward the nearest enemy, like a player would
-    if (l <= 0.3 && !enemies.some(e => e.spawn <= 0 && !e.dead && lineOfSight(p, e))) {
+    // nothing to dodge but no clear shot in reach: walk around cover toward the nearest enemy, like a player would
+    if (l <= 0.3 && !enemies.some(e => e.spawn <= 0 && !e.dead && dist(p, e) <= SHOT_RANGE && lineOfSight(p, e))) {
       let t = null, bd = 1e9;
       for (const e of enemies) { if (e.spawn > 0 || e.dead) continue; const d = dist(p, e); if (d < bd) { bd = d; t = e; } }
       if (t) { const a = pathAngleFor(p, t); fx = Math.cos(a); fy = Math.sin(a); l = 1; }

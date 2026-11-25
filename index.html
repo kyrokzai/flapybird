@@ -72,7 +72,8 @@
   const GATE_X = W / 2, GATE_W = 60;
   const DT = 1 / 60;
   const FONT = '"Montserrat", "Segoe UI", Arial, sans-serif';
-  const TOTAL_ROOMS = 20;   // QARATUN: four acts of five rooms
+  const TOTAL_ROOMS = 20;
+  const SHOT_RANGE = 480;   // how far the batyr aims and his arrows fly (px); about half the old reach, so a long room cannot be shot through from the entrance   // QARATUN: four acts of five rooms
   const TEST_MODE = location.hash === '#test';   // automated tests: hero cannot be hurt
   const KYDYR_AFTER = [3, 5, 8, 10, 13];
   const C = {
@@ -638,11 +639,11 @@
     j: { name: { ru: 'Жезтырнак', kz: 'Жезтырнақ', en: 'Zheztyrnak' }, hp: 38, r: 12, speed: 48, dmg: 10, xp: 10, coin: 3, ai: 'shooter' },
     a: { name: { ru: 'Албасты', kz: 'Албасты', en: 'Albasty' }, hp: 50, r: 14, speed: 30, dmg: 12, xp: 12, coin: 3, ai: 'ghost', fly: true },
     m: { name: { ru: 'Мыстан', kz: 'Мыстан', en: 'Mystan' }, hp: 55, r: 13, speed: 0, dmg: 11, xp: 12, coin: 4, ai: 'witch' },
-    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 420, r: 28, speed: 46, dmg: 15, xp: 70, coin: 35, ai: 'boss', boss: true,
+    D: { name: { ru: 'Дэу-великан', kz: 'Дәу', en: 'Dau the Giant' }, hp: 360, r: 28, speed: 46, dmg: 15, xp: 70, coin: 35, ai: 'boss', boss: true,
          pats: ['walk', 'stomp', 'walk', 'charge', 'walk', 'boulders', 'charge'] },
-    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір', en: 'Zhalmauyz Kempir' }, hp: 750, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
+    J: { name: { ru: 'Жалмауыз-кемпир', kz: 'Жалмауыз кемпір', en: 'Zhalmauyz Kempir' }, hp: 650, r: 22, speed: 55, dmg: 15, xp: 90, coin: 45, ai: 'boss', boss: true,
          pats: ['walk', 'spiral', 'teleport', 'summon', 'walk', 'teleport', 'spiral', 'teleport'] },
-    A: { name: { ru: 'Айдахар', kz: 'Айдаһар', en: 'Aydahar' }, hp: 1150, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
+    A: { name: { ru: 'Айдахар', kz: 'Айдаһар', en: 'Aydahar' }, hp: 1000, r: 30, speed: 42, dmg: 19, xp: 120, coin: 70, ai: 'boss', boss: true,
          pats: ['walk', 'breath', 'charge', 'rings', 'walk', 'wolves', 'breath', 'charge'] },
   };
 
@@ -705,7 +706,7 @@
       '........', '.m.jj.m.', '........', '..####..', '........', 'a......a', '.w.ww.w.', '........', '..Y..Y..', '........', '~~.jj.~~', '........', '.s.ss.s.', '........', '#..mm..#', '........', '........', '........', '........', '........'] },
     { theme: 'steppe_dark', place: { ru: 'Тропа духов', kz: 'Аруақтар соқпағы', en: 'Path of Spirits' }, lm: [], L: [
       '........', 'aa....aa', '........', '#.m..m.#', '........', '.j.jj.j.', '........', '.~~..~~.', '........', 'w.wssw.w', '........', '..Y..Y..', '........', '.m....m.', '........', '........', '........', '........', '........', '........'] },
-    { theme: 'steppe_dark', place: { ru: 'Сердце Қара түн', kz: 'Қара түн жүрегі', en: 'Heart of Qara Tun' }, lm: [['portal', 0, 2, 1.4]], bossMul: 2,
+    { theme: 'steppe_dark', place: { ru: 'Сердце Қара түн', kz: 'Қара түн жүрегі', en: 'Heart of Qara Tun' }, lm: [['portal', 0, 2, 1.4]], bossMul: 1.8,
       bossName: { ru: 'Чёрный Айдахар', kz: 'Қара Айдаһар', en: 'Black Aydahar' }, L: [
       '........', '........', '...A....', '........', '........', '#......#', '........', '..~..~..', '........', '#......#', '........', '........', '........', '........', '........', '........'] },
   );
@@ -877,8 +878,8 @@
   function spawnEnemy(type, x, y, spawn) {
     const d = ENEMY[type];
     const room = diffLevel();
-    const hpMul = d.boss ? 1 : 1 + 0.2 * (room - 1) + 0.035 * Math.max(0, room - 10) ** 2;   // the later acts get tough fast
-    const dmgMul = 1 + 0.085 * (room - 1);   // QARATUN: every room hits a little harder
+    const hpMul = d.boss ? 1 : 1 + 0.16 * (room - 1) + 0.03 * Math.max(0, room - 10) ** 2;   // the later acts get tough fast
+    const dmgMul = 1 + 0.075 * (room - 1);   // QARATUN: every room hits a little harder (softened when the shooting range was halved)
     const e = {
       type, x, y, r: d.r, hp: d.hp * hpMul, maxHp: d.hp * hpMul, speed: d.speed, dmg: d.dmg * dmgMul,
       xp: d.xp, coin: d.coin, ai: d.ai, fly: !!d.fly, boss: !!d.boss, name: d.name,
@@ -999,6 +1000,7 @@
     for (const e of enemies) {
       if (e.spawn > 0 || e.dead) continue;
       const d = dist(player, e);
+      if (d > SHOT_RANGE) continue;   // out of reach: walk closer
       const los = lineOfSight(player, e);
       if ((los && !bestLos) || (los === bestLos && d < bestD)) { bestE = e; bestD = d; bestLos = los; }
     }
@@ -1009,7 +1011,7 @@
   function spawnArrow(x, y, ang, dmg, kind) {
     arrows.push({
       x, y, vx: Math.cos(ang) * 560, vy: Math.sin(ang) * 560, ang, dmg, kind: kind || 'arrow',
-      pierce: sk('pierce') + (heavyOn() ? 2 : 0), rico: sk('rico'), wall: sk('wall') * 2, hit: new Set(), life: 1.6,
+      pierce: sk('pierce') + (heavyOn() ? 2 : 0), rico: sk('rico'), wall: sk('wall') * 2, hit: new Set(), life: SHOT_RANGE / 560,
       fire: sk('fire') > 0, ice: sk('ice') > 0, heavy: heavyOn(),
     });
   }
@@ -1575,7 +1577,7 @@
           eg.cd = 1.15 - 0.2 * sk('eagle');
           const a = angTo(eg, t);
           arrows.push({ x: eg.x, y: eg.y, vx: Math.cos(a) * 480, vy: Math.sin(a) * 480, ang: a, dmg: atk() * (0.5 + 0.25 * sk('eagle')), kind: 'feather',
-            pierce: 0, rico: 0, wall: 0, hit: new Set(), life: 1.4, fire: false, ice: false });
+            pierce: 0, rico: 0, wall: 0, hit: new Set(), life: SHOT_RANGE / 480, fire: false, ice: false });
         }
       }
     }
@@ -1611,7 +1613,7 @@
               const dd = Math.hypot(o2.x - a.x, o2.y - a.y);
               if (dd < nd) { nd = dd; nb = o2; }
             }
-            if (nb) { a.rico--; a.dmg *= 0.7; const an = angTo(a, nb); a.vx = Math.cos(an) * 560; a.vy = Math.sin(an) * 560; a.life = 1; break; }
+            if (nb) { a.rico--; a.dmg *= 0.7; const an = angTo(a, nb); a.vx = Math.cos(an) * 560; a.vy = Math.sin(an) * 560; a.life = 0.5; break; }
           }
           a.dead = true; break;
         }
@@ -4968,8 +4970,8 @@
     const m = 34;
     if (p.x < ARENA.x + m) fx += 0.7; if (p.x > AX2 - m) fx -= 0.7; if (p.y < ARENA.y + m) fy += 0.7; if (p.y > AY2 - m) fy -= 0.7;
     let l = Math.hypot(fx, fy);
-    // nothing to dodge but no clear shot: walk around cover toward the nearest enemy, like a player would
-    if (l <= 0.3 && !enemies.some(e => e.spawn <= 0 && !e.dead && lineOfSight(p, e))) {
+    // nothing to dodge but no clear shot in reach: walk around cover toward the nearest enemy, like a player would
+    if (l <= 0.3 && !enemies.some(e => e.spawn <= 0 && !e.dead && dist(p, e) <= SHOT_RANGE && lineOfSight(p, e))) {
       let t = null, bd = 1e9;
       for (const e of enemies) { if (e.spawn > 0 || e.dead) continue; const d = dist(p, e); if (d < bd) { bd = d; t = e; } }
       if (t) { const a = pathAngleFor(p, t); fx = Math.cos(a); fy = Math.sin(a); l = 1; }

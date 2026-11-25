@@ -42,8 +42,8 @@
   function spawnEnemy(type, x, y, spawn) {
     const d = ENEMY[type];
     const room = diffLevel();
-    const hpMul = d.boss ? 1 : 1 + 0.2 * (room - 1) + 0.035 * Math.max(0, room - 10) ** 2;   // the later acts get tough fast
-    const dmgMul = 1 + 0.085 * (room - 1);   // QARATUN: every room hits a little harder
+    const hpMul = d.boss ? 1 : 1 + 0.16 * (room - 1) + 0.03 * Math.max(0, room - 10) ** 2;   // the later acts get tough fast
+    const dmgMul = 1 + 0.075 * (room - 1);   // QARATUN: every room hits a little harder (softened when the shooting range was halved)
     const e = {
       type, x, y, r: d.r, hp: d.hp * hpMul, maxHp: d.hp * hpMul, speed: d.speed, dmg: d.dmg * dmgMul,
       xp: d.xp, coin: d.coin, ai: d.ai, fly: !!d.fly, boss: !!d.boss, name: d.name,
