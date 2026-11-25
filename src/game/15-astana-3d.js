@@ -440,7 +440,8 @@
     if (runs.length) R.add(propInstances(hedge ? 'prop_hedge' : 'prop_fence', runs));
     // gate
     G3.doors = [];
-    if (theme !== 'office' && G3.models.prop_gate) {
+    if (theme === 'steppe_blood' && G3.models.stp_gate) steppeSkullGate(R, zN);
+    else if (theme !== 'office' && G3.models.prop_gate) {
       // the owner's carved wooden gate: a static frame with the crest, and two leaves hinged on the posts
       const src = G3.models.prop_gate; src.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(src), k = 2.2 / (box.max.z - box.min.z);

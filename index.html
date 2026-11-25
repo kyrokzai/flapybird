@@ -2433,7 +2433,8 @@
     if (runs.length) R.add(propInstances(hedge ? 'prop_hedge' : 'prop_fence', runs));
     // gate
     G3.doors = [];
-    if (theme !== 'office' && G3.models.prop_gate) {
+    if (theme === 'steppe_blood' && G3.models.stp_gate) steppeSkullGate(R, zN);
+    else if (theme !== 'office' && G3.models.prop_gate) {
       // the owner's carved wooden gate: a static frame with the crest, and two leaves hinged on the posts
       const src = G3.models.prop_gate; src.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(src), k = 2.2 / (box.max.z - box.min.z);
@@ -2799,6 +2800,7 @@
   // ---- 3D models supplied as assets/<name>.js (GLB in base64, so the game also runs from file://)
   const MODEL_KEYS = { batyr: 'BATYR_GLB', kydyr: 'KYDYR_GLB', eagle: 'EAGLE_GLB', batyr_bow: 'BATYR_BOW_GLB', batyr_rig: 'BATYR_RIG_GLB', hero: 'HERO_GLB', yurt: 'YURT_GLB', balbal: 'BALBAL_GLB', horse: 'HORSE_GLB',
     prop_palm: 'PROP_PALM_GLB', prop_umbrella: 'PROP_UMBRELLA_GLB', prop_fountain: 'PROP_FOUNTAIN_GLB', prop_tree: 'PROP_TREE_GLB', prop_birch: 'PROP_BIRCH_GLB', lm_portal: 'LM_PORTAL_GLB', civ_woman: 'CIV_WOMAN_GLB',
+    stp_palisade: 'STP_PALISADE_GLB', stp_torch: 'STP_TORCH_GLB', stp_banner: 'STP_BANNER_GLB', stp_gate: 'STP_GATE_GLB', stp_yurtbig: 'STP_YURTBIG_GLB', stp_boulder: 'STP_BOULDER_GLB', stp_menhir: 'STP_MENHIR_GLB', stp_tamga: 'STP_TAMGA_GLB', stp_cart: 'STP_CART_GLB', stp_deadtree: 'STP_DEADTREE_GLB', stp_bush: 'STP_BUSH_GLB', stp_skull: 'STP_SKULL_GLB', stp_bones: 'STP_BONES_GLB', stp_wheel: 'STP_WHEEL_GLB', stp_cauldron: 'STP_CAULDRON_GLB',
     prop_gate: 'PROP_GATE_GLB', prop_chest: 'PROP_CHEST_GLB', prop_fence: 'PROP_FENCE_GLB', prop_hedge: 'PROP_HEDGE_GLB', prop_lamp: 'PROP_LAMP_GLB',
     lm_baiterek: 'LM_BAITEREK_GLB', lm_khanshatyr: 'LM_KHANSHATYR_GLB', lm_nuralem: 'LM_NURALEM_GLB', lm_akorda: 'LM_AKORDA_GLB', lm_station: 'LM_STATION_GLB', lm_towers: 'LM_TOWERS_GLB',
     prop_desk: 'PROP_DESK_GLB', prop_server: 'PROP_SERVER_GLB', prop_bench: 'PROP_BENCH_GLB', prop_busstop: 'PROP_BUSSTOP_GLB', prop_car: 'PROP_CAR_GLB', aydahar: 'AYDAHAR_GLB', zhalmauyz: 'ZHALMAUYZ_GLB', dau: 'DAU_GLB', albasty: 'ALBASTY_GLB', mystan: 'MYSTAN_GLB', zheztyrnak: 'ZHEZ_GLB', wolf: 'WOLF_GLB', tarantula: 'TARANTULA_GLB' };
@@ -2817,7 +2819,7 @@
           if (name === 'batyr') { G3.batyrScene = gltf.scene; const an = G3.r ? Math.min(8, G3.r.capabilities.getMaxAnisotropy()) : 1; gltf.scene.traverse(o => { if (o.isMesh) for (const t of [o.material.map, o.material.normalMap]) if (t) { t.anisotropy = an; t.needsUpdate = true; } }); }
           if (name === 'kydyr') makeKydyrPortrait();
           if (name === 'prop_tree' || name === 'prop_palm' || name === 'prop_birch') gltf.scene.traverse(o => { if (o.isMesh) windMaterial(o.material, WIND_TREE); });
-          if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_') || name.startsWith('prop_') || name.startsWith('civ_')) G3.dirty = true;
+          if (name === 'yurt' || name === 'balbal' || name === 'horse' || name.startsWith('lm_') || name.startsWith('prop_') || name.startsWith('civ_') || name.startsWith('stp_')) G3.dirty = true;
           if (done) done();
         }, () => { if (done) done(); });
       } catch (e) { if (done) done(); }
@@ -4728,7 +4730,7 @@
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !TEST_MODE) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* sandboxed frame */ } }
   if (typeof THREE === 'undefined' || !initGL()) { document.getElementById('nogl').style.display = 'flex'; return; }
   // load one model after another, most needed first
-  const LOAD_ORDER = ['batyr', 'hero', 'horse', 'yurt', 'balbal', 'lm_baiterek', 'prop_gate', 'prop_hedge', 'prop_chest', 'prop_birch', 'prop_tree', 'civ_woman', 'prop_fence', 'prop_lamp', 'lm_portal', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
+  const LOAD_ORDER = ['batyr', 'hero', 'horse', 'yurt', 'balbal', 'stp_palisade', 'stp_torch', 'stp_banner', 'stp_gate', 'stp_yurtbig', 'stp_boulder', 'stp_menhir', 'stp_tamga', 'stp_cart', 'stp_deadtree', 'stp_bush', 'stp_skull', 'stp_bones', 'stp_wheel', 'stp_cauldron', 'prop_gate', 'prop_hedge', 'prop_chest', 'prop_birch', 'prop_tree', 'civ_woman', 'prop_fence', 'prop_lamp', 'lm_portal', 'prop_fountain', 'prop_bench', 'lm_towers', 'wolf', 'tarantula', 'lm_khanshatyr', 'zheztyrnak', 'albasty',
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
   const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'hero'], ['i', 'icons'], ['c', 'comic'], ['a', 'music_menu'], ['a', 'sfx'],
@@ -7157,6 +7159,9 @@
       tint: [0.78, 0.56, 0.42], wood: '#3a281c', tip: '#5a4232', stone: '#5a4a46', cloth: '#6a1010', pool: '#ff8a40', bush: ['#4a2a1a', '#3a1a12', '#5a3a22'] },
   };
   const STP_NAME = { gold: 'steppe_gold', night: 'steppe_night', blood: 'steppe_blood' };
+  // the owner's Tripo props (assets/stp_*.js); each builder below falls back to the coded shape until its model has loaded
+  const stpHas = k => !!G3.models['stp_' + k];
+  const stpModel = (k, size, by) => propModel('stp_' + k, size, by);
 
   // dry cracked earth: random-walk fissures (shared by the floor, the outer ground and the glowing layer)
   function crackPaths(r, w, h, n) {
@@ -7241,6 +7246,7 @@
   }
   function stoneMat(v) { return mat('#ffffff', { map: petroTex(v), r: 0.92 }); }
   function makeBullSkull(scale, v) {
+    if (stpHas('skull')) return stpModel('skull', 0.5 * scale, 'w');
     const g = new THREE.Group(), bone = mat(v === 'blood' ? '#d8c4a8' : '#e8dcc4', { r: 0.7 }), dark = mat('#2a1e16', { r: 1 });
     g.add(mesh(G3.geo.sphere, bone, 0, 0.1, -0.04, 0.12, 0.09, 0.13));
     g.add(mesh(G3.geo.box, bone, 0, 0.07, 0.11, 0.1, 0.07, 0.14));
@@ -7252,6 +7258,7 @@
     g.scale.setScalar(scale); return g;
   }
   function makeCartWheel(v) {
+    if (stpHas('wheel')) return stpModel('wheel', 0.62, 'w');
     const g = new THREE.Group(), wood = mat(STP[v].wood, { r: 0.85 });
     const rim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 20), wood); rim.castShadow = true; g.add(rim);
     for (let i = 0; i < 8; i++) { const sp = mesh(G3.geo.box, wood, 0, 0, 0, 0.56, 0.03, 0.03); sp.rotation.z = i * Math.PI / 8; g.add(sp); }
@@ -7259,6 +7266,7 @@
     return g;
   }
   function makeBrokenCart(v, r) {
+    if (stpHas('cart')) { const c = stpModel('cart', 1.05, 'w'); c.rotation.y = r() * TAU; return c; }
     const g = new THREE.Group(), wood = mat(STP[v].wood, { r: 0.85 }), plank = mat(STP[v].tip, { r: 0.9 });
     const bed = mesh(G3.geo.box, plank, 0, 0.18, 0, 0.62, 0.06, 0.9); bed.rotation.z = 0.32; bed.rotation.y = 0.2; g.add(bed);
     for (const z of [-0.36, 0, 0.36]) { const p = mesh(G3.geo.box, wood, 0.24, 0.32, z, 0.04, 0.22, 0.05); p.rotation.z = 0.3; g.add(p); }
@@ -7267,6 +7275,7 @@
     g.rotation.y = r() * TAU; return g;
   }
   function makeDeadTree(v, r, h) {
+    if (stpHas('deadtree')) { const t = stpModel('deadtree', h, 'h'); t.rotation.y = r() * TAU; return t; }
     const g = new THREE.Group(), bark = mat(v === 'blood' ? '#2a1a14' : '#3a3228', { r: 1 });
     const limb = (x, y, z, len, rad, ax, az, depth) => {
       const m = mesh(G3.geo.cone, bark, 0, len / 2, 0, rad, len, rad), pv = new THREE.Group();
@@ -7281,6 +7290,7 @@
     return g;
   }
   function makeBush(v, r) {
+    if (stpHas('bush')) { const b = stpModel('bush', 0.55 + r() * 0.35, 'w'); b.rotation.y = r() * TAU; return b; }
     const g = new THREE.Group(), cols = STP[v].bush;
     for (let i = 0; i < 3; i++) { const s = 0.14 + r() * 0.12; g.add(mesh(G3.geo.dodeca, mat(cols[(i + Math.floor(r() * 3)) % cols.length], { r: 1, flat: true }), (r() - 0.5) * 0.3, s * 0.8, (r() - 0.5) * 0.3, s, s * 0.85, s)); }
     return g;
@@ -7309,7 +7319,7 @@
     }
     if (kind === 'yurt') {
       const k = r();
-      if (v !== 'blood' && k < 0.55) { const y = makeYurt(0, 0, 1.05); y.rotation.y = r() * TAU; g.add(y); }
+      if (v !== 'blood' && k < 0.55) { const y = stpHas('yurtbig') ? stpModel('yurtbig', 1.15, 'w') : makeYurt(0, 0, 1.05); y.rotation.y = r() * TAU; g.add(y); }
       else if (k < 0.8 || v !== 'blood') g.add(makeBrokenCart(v, r));
       else { g.add(makeDeadTree(v, r, 2.2)); g.add(makeRockLow(v, r)); }
       return g;
@@ -7317,6 +7327,9 @@
     // stone: a balbal statue, a carved standing stone or a boulder with petroglyphs
     const k = r();
     if (k < 0.22 && G3.models.balbal) { const b = G3.models.balbal.clone(); b.scale.setScalar(1.05); b.rotation.y = (r() - 0.5) * 0.8; g.add(b); }
+    else if (stpHas('menhir') && k < 0.5) { const m = stpModel('menhir', 1.05 + r() * 0.4, 'h'); m.rotation.y = Math.PI / 2 + (r() - 0.5) * 0.7; g.add(m); }
+    else if (stpHas('boulder') && k < 0.78) { const b = stpModel('boulder', 0.85 + r() * 0.15, 'w'); b.rotation.y = Math.PI / 2 + (r() - 0.5) * 1.2; g.add(b); }
+    else if (stpHas('tamga')) { const t = stpModel('tamga', 0.95, 'w'); t.rotation.y = r() * TAU; g.add(t); }
     else if (k < 0.62) {
       const h = 0.85 + r() * 0.45, st = mesh(G3.geo.box, stoneMat(v), 0, h / 2, 0, 0.36, h, 0.2);
       st.rotation.y = (r() - 0.5) * 0.6; st.rotation.z = (r() - 0.5) * 0.12; g.add(st);
@@ -7358,6 +7371,12 @@
     'transformed.x += sin(uT * 1.9 + position.y * 3.0) * 0.02 * k;',
   ].join('\n');
   function makeBanner(v, h, w) {
+    if (stpHas('banner')) {
+      // its cloth faces +z, like the coded one; lit a little by its own colours so it does not turn black against the low sun
+      const g = new THREE.Group(), b = stpModel('banner', h + 0.25, 'h'); b.rotation.y = Math.PI / 2;
+      b.traverse(o => { if (!o.isMesh) return; if (!G3.bannerMat) { G3.bannerMat = o.material.clone(); G3.bannerMat.emissive = col('#ffffff'); G3.bannerMat.emissiveMap = G3.bannerMat.map; G3.bannerMat.emissiveIntensity = 0.35; } o.material = G3.bannerMat; });
+      g.add(b); return g;
+    }
     const g = new THREE.Group(), wood = mat(STP[v].wood, { r: 0.85 }), gold = mat('#d8a83a', { m: 0.7, r: 0.35 });
     g.add(mesh(G3.geo.cyl, wood, 0, h / 2, 0, 0.045, h, 0.045));
     g.add(mesh(G3.geo.box, wood, 0, h - 0.08, 0, w + 0.18, 0.05, 0.05));
@@ -7369,8 +7388,11 @@
   }
   function makeTorch(v, R, x, z, h) {
     const g = new THREE.Group(); g.position.set(x, 0, z);
-    g.add(mesh(G3.geo.cyl, mat(STP[v].wood, { r: 0.85 }), 0, h / 2, 0, 0.05, h, 0.05));
-    const bowl = mesh(G3.geo.cone, mat('#3a2e24', { m: 0.6, r: 0.4 }), 0, h + 0.05, 0, 0.14, 0.16, 0.14); bowl.rotation.x = Math.PI; g.add(bowl);
+    if (stpHas('torch')) { const t = stpModel('torch', h + 0.2, 'h'); t.rotation.y = x * 1.7 + z; g.add(t); h -= 0.06; }   // the flame sits in its iron basket
+    else {
+      g.add(mesh(G3.geo.cyl, mat(STP[v].wood, { r: 0.85 }), 0, h / 2, 0, 0.05, h, 0.05));
+      const bowl = mesh(G3.geo.cone, mat('#3a2e24', { m: 0.6, r: 0.4 }), 0, h + 0.05, 0, 0.14, 0.16, 0.14); bowl.rotation.x = Math.PI; g.add(bowl);
+    }
     R.add(g);
     const fl = new THREE.Group(); fl.position.set(x, h + 0.12, z);
     const outer = new THREE.Mesh(G3.geo.cone, new THREE.MeshBasicMaterial({ color: col('#ff8a2a'), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -7394,36 +7416,51 @@
     const line = (x0, z0, x1, z1) => {
       const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 0.17));
       for (let i = 0; i <= n; i++) { const t = i / n; places.push([x0 + (x1 - x0) * t + (rnd() - 0.5) * 0.03, z0 + (z1 - z0) * t + (rnd() - 0.5) * 0.03, 0.8 + rnd() * 0.4]); }
-      for (const y of [0.32, 0.66]) R.add(mesh(G3.geo.box, mat(P.wood, { r: 0.9 }), (x0 + x1) / 2, y, (z0 + z1) / 2, Math.abs(x1 - x0) + 0.05, 0.05, Math.abs(z1 - z0) + 0.05));
+      if (!stpHas('palisade')) for (const y of [0.32, 0.66]) R.add(mesh(G3.geo.box, mat(P.wood, { r: 0.9 }), (x0 + x1) / 2, y, (z0 + z1) / 2, Math.abs(x1 - x0) + 0.05, 0.05, Math.abs(z1 - z0) + 0.05));
     };
     const X = 4.15;
     line(-X, zN - 0.15, -1.25, zN - 0.15); line(1.25, zN - 0.15, X, zN - 0.15);
     line(-X, zS + 0.15, pathXs - 0.75, zS + 0.15); line(pathXs + 0.75, zS + 0.15, X, zS + 0.15);
     line(-X, zN - 0.15, -X, zS + 0.15); line(X, zN - 0.15, X, zS + 0.15);
+    // the owner's palisade sections laid along the lines (one instanced mesh per material), else coded stakes
+    if (stpHas('palisade')) {
+      const segs = [], lay = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n2 = Math.max(1, Math.round(L / 1.55)); for (let i = 0; i < n2; i++) { const t = (i + 0.5) / n2; segs.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, ry: Math.abs(x1 - x0) > Math.abs(z1 - z0) ? Math.PI / 2 : 0, l: L / n2 * 1.03, h: 1.15 + rnd() * 0.12, w: 0.16 }); } };
+      lay(-X, zN - 0.15, -1.25, zN - 0.15); lay(1.25, zN - 0.15, X, zN - 0.15);
+      lay(-X, zS + 0.15, pathXs - 0.75, zS + 0.15); lay(pathXs + 0.75, zS + 0.15, X, zS + 0.15);
+      lay(-X, zN - 0.15, -X, zS + 0.15); lay(X, zN - 0.15, X, zS + 0.15);
+      R.add(propInstances('stp_palisade', segs));
+      places.length = 0;
+    }
     // the stakes: shafts and sharpened tips, one instanced mesh each
     const shaftM = mat(P.wood, { r: 0.9 }), tipM = mat(P.tip, { r: 0.85 }), n = places.length;
-    const shaft = new THREE.InstancedMesh(G3.geo.cyl, shaftM, n), tip = new THREE.InstancedMesh(G3.geo.cone, tipM, n), d = new THREE.Object3D(), cc = new THREE.Color();
+    const shaft = new THREE.InstancedMesh(G3.geo.cyl, shaftM, Math.max(1, n)), tip = new THREE.InstancedMesh(G3.geo.cone, tipM, Math.max(1, n)), d = new THREE.Object3D(), cc = new THREE.Color();
     places.forEach(([x, z, h], i) => {
       const lean = (rnd() - 0.5) * 0.08, lean2 = (rnd() - 0.5) * 0.08;
       d.position.set(x, h / 2, z); d.rotation.set(lean, rnd() * TAU, lean2); d.scale.set(0.058, h, 0.058); d.updateMatrix(); shaft.setMatrixAt(i, d.matrix);
       d.position.set(x + lean2 * -h * 0.5, h + 0.08, z + lean * h * 0.5); d.scale.set(0.058, 0.18, 0.058); d.updateMatrix(); tip.setMatrixAt(i, d.matrix);
       const k = 0.8 + rnd() * 0.35; cc.setRGB(k, k * 0.97, k * 0.92); shaft.setColorAt(i, cc); tip.setColorAt(i, cc);
     });
-    for (const im of [shaft, tip]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; R.add(im); }
+    if (n) for (const im of [shaft, tip]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; R.add(im); }
     // torches at the corners, by the gate and along the sides
     const torches = [[-X, zN - 0.15], [X, zN - 0.15], [-X, zS + 0.15], [X, zS + 0.15], [-1.45, zN - 0.15], [1.45, zN - 0.15]];
     for (let z = zN + 4.6; z < zS - 2.5; z += 4.6) torches.push([-X, z], [X, z]);
     for (const [x, z] of torches) dyn.push(makeTorch(v, R, x, z, 1.25));
     // banners: a pair flanking the gate, more hung along the sides
     for (const s of [-1, 1]) { const b = makeBanner(v, 2.7, 0.55); b.position.set(s * 2.35, 0, zN - 0.55); R.add(b); }
-    for (let z = zN + 7, i = 0; z < zS - 4; z += 7.5, i++) { const s = i % 2 ? 1 : -1, b = makeBanner(v, 1.9, 0.4); b.position.set(s * 4.45, 0, z); b.rotation.y = s * Math.PI / 2; R.add(b); }
+    for (let z = zN + 7, i = 0; z < zS - 4; z += 7.5, i++) { const s = i % 2 ? 1 : -1, b = makeBanner(v, 1.9, 0.4); b.position.set(s * 4.45, 0, z); b.rotation.y = -s * Math.PI / 2; R.add(b); }   // cloth facing into the arena
     // beyond the gate: the great yurt with its door aglow, or — under the eclipse — a bull skull nailed over the gate
     if (v !== 'blood') {
-      const y = makeYurt(0, zN - 3.6, 2.7); R.add(y);
+      if (stpHas('yurtbig')) { const y = stpModel('yurtbig', 3.4, 'w'); y.position.set(0, 0, zN - 3.9); y.rotation.y = Math.PI / 2; R.add(y); }
+      else R.add(makeYurt(0, zN - 3.6, 2.7));
+      if (stpHas('cauldron')) {   // a cauldron on its tripod by the yurt, embers under it
+        const c = stpModel('cauldron', 0.75, 'w'); c.position.set(2.6, 0, zN - 2.2); R.add(c);
+        const eg = glow('#ff9a40', 0.9, 0.7); eg.position.set(2.6, 0.12, zN - 2.2); R.add(eg); dyn.push(eg);
+        (G3.stpAnim = G3.stpAnim || []).push(t => { eg.material.opacity = 0.5 + Math.sin(t * 9 + 1) * 0.12 + Math.sin(t * 15) * 0.08; });
+      }
       const dg = glow('#ffb050', 2.2, 0.75); dg.position.set(0, 0.6, zN - 2.3); R.add(dg); dyn.push(dg);
       (G3.stpAnim = G3.stpAnim || []).push(t => { dg.material.opacity = 0.6 + Math.sin(t * 5.3) * 0.08 + Math.sin(t * 11) * 0.05; });
     } else {
-      const sk = makeBullSkull(2.2, v); sk.position.set(0, 2.25, zN - 0.05); R.add(sk);
+      if (!stpHas('gate')) { const sk = makeBullSkull(2.2, v); sk.position.set(0, 2.25, zN - 0.05); R.add(sk); }
       for (const [x, z, h] of [[3.4, zN - 2.6, 3.2], [-5.5, zN - 4.2, 3.8], [6.8, zN - 6, 2.8]]) { const t = makeDeadTree(v, rnd, h); t.position.set(x, 0, z); R.add(t); }
     }
     return dyn;
@@ -7443,7 +7480,8 @@
       else if (k < 0.72) o = makeBush(v, rnd);
       else if (k < 0.82) { o = makeBullSkull(0.8 + rnd() * 0.4, v); o.rotation.y = rnd() * TAU; }
       else if (k < 0.9 && v !== 'gold') o = makeDeadTree(v, rnd, 2 + rnd() * 1.6);
-      else if (k < 0.95) { o = makeCartWheel(v); o.rotation.x = -Math.PI / 2 + 0.15; o.position.y = 0.05; const w = new THREE.Group(); w.add(o); o = w; }
+      else if (k < 0.95 && stpHas('bones') && rnd() < 0.5) { o = stpModel('bones', 0.8 + rnd() * 0.4, 'w'); o.rotation.y = rnd() * TAU; }
+      else if (k < 0.95) { const w = new THREE.Group(), wh = makeCartWheel(v); if (stpHas('wheel')) { wh.rotation.z = Math.PI / 2 - 0.12; wh.position.y = 0.06; } else { wh.rotation.x = -Math.PI / 2 + 0.15; wh.position.y = 0.05; } w.add(wh); w.rotation.y = rnd() * TAU; o = w; }
       else o = makeBush(v, rnd);
       o.position.x = x; o.position.z = z; R.add(o);
     }
@@ -7503,6 +7541,22 @@
   function ensureSteppeSky(theme) {
     if (G3.skyTex[theme]) return;
     const t = steppeSkyTex(theme); t.mapping = THREE.EquirectangularReflectionMapping; G3.skyTex[theme] = t;
+  }
+
+  // eclipse rooms: the owner's skull archway, the carved gate's two leaves hung inside it (they swing open like the others)
+  function steppeSkullGate(R, zN) {
+    const fr = stpModel('gate', 2.55, 'w'); fr.rotation.y = Math.PI / 2; fr.position.set(0, 0, zN - 0.15); R.add(fr);
+    if (!G3.models.prop_gate) return;
+    const src = G3.models.prop_gate; src.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(src), k = 2.6;
+    const root = new THREE.Group(); root.position.set(0, -box.min.y * k, zN - 0.12); root.rotation.y = Math.PI / 2; root.scale.setScalar(k); R.add(root);
+    src.traverse(o => {
+      if (!o.isMesh || (o.name !== 'doorL' && o.name !== 'doorR')) return;
+      const m = new THREE.Mesh(o.geometry, o.material); m.applyMatrix4(o.matrixWorld); m.castShadow = true; m.receiveShadow = true;
+      const sx = o.name === 'doorL' ? -1 : 1, hx = -0.015, hz = sx * 0.315;
+      const pv = new THREE.Group(); pv.position.set(hx, 0, hz); m.position.x -= hx; m.position.z -= hz; pv.add(m); root.add(pv);
+      G3.doors.push({ pv, sx });
+    });
   }
 })();
 </script>
