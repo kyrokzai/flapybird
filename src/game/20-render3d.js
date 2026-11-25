@@ -60,7 +60,7 @@
       hm.g.visible = (hm.rig || scene !== 'dead') && !(player.inv > 0 && player.hp > 0 && Math.floor(time * 20) % 2 === 0);
       hm.g.position.set(X3(player.x), 0, Z3(player.y)); hm.g.scale.setScalar(1.18);
       hm.g.rotation.y = -player.face;
-      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, shot: player.atkAnim > 0 ? player.atkAnim / 0.18 : 0, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
     }
     syncHeroAtmosphere(menu);
     const ens = menu ? [] : enemies;

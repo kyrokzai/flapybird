@@ -3103,6 +3103,13 @@
     if (act.aim) act.aim.timeScale = 1.5;
     const run = clips.find(c => c.name === 'run');
     if (!act.idle && run) { act.idle = mixer.clipAction(THREE.AnimationUtils.subclip(run, 'idle', 15, 16, 30)); m0.pose = true; }   // the most upright frame of the run as a standing pose
+    if (m0.pose && !act.shot) {
+      // no archery clip yet: the arms are posed from code (see archerPose) and a bow is put in the left hand
+      const b = n => model.getObjectByName(n);
+      m0.bones = { LU: b('L_Upperarm'), LF: b('L_Forearm'), LH: b('L_Hand'), RU: b('R_Upperarm'), RF: b('R_Forearm'), RH: b('R_Hand'),
+        LT: b('L_Thigh'), LC: b('L_Calf'), LFt: b('L_Foot'), LTo: b('L_ToeBase'), RT: b('R_Thigh'), RC: b('R_Calf'), RFt: b('R_Foot'), RTo: b('R_ToeBase') };
+      if (Object.values(m0.bones).every(Boolean)) { m0.bow = makeHandBow(); up.add(m0.bow.g); m0.aimW = 0; m0.aimK = 0; } else m0.bones = null;
+    }
     if (act.idle) act.idle.play();
     return Object.assign(m0, { g, up, rig: true, mixer, act, cur: 'idle', hitT: 0, lastHp: null, deadK: 0 });
   }
@@ -3132,7 +3139,71 @@
       const fl = m.hitT > 0 ? Math.sin((0.5 - m.hitT) / 0.5 * Math.PI) * 0.22 : 0;
       m.up.rotation.z = -fl + m.deadK * m.deadK * 1.45;
       m.up.position.y = m.deadK * 0.12;
+      if (m.bones) archerPose(m, o, dt);
     }
+  }
+
+  // ---- archer pose from code, for a rig that only has a run clip.
+  // Each arm bone is turned so it points along a direction given in the hero's own frame (+x forward, +y up, +z his right),
+  // so the bones' local axes do not matter. Weight w blends from the clip pose to the archer pose.
+  const AP = {
+    LU: [1, 0.15, -0.3], LF: [1, 0.12, -0.05],                                    // bow arm straight ahead
+    RUdrawn: [-0.35, 0.12, 1], RFdrawn: [0.75, 0.08, -0.65],                     // string hand at the cheek
+    RUbow: [0.85, 0.1, 0.45], RFbow: [1, 0.1, -0.3],                             // hand at the bow, taking an arrow
+    RUfree: [-0.6, 0.1, 1], RFfree: [-0.2, 0.1, 1],                              // follow-through right after the release
+    LT: [0.08, -1, -0.16], LC: [0.02, -1, -0.12], RT: [-0.08, -1, 0.16], RC: [-0.02, -1, 0.12],   // feet apart, knees straight
+    LUlow: [0.5, -0.85, -0.2], LFlow: [0.7, -0.6, 0], RUlow: [0.1, -1, 0.25], RFlow: [0.3, -0.9, 0.1],   // bow lowered, nothing to shoot
+  };
+  const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pd = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pw = new THREE.Quaternion(), _pp = new THREE.Quaternion(), _gq = new THREE.Quaternion(), _idq = new THREE.Quaternion();
+  const mixDir = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+  function pointBone(bone, child, dir, w) {
+    bone.getWorldPosition(_pa); child.getWorldPosition(_pb);
+    _pd.set(dir[0], dir[1], dir[2]).normalize().applyQuaternion(_gq);
+    _pq.setFromUnitVectors(_pb.sub(_pa).normalize(), _pd);
+    if (w < 1) _pq.slerp(_idq, 1 - w);
+    bone.getWorldQuaternion(_pw); bone.parent.getWorldQuaternion(_pp);
+    bone.quaternion.copy(_pp.invert().multiply(_pq.multiply(_pw)));
+    bone.updateMatrixWorld(true);
+  }
+  function archerPose(m, o, dt) {
+    const B = m.bones, ready = !o.moving && !o.dead && !o.menu;
+    m.aimW += ((ready ? 1 : 0) - m.aimW) * Math.min(1, dt * 12);
+    m.aimK += ((enemies.some(e => e.spawn <= 0) ? 1 : 0) - m.aimK) * Math.min(1, dt * 6);
+    m.bow.g.visible = m.aimW > 0.4;
+    if (m.aimW < 0.02) return;
+    m.g.updateMatrixWorld(true); m.g.getWorldQuaternion(_gq);
+    // shot cycle: release → hand back to the bow → draw to the cheek (t runs 0..1 over the shot animation)
+    const t = o.shot > 0 ? 1 - o.shot : 1;
+    let ru, rf, draw;
+    if (t < 0.25) { const k = t / 0.25; ru = mixDir(AP.RUfree, AP.RUfree, k); rf = AP.RFfree; draw = 0; }
+    else if (t < 0.55) { const k = (t - 0.25) / 0.3; ru = mixDir(AP.RUfree, AP.RUbow, k); rf = mixDir(AP.RFfree, AP.RFbow, k); draw = 0; }
+    else { const k = (t - 0.55) / 0.45; ru = mixDir(AP.RUbow, AP.RUdrawn, k); rf = mixDir(AP.RFbow, AP.RFdrawn, k); draw = k; }
+    const a = m.aimK, w = m.aimW;
+    // stand on both feet (the borrowed run frame has a knee up), then put the soles back on the ground
+    pointBone(B.LT, B.LC, AP.LT, w); pointBone(B.LC, B.LFt, AP.LC, w); pointBone(B.RT, B.RC, AP.RT, w); pointBone(B.RC, B.RFt, AP.RC, w);
+    m.g.getWorldPosition(_pb); B.LFt.getWorldPosition(_pa); let low = _pa.y; B.RFt.getWorldPosition(_pa); low = Math.min(low, _pa.y);
+    if (m.footY === undefined) m.footY = 0.06;   // ankle height above the ground
+    m.up.position.y += (m.footY - (low - _pb.y)) / m.g.scale.y * w;
+    m.g.updateMatrixWorld(true);
+    pointBone(B.LU, B.LF, mixDir(AP.LUlow, AP.LU, a), w); pointBone(B.LF, B.LH, mixDir(AP.LFlow, AP.LF, a), w);
+    pointBone(B.RU, B.RF, mixDir(AP.RUlow, ru, a), w); pointBone(B.RF, B.RH, mixDir(AP.RFlow, rf, a), w);
+    // the bow sits in the left hand, the string follows the right hand while drawing
+    const bw = m.bow; B.LH.getWorldPosition(_pa); m.up.worldToLocal(_pa); bw.g.position.copy(_pa);
+    bw.g.rotation.set(-0.12, 0, -(1 - a) * 1.1);
+    bw.g.updateMatrixWorld(true);
+    B.RH.getWorldPosition(_pb); bw.g.worldToLocal(_pb);
+    const d = draw * a, sp = bw.str.geometry.attributes.position;
+    sp.setXYZ(1, bw.tipX + (_pb.x - bw.tipX) * d, _pb.y * d, _pb.z * d); sp.needsUpdate = true;
+  }
+  function makeHandBow() {
+    const g = new THREE.Group(), R = 0.49, arc = 1.9;
+    const limb = new THREE.Mesh(new THREE.TorusGeometry(R, 0.016, 6, 28, arc), mat('#6b3f1f', { r: 0.55 }));
+    limb.rotation.z = -arc / 2; limb.position.x = -R; limb.castShadow = true; g.add(limb);
+    g.add(mesh(G3.geo.sphere, mat('#e0b040', { m: 0.8, r: 0.3 }), 0, 0, 0, 0.035, 0.07, 0.035));
+    const tipX = -R * (1 - Math.cos(arc / 2)), tipY = R * Math.sin(arc / 2);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute([tipX, tipY, 0, tipX, 0, 0, tipX, -tipY, 0], 3));
+    const str = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: col('#efe6cc') })); str.frustumCulled = false; g.add(str);
+    return { g, str, tipX };
   }
   function animateBatyr(m, o) {
     m.uni.uSwing.value = o.moving ? Math.sin(o.walk) * 0.55 : 0;
@@ -3927,7 +3998,7 @@
       hm.g.visible = (hm.rig || scene !== 'dead') && !(player.inv > 0 && player.hp > 0 && Math.floor(time * 20) % 2 === 0);
       hm.g.position.set(X3(player.x), 0, Z3(player.y)); hm.g.scale.setScalar(1.18);
       hm.g.rotation.y = -player.face;
-      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
+      (hm.rig ? animateRig : hm.batyr ? animateBatyr : animateHero)(hm, { dt: fdt, hp: player.hp, dead: player.hp <= 0, moving: player.moving, walk: player.walk, shot: player.atkAnim > 0 ? player.atkAnim / 0.18 : 0, pull: player.atkAnim > 0 ? 1 - player.atkAnim / 0.18 : (player.moving ? 0 : 0.35) });
     }
     syncHeroAtmosphere(menu);
     const ens = menu ? [] : enemies;
