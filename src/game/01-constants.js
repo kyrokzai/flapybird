@@ -13,7 +13,7 @@
   const GATE_X = W / 2, GATE_W = 60;
   const DT = 1 / 60;
   const FONT = '"Montserrat", "Segoe UI", Arial, sans-serif';
-  const TOTAL_ROOMS = 15;
+  const TOTAL_ROOMS = 20;   // QARATUN: four acts of five rooms
   const TEST_MODE = location.hash === '#test';   // automated tests: hero cannot be hurt
   const KYDYR_AFTER = [3, 5, 8, 10, 13];
   const C = {

@@ -2,7 +2,7 @@
   // steppe_gold (rooms 1–5, sunset), steppe_night (6–10, moon and fog), steppe_blood (11–15, red eclipse, glowing cracks).
   // Wooden palisade with torches, banners, standing stones with petroglyphs, yurts, broken carts, bull skulls, dead trees.
   const isSteppe = t => typeof t === 'string' && t.startsWith('steppe');
-  const svar = t => t === 'steppe_night' ? 'night' : t === 'steppe_blood' ? 'blood' : 'gold';
+  const svar = t => t === 'steppe_night' ? 'night' : t === 'steppe_blood' ? 'blood' : t === 'steppe_dark' ? 'dark' : 'gold';
   const STP = {
     gold: { base: '#97834e', blots: ['#a89058', '#6e5a30', '#b8a066', '#857244', '#5e5230', '#a0884a'], strokes: ['rgba(90,62,24,0.5)', 'rgba(236,206,130,0.45)'],
       path: ['#5e4630', '#7c6248', '#957c5e'], dots: ['#a83a2a', '#d8a830', '#6a3a2a'], crack: 'rgba(60,40,20,0.5)', glow: null,
@@ -14,6 +14,9 @@
       path: ['#4a3426', '#64483a', '#7a5c48'], dots: ['#5a1a12', '#3a1a10'], crack: 'rgba(20,8,4,0.8)', glow: '#ff4a1a',
       tint: [0.78, 0.56, 0.42], wood: '#3a281c', tip: '#5a4232', stone: '#5a4a46', cloth: '#6a1010', pool: '#ff8a40', bush: ['#4a2a1a', '#3a1a12', '#5a3a22'] },
   };
+  STP.dark = { base: '#34303e', blots: ['#3e3a4a', '#2a2632', '#48425a', '#24202c', '#4a4458'], strokes: ['rgba(16,12,24,0.55)', 'rgba(170,150,220,0.25)'],
+    path: ['#2e2a34', '#45404e', '#5a5466'], dots: ['#8a6ad8', '#a888f0', '#5a4a9a'], crack: 'rgba(12,8,20,0.6)', glow: null,
+    tint: [0.62, 0.56, 0.82], wood: '#3a3038', tip: '#5a4e5a', stone: '#5a5668', cloth: '#2a1a4a', pool: '#8a7aff', bush: ['#2e2a3a', '#4a3a5a', '#3a3446'] };
   const STP_NAME = { gold: 'steppe_gold', night: 'steppe_night', blood: 'steppe_blood' };
   // the owner's Tripo props (assets/stp_*.js); each builder below falls back to the coded shape until its model has loaded
   const stpHas = k => !!G3.models['stp_' + k];
@@ -67,7 +70,7 @@
       if (cr) strokeCracks(g, cr, 'rgba(24,6,2,0.85)', 1.8);
       for (const o of obs) {
         const ox = o.x - ARENA.x, oy = o.y - ARENA.y;
-        if (o.kind === 'water') { g.fillStyle = v === 'blood' ? 'rgba(20,6,2,0.65)' : 'rgba(40,34,22,0.55)'; g.beginPath(); g.ellipse(ox + 20, oy + 20, 26, 24, 0, 0, TAU); g.fill(); }
+        if (o.kind === 'water') continue;   // the pond shape covers it
         else { g.fillStyle = 'rgba(0,0,0,0.2)'; g.beginPath(); g.ellipse(ox + 20, oy + 22, 21, 17, 0, 0, TAU); g.fill(); }
       }
       steppePath(g, v, xAt, -10, AH + 10);
@@ -158,21 +161,7 @@
   }
   function steppeProp(theme, kind, o, cx, cz) {
     const v = svar(theme), r = mulberry32(o.seed * 7 + 13), g = new THREE.Group(); g.position.set(cx, 0, cz);
-    if (kind === 'water') {
-      if (v === 'blood') {
-        // a fissure of embers: dark scorched bed and a pulsing glow
-        const bed = new THREE.Mesh(new THREE.CircleGeometry(0.58, 18), mat('#1a0e0a', { r: 1 })); bed.rotation.x = -Math.PI / 2; bed.position.y = 0.02; bed.receiveShadow = true; g.add(bed);
-        const lava = new THREE.Mesh(G3.geo.plane, new THREE.MeshBasicMaterial({ map: lavaTex(), color: col('#ff5a20'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-        lava.rotation.x = -Math.PI / 2; lava.rotation.z = r() * TAU; lava.scale.set(0.72, 0.72, 1); lava.position.y = 0.03; g.add(lava);
-        (G3.stpAnim = G3.stpAnim || []).push(t => { lava.material.opacity = 0.45 + Math.sin(t * 2.3 + cx + cz) * 0.15; });
-      } else {
-        if (!G3['pondMat_' + v]) { G3['pondMat_' + v] = mat(v === 'night' ? '#16262e' : '#3a5248', { r: 0.12, m: 0.5 }); }   // dark still water that mirrors the sky
-        const shore = new THREE.Mesh(new THREE.CircleGeometry(0.68, 20), mat(v === 'night' ? '#26302a' : '#5a4a30', { r: 1 })); shore.rotation.x = -Math.PI / 2; shore.position.y = 0.015; shore.receiveShadow = true; g.add(shore);
-        const w = new THREE.Mesh(new THREE.CircleGeometry(0.6, 20), G3['pondMat_' + v]); w.rotation.x = -Math.PI / 2; w.position.y = 0.03; w.receiveShadow = true; g.add(w);
-        if (r() < 0.6) for (let i = 0; i < 5; i++) { const reed = mesh(G3.geo.cyl, mat(v === 'night' ? '#3a4a32' : '#8a7a3a'), -0.42 + r() * 0.84, 0.2, (r() < 0.5 ? -1 : 1) * 0.44, 0.012, 0.32 + r() * 0.2, 0.012); reed.rotation.z = (r() - 0.5) * 0.3; g.add(reed); }
-      }
-      return g;
-    }
+    if (kind === 'water') return g;   // ponds and lava fissures are laid whole by steppePonds
     if (kind === 'yurt') {
       const k = r();
       if (v !== 'blood' && k < 0.55) { const y = stpHas('yurtbig') ? stpModel('yurtbig', 1.15, 'w') : makeYurt(0, 0, 1.05); y.rotation.y = r() * TAU; g.add(y); }
@@ -251,13 +240,13 @@
     }
     R.add(g);
     const fl = new THREE.Group(); fl.position.set(x, h + 0.12, z);
-    const outer = new THREE.Mesh(G3.geo.cone, new THREE.MeshBasicMaterial({ color: col('#ff8a2a'), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const ghost = v === 'dark', outer = new THREE.Mesh(G3.geo.cone, new THREE.MeshBasicMaterial({ color: col(ghost ? '#5a7aff' : '#ff8a2a'), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
     outer.scale.set(0.1, 0.32, 0.1); outer.position.y = 0.14; fl.add(outer);
-    const inner = new THREE.Mesh(G3.geo.cone, new THREE.MeshBasicMaterial({ color: col('#fff0a0'), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const inner = new THREE.Mesh(G3.geo.cone, new THREE.MeshBasicMaterial({ color: col(ghost ? '#d8e4ff' : '#fff0a0'), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
     inner.scale.set(0.05, 0.18, 0.05); inner.position.y = 0.09; fl.add(inner);
-    const gl = glow(v === 'blood' ? '#ff7a40' : '#ffb050', 1.5, 0.75); gl.position.y = 0.18; fl.add(gl);
+    const gl = glow(ghost ? '#7a8aff' : v === 'blood' ? '#ff7a40' : '#ffb050', 1.5, 0.75); gl.position.y = 0.18; fl.add(gl);
     R.add(fl);
-    const pool = decal(lampPoolTex(), STP[v].pool, 3.2, v === 'gold' ? 0.22 : 0.42); pool.material.blending = THREE.AdditiveBlending; pool.position.set(x, 0.03, z); R.add(pool);
+    const pool = decal(lampPoolTex(), STP[v].pool, 3.2, v === 'gold' ? 0.22 : 0.45); pool.material.blending = THREE.AdditiveBlending; pool.position.set(x, 0.03, z); R.add(pool);
     const ph = x * 3.1 + z * 1.7;
     (G3.stpAnim = G3.stpAnim || []).push(t => {
       const f = REDUCED_MOTION ? 1 : 1 + Math.sin(t * 13 + ph) * 0.08 + Math.sin(t * 7.3 + ph * 2) * 0.06;
@@ -345,6 +334,7 @@
   function steppeScenery(R, theme, n, zN, zS) {
     const rnd = mulberry32(n * 91 + 5), v = svar(theme);
     const dyn = steppeWalls(R, theme, zN, zS);
+    steppePonds(R, theme, dyn);
     steppeScatter(R, theme, rnd, -13, -4.9, zN - 9, zS + 12, Math.round(26 * Q.fx + 10), null);
     steppeScatter(R, theme, rnd, 4.9, 13, zN - 9, zS + 12, Math.round(26 * Q.fx + 10), null);
     // eclipse: the cracks in the floor glow and pulse
@@ -413,4 +403,58 @@
       const pv = new THREE.Group(); pv.position.set(hx, 0, hz); m.position.x -= hx; m.position.z -= hz; pv.add(m); root.add(pv);
       G3.doors.push({ pv, sx });
     });
+  }
+
+  // ponds and lava fissures: neighbouring '~' cells become one rounded pool with a muddy shore and reeds (no more striped discs)
+  function pondTex(v) {
+    const key = 'pondTex_' + v; if (G3[key]) return G3[key];
+    const r = mulberry32(v.length * 19 + 2);
+    return (G3[key] = canvasTex(256, 256, (g, w, h) => {
+      const c = { gold: ['#2a4446', '#3e5a52', '#6a7a5a'], night: ['#0a1622', '#14283a', '#2a3c40'], dark: ['#0e0a1a', '#1c1830', '#2e2a40'], blood: ['#120604', '#2a0e08', '#3a1a10'] }[v];
+      const gr = g.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w * 0.62); gr.addColorStop(0, c[0]); gr.addColorStop(0.7, c[1]); gr.addColorStop(1, c[2]);
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      if (v === 'blood') { strokeCracks(g, crackPaths(r, w, h, 14), 'rgba(0,0,0,0.6)', 3); return; }
+      // ripples and a soft sky glint
+      g.strokeStyle = v === 'gold' ? 'rgba(255,220,160,0.18)' : 'rgba(190,210,255,0.16)'; g.lineWidth = 1.5;
+      for (let i = 0; i < 9; i++) { const x = r() * w, y = r() * h, rr = 8 + r() * 26; g.beginPath(); g.ellipse(x, y, rr, rr * 0.45, 0, 0, TAU); g.stroke(); }
+      const gl = g.createLinearGradient(0, 0, w, h); gl.addColorStop(0.3, 'rgba(255,255,255,0)'); gl.addColorStop(0.5, v === 'gold' ? 'rgba(255,210,140,0.22)' : 'rgba(200,215,255,0.16)'); gl.addColorStop(0.7, 'rgba(255,255,255,0)');
+      g.fillStyle = gl; g.fillRect(0, 0, w, h);
+    }));
+  }
+  function roundRectGeo(w, h, rad) {
+    const s2 = new THREE.Shape(), x = -w / 2, y = -h / 2;
+    s2.moveTo(x + rad, y); s2.lineTo(x + w - rad, y); s2.quadraticCurveTo(x + w, y, x + w, y + rad); s2.lineTo(x + w, y + h - rad); s2.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+    s2.lineTo(x + rad, y + h); s2.quadraticCurveTo(x, y + h, x, y + h - rad); s2.lineTo(x, y + rad); s2.quadraticCurveTo(x, y, x + rad, y);
+    const geo = new THREE.ShapeGeometry(s2, 8), p = geo.attributes.position, uv = geo.attributes.uv;
+    for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) - x) / w, (p.getY(i) - y) / h);
+    return geo;
+  }
+  function steppePonds(R, theme, dyn) {
+    const v = svar(theme), cells = obstacles.filter(o => o.kind === 'water'), K = o => o.x + ',' + o.y, byKey = new Map(cells.map(o => [K(o), o])), seen = new Set(), rnd = mulberry32(run.room * 29 + 1);
+    for (const o of cells) {
+      if (seen.has(K(o))) continue;
+      const grp = [], st = [o]; seen.add(K(o));
+      while (st.length) { const c = st.pop(); grp.push(c); for (const [dx, dy] of [[CELL, 0], [-CELL, 0], [0, CELL], [0, -CELL]]) { const k = (c.x + dx) + ',' + (c.y + dy); if (byKey.has(k) && !seen.has(k)) { seen.add(k); st.push(byKey.get(k)); } } }
+      const x0 = Math.min(...grp.map(c => c.x)), x1 = Math.max(...grp.map(c => c.x + c.w)), y0 = Math.min(...grp.map(c => c.y)), y1 = Math.max(...grp.map(c => c.y + c.h));
+      const w = (x1 - x0) / CELL, h = (y1 - y0) / CELL, cx = X3((x0 + x1) / 2), cz = Z3((y0 + y1) / 2);
+      const shore = new THREE.Mesh(roundRectGeo(w + 0.22, h + 0.22, Math.min(0.55, (Math.min(w, h) + 0.22) / 2)), mat(v === 'blood' ? '#2a1a12' : v === 'gold' ? '#5e4c30' : '#262a26', { r: 1 }));
+      shore.rotation.x = -Math.PI / 2; shore.position.set(cx, 0.014, cz); shore.receiveShadow = true; R.add(shore);
+      const water = new THREE.Mesh(roundRectGeo(w - 0.04, h - 0.04, Math.min(0.45, (Math.min(w, h) - 0.04) / 2)), new THREE.MeshStandardMaterial({ map: pondTex(v), roughness: v === 'blood' ? 1 : 0.3, metalness: 0 }));
+      water.rotation.x = -Math.PI / 2; water.position.set(cx, 0.03, cz); water.receiveShadow = true; R.add(water);
+      if (v === 'blood') {
+        const lv = new THREE.Mesh(roundRectGeo(w - 0.12, h - 0.12, Math.min(0.4, (Math.min(w, h) - 0.12) / 2)), new THREE.MeshBasicMaterial({ map: lavaTex(), color: col('#ff5a20'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+        lv.rotation.x = -Math.PI / 2; lv.position.set(cx, 0.04, cz); R.add(lv); dyn.push(lv);
+        (G3.stpAnim = G3.stpAnim || []).push(t => { lv.material.opacity = 0.5 + Math.sin(t * 2.1 + cx) * 0.18; });
+      } else {
+        // reeds and a few stones along the shore
+        const reedM = mat(v === 'gold' ? '#8a7a3a' : '#33402e', { r: 1 }), stoneM = mat(STP[v].stone, { r: 1, flat: true });
+        const per = 2 * (w + h), n = Math.round(per * 2.2);
+        for (let i = 0; i < n; i++) {
+          let t = rnd() * per, px, pz;
+          if (t < w) { px = -w / 2 + t; pz = -h / 2; } else if ((t -= w) < h) { px = w / 2; pz = -h / 2 + t; } else if ((t -= h) < w) { px = w / 2 - t; pz = h / 2; } else { t -= w; px = -w / 2; pz = h / 2 - t; }
+          if (rnd() < 0.6) { const rd = mesh(G3.geo.cyl, reedM, cx + px * 0.97, 0.18, cz + pz * 0.97, 0.012, 0.3 + rnd() * 0.25, 0.012); rd.rotation.z = (rnd() - 0.5) * 0.4; R.add(rd); }
+          else R.add(mesh(G3.geo.dodeca, stoneM, cx + px * 1.02, 0.04, cz + pz * 1.02, 0.07 + rnd() * 0.05, 0.04, 0.06));
+        }
+      }
+    }
   }

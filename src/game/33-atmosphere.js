@@ -21,7 +21,13 @@
     13: { name: 'eclipse', pano: ['#ffccc0', 0.95], grade: [0.91, 1.12, '#ffece6'], mist: 0.05, light: '#ffb08a' },
     14: { name: 'eclipse', pano: ['#ffc8bc', 0.95], grade: [0.92, 1.12, '#ffeae2'], mist: 0.05, light: '#ffb08a' },
     15: { name: 'eclipse', sunI: 0.9, pano: ['#ffc0b0', 0.9], grade: [0.93, 1.14, '#ffe6de'], mist: 0.06, light: '#ff9a7a' },
-    16: { name: 'floodlights', sun: '#f2f5ff', sunI: 0.95, hemi: ['#c8d4ff', '#24342a', 0.65], pano: ['#5a68a8', 0.42], grade: [0.9, 1.12, '#f2f4ff'], mist: 0.03 },
+    // black night: no moon, violet haze, ghost-blue fire on the torches
+    16: { name: 'dark', pano: ['#9a8ad0', 0.55], grade: [1.0, 1.06, '#ece4ff'], mist: 0.09, light: '#c8b0ff' },
+    17: { name: 'dark', pano: ['#9080c8', 0.52], grade: [1.0, 1.06, '#eae2ff'], mist: 0.1, light: '#c8b0ff' },
+    18: { name: 'dark', pano: ['#8a78c0', 0.5], grade: [1.0, 1.07, '#e8e0ff'], mist: 0.1, light: '#c8b0ff' },
+    19: { name: 'dark', pano: ['#8070b8', 0.48], grade: [1.01, 1.07, '#e6deff'], mist: 0.11, light: '#c8b0ff' },
+    20: { name: 'dark', sunI: 0.9, pano: ['#7a68b0', 0.45], grade: [1.02, 1.08, '#e4dcff'], mist: 0.12, light: '#d0b8ff' },
+    [SURV_ROOM]: { name: 'floodlights', sun: '#f2f5ff', sunI: 0.95, hemi: ['#c8d4ff', '#24342a', 0.65], pano: ['#5a68a8', 0.42], grade: [0.9, 1.12, '#f2f4ff'], mist: 0.03 },
   };
 
   const moodOf = n => MOODS[n] || {};
@@ -50,7 +56,7 @@
     if (m.mist && Q.fx > 0.5) {
       const tex = mistTex();
       for (let k = 0; k < 5; k++) {
-        const p = new THREE.Mesh(G3.geo.plane, new THREE.MeshBasicMaterial({ map: tex, color: col(n >= 6 && n <= 10 ? '#aab4ff' : n >= 11 && n <= 15 ? '#ff9a80' : '#ffffff'), transparent: true, opacity: m.mist, depthWrite: false }));
+        const p = new THREE.Mesh(G3.geo.plane, new THREE.MeshBasicMaterial({ map: tex, color: col(n >= 6 && n <= 10 ? '#aab4ff' : n >= 11 && n <= 15 ? '#ff9a80' : n >= 16 && n <= 20 ? '#b8a0ff' : '#ffffff'), transparent: true, opacity: m.mist, depthWrite: false }));
         p.rotation.x = -Math.PI / 2; p.scale.set(9, 6, 1);
         const z0 = zN + (zS - zN) * (k + 0.5) / 5;
         p.position.set(0, 0.12 + k * 0.02, z0); R.add(p);

@@ -308,6 +308,7 @@
 
   // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
   const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH', steppe_gold: 'SKY_STEPPE_GOLD', steppe_night: 'SKY_STEPPE_NIGHT', steppe_blood: 'SKY_STEPPE_BLOOD' };
+  const skyOf = t => t === 'steppe_dark' ? 'steppe_night' : t;   // the black night borrows the night sky, tinted by its mood
   function loadSky(name, done) {
     const key = SKY_KEYS[name];
     const go = () => {
@@ -480,7 +481,7 @@
     G3.gateBeam.scale.y = 6; G3.gateBeam.position.set(0, 3, zN - 0.2); R.add(G3.gateBeam);
   }
 
-  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2 + 0.55, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2, steppe_gold: -Math.PI / 2, steppe_night: -Math.PI / 2, steppe_blood: -Math.PI / 2 };   // image centre faces the gate
+  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2 + 0.55, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2, steppe_gold: -Math.PI / 2, steppe_night: -Math.PI / 2, steppe_blood: -Math.PI / 2, steppe_dark: -Math.PI / 2 };   // image centre faces the gate
   function grassMaterial() { const m = new THREE.MeshStandardMaterial({ roughness: 1 }); windMaterial(m, WIND_GRASS); return m; }
   function build3D() {
     const menu = scene === 'menu';
@@ -537,8 +538,8 @@
     const zN = Z3(ARENA.y), zS = Z3(AY2), zc = (zN + zS) / 2, rnd = mulberry32(n * 71 + 9);
     G3.scene.background = null;
     setSky(th.sky[0], th.sky[1], th.outer, new THREE.Vector3(-0.4, 0.55, 0.45), th.sun);
-    if (isSteppe(theme)) ensureSteppeSky(theme);   // painted stand-in until the panorama file exists
-    const pano = setPano(theme, PANO_YAW[theme]);
+    if (isSteppe(theme)) ensureSteppeSky(skyOf(theme));   // painted stand-in until the panorama file exists
+    const pano = setPano(skyOf(theme), PANO_YAW[theme]);
     G3.sun.color = col(th.sun); G3.sun.intensity = th.sunI; G3.fill.intensity = 0;
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
     G3.themeSun = th.sunPos;

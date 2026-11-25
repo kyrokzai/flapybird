@@ -101,12 +101,26 @@
       '........', '........', '...A....', '........', '........', '#......#', '........', '........', '~~....~~', '~~....~~',
       '........', '........', '#.Y..Y.#', '........', '........', '........', '........', '........', '........', '........'] },
   ];
+  // act 4 — the black night itself (rooms 16–20), Black Aydahar at the end
+  ROOM_DEFS.push(
+    { theme: 'steppe_dark', place: { ru: 'Безлунная степь', kz: 'Айсыз дала', en: 'Moonless Steppe' }, lm: [], L: [
+      '........', '.m.aa.m.', '........', '#.j..j.#', '........', '~~.ss.~~', '........', '.Y....Y.', '........', 'w.w..w.w', '........', '..#..#..', '........', '.j....j.', '........', '........', '........', '........'] },
+    { theme: 'steppe_dark', place: { ru: 'Курган теней', kz: 'Көлеңкелер қорғаны', en: 'Barrow of Shadows' }, lm: [], L: [
+      '........', 'a..m...a', '........', '.##..##.', '........', '.j.ww.j.', '........', '~~~..~~~', '........', '.s.ss.s.', '........', 'Y..mm..Y', '........', '.w....w.', '........', '........', '........', '........', '........'] },
+    { theme: 'steppe_dark', place: { ru: 'Чёрный аул', kz: 'Қара ауыл', en: 'Black Aul' }, lm: [], L: [
+      '........', '.m.jj.m.', '........', '..####..', '........', 'a......a', '.w.ww.w.', '........', '..Y..Y..', '........', '~~.jj.~~', '........', '.s.ss.s.', '........', '#..mm..#', '........', '........', '........', '........', '........'] },
+    { theme: 'steppe_dark', place: { ru: 'Тропа духов', kz: 'Аруақтар соқпағы', en: 'Path of Spirits' }, lm: [], L: [
+      '........', 'aa....aa', '........', '#.m..m.#', '........', '.j.jj.j.', '........', '.~~..~~.', '........', 'w.wssw.w', '........', '..Y..Y..', '........', '.m....m.', '........', '........', '........', '........', '........', '........'] },
+    { theme: 'steppe_dark', place: { ru: 'Сердце Қара түн', kz: 'Қара түн жүрегі', en: 'Heart of Qara Tun' }, lm: [['portal', 0, 2, 1.4]], bossMul: 2,
+      bossName: { ru: 'Чёрный Айдахар', kz: 'Қара Айдаһар', en: 'Black Aydahar' }, L: [
+      '........', '........', '...A....', '........', '........', '#......#', '........', '..~..~..', '........', '#......#', '........', '........', '........', '........', '........', '........'] },
+  );
   // QARATUN rooms are 1.5x longer: the middle of each layout is repeated once more (its obstacles, and at most two of its
   // monsters, the weakest first; none in rooms 1–3, one in 4–7) between the fight at the north end and the entrance. Boss rooms get the extra stretch empty.
   ROOM_DEFS.forEach((d, ri) => {
     const L = d.L, n = L.length, boss = L.some(r => /[DJA]/.test(r)), k = Math.round(n * 0.5);
     const from = Math.floor(n * 0.2), block = L.slice(from, from + k);
-    let left = boss || ri < 3 ? 0 : ri < 7 ? 1 : 2;   // the first rooms stay gentle (no wall in room 2)
+    let left = boss || ri < 3 ? 0 : ri < 8 ? 1 : 2;   // the first rooms stay gentle (no wall in room 2)
     const order = 'swjam';
     const keep = new Set();
     for (const t of order) block.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === t && left > 0) { keep.add(i + ':' + j); left--; } }));
@@ -120,10 +134,12 @@
     // QARATUN: the steppe around the capital in three hours of the black night
     steppe_gold: { zone: { ru: 'Золотая степь', kz: 'Алтын дала', en: 'Golden Steppe' }, sky: ['#2a2c58', '#ffb070'], sun: '#ffe2bc', sunPos: [-6, 10, -7], sunI: 1.7,
             hemi: ['#e8dcc8', '#4a3a26', 0.5], outer: '#9a7a3e', tuft: ['#8a6a2e', '#d8b060'] },
-    steppe_night: { zone: { ru: 'Лунная степь', kz: 'Айлы дала', en: 'Moonlit Steppe' }, sky: ['#060b18', '#34466a'], sun: '#a8b8ff', sunPos: [4, 12, -6], sunI: 1.05,
-            hemi: ['#8a9ac8', '#1a2018', 0.6], outer: '#2f3a30', tuft: ['#34442e', '#6a7a58'] },
-    steppe_blood: { zone: { ru: 'Кровавое затмение', kz: 'Қанды тұтылу', en: 'Blood Eclipse' }, sky: ['#120406', '#a8301a'], sun: '#ffb49a', sunPos: [5, 11, -7], sunI: 1.1,
-            hemi: ['#b89080', '#1e1410', 0.55], outer: '#5a3424', tuft: ['#5a3a22', '#a87a4a'] },
+    steppe_night: { zone: { ru: 'Лунная степь', kz: 'Айлы дала', en: 'Moonlit Steppe' }, sky: ['#060b18', '#34466a'], sun: '#a8b8ff', sunPos: [4, 12, -6], sunI: 1.4,
+            hemi: ['#a0b0dc', '#2c3428', 0.95], outer: '#2f3a30', tuft: ['#34442e', '#6a7a58'] },
+    steppe_blood: { zone: { ru: 'Кровавое затмение', kz: 'Қанды тұтылу', en: 'Blood Eclipse' }, sky: ['#120406', '#a8301a'], sun: '#ffb49a', sunPos: [5, 11, -7], sunI: 1.35,
+            hemi: ['#c8a090', '#2e2018', 0.85], outer: '#5a3424', tuft: ['#5a3a22', '#a87a4a'] },
+    steppe_dark: { zone: { ru: 'Чёрная ночь', kz: 'Қара түн', en: 'Black Night' }, sky: ['#05040c', '#2a2050'], sun: '#b8a8ff', sunPos: [4, 12, -6], sunI: 1.3,
+            hemi: ['#a898d8', '#241e32', 0.92], outer: '#2a2634', tuft: ['#2e2a3a', '#6a5a8a'] },
     park: { zone: { ru: 'Парки Астаны', kz: 'Астана саябақтары', en: 'Parks of Astana' }, sky: ['#4f8fd0', '#d8ecf6'], sun: '#fff1dc', sunPos: [-5, 14, 6], sunI: 1.75,
             hemi: ['#e4f4ff', '#6b7a3a', 0.45], outer: '#5f7f3a', tuft: ['#5f8a32', '#9cc25a'] },
     street: { zone: { ru: 'Улицы столицы', kz: 'Елорда көшелері', en: 'Streets of the capital' }, sky: ['#5a76b5', '#f6d9a8'], sun: '#ffdcae', sunPos: [-8, 11, 4], sunI: 1.9,

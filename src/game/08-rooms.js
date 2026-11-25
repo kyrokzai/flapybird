@@ -16,21 +16,33 @@
         else if (ENEMY[ch]) spawnEnemy(ch, ENEMY[ch].boss ? W / 2 : x + CELL / 2, y + CELL / 2, 0.9);
       }
     }
+    const def = ROOM_DEFS[n - 1], bossRoom = L.some(r => /[DJA]/.test(r));
+    // more monsters as the chapter goes on: from room 9 (two), one more every third room, drawn from the act's own pack, in the north two thirds
+    if (n <= TOTAL_ROOMS && !bossRoom) {
+      const extra = n < 9 ? 0 : Math.floor((n - 6) / 3) + 1, pool = n <= 5 ? 'wwsj' : n <= 10 ? 'wsjja' : n <= 15 ? 'wjjam' : 'wjamm', rr = mulberry32(n * 17 + 3);
+      for (let i = 0, tries = 0; i < extra && tries < 200; tries++) {
+        const c = Math.floor(rr() * COLS), r = 1 + Math.floor(rr() * ROWS * 0.62);
+        if (L[r][c] !== '.' || enemies.some(e => Math.abs(e.x - (ARENA.x + c * CELL + CELL / 2)) < CELL && Math.abs(e.y - (ARENA.y + r * CELL + CELL / 2)) < CELL)) continue;
+        spawnEnemy(pool[Math.floor(rr() * pool.length)], ARENA.x + c * CELL + CELL / 2, ARENA.y + r * CELL + CELL / 2, 0.9); i++;
+      }
+    }
+    // the last boss: the same dragon, darker and much tougher
+    if (def && def.bossMul) for (const e of enemies) if (e.boss) { e.hp *= def.bossMul; e.maxHp *= def.bossMul; e.dmg *= 1.2; }
     player.x = W / 2; player.y = AY2 - 30; player.volleys = []; player.fireCd = 0.4;
-    // supply crates: one per room, two in the long ones (boss rooms always have one)
-    for (let i = 0; i < (ROWS >= 20 ? 2 : 1); i++) { const sp = freeSpotAwayFromPlayer(110); crates.push({ x: sp.x, y: sp.y }); }
+    // supply crate: one per room
+    { const sp = freeSpotAwayFromPlayer(110); crates.push({ x: sp.x, y: sp.y }); }
     player.eagle.x = player.x - 20; player.eagle.y = player.y - 30;
     G3.dirty = true; flowT = 0;
     const boss = enemies.find(e => e.boss);
-    if (boss) { banner = { kind: 'boss', type: boss.type, room: n, t: 3.2 }; Sound.roar(); }
+    if (boss) { banner = { kind: 'boss', type: boss.type, name: def && def.bossName, room: n, t: 3.2 }; Sound.roar(); }
     else banner = { kind: 'room', room: n, t: 3.0 };
   }
 
   function spawnEnemy(type, x, y, spawn) {
     const d = ENEMY[type];
     const room = diffLevel();
-    const hpMul = d.boss ? 1 : 1 + 0.2 * (room - 1);
-    const dmgMul = 1 + 0.07 * (room - 1);
+    const hpMul = d.boss ? 1 : 1 + 0.2 * (room - 1) + 0.035 * Math.max(0, room - 10) ** 2;   // the later acts get tough fast
+    const dmgMul = 1 + 0.085 * (room - 1);   // QARATUN: every room hits a little harder
     const e = {
       type, x, y, r: d.r, hp: d.hp * hpMul, maxHp: d.hp * hpMul, speed: d.speed, dmg: d.dmg * dmgMul,
       xp: d.xp, coin: d.coin, ai: d.ai, fly: !!d.fly, boss: !!d.boss, name: d.name,

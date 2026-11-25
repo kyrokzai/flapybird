@@ -284,7 +284,7 @@
     if (banner.max === undefined) banner.max = banner.t;
     const a = clamp(banner.t / 0.4, 0, 1) * clamp((banner.max - banner.t) * 4, 0, 1);
     let text, sub, color = C.gold;
-    if (banner.kind === 'boss') { text = ENEMY[banner.type].name[lang].toUpperCase(); sub = tr('boss') + ' · ' + roomPlace(banner.room); color = '#ff6b5b'; }
+    if (banner.kind === 'boss') { text = (banner.name || ENEMY[banner.type].name)[lang].toUpperCase(); sub = tr('boss') + ' · ' + roomPlace(banner.room); color = '#ff6b5b'; }
     else if (banner.kind === 'room') { text = roomPlace(banner.room).toUpperCase(); sub = isSurv() ? mt('survival') + ' · ' + mt('survSub') : tr('room') + ' ' + banner.room + '/' + TOTAL_ROOMS + ' · ' + biome(banner.room).zone[lang]; }
     else if (banner.kind === 'wave') { text = mt('wave').toUpperCase() + ' ' + banner.wave; sub = banner.boss ? tr('boss') + ': ' + ENEMY[banner.boss].name[lang] : mt('survival'); color = banner.boss ? '#ff6b5b' : C.gold; }
     else if (banner.kind === 'waveClear') { text = mt('waveClear'); sub = mt('waveClearSub'); color = '#7cf07a'; }

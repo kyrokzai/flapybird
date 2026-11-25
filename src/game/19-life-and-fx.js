@@ -140,7 +140,7 @@
       const N = Math.round(140 * Q.fx), geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), seeds = [];
       for (let i = 0; i < N; i++) seeds.push([(rnd() - 0.5) * 9, rnd() * 2.6, menu ? rnd() * 8 - 2 : zN + rnd() * len, rnd() * 10]);
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const pc = { park: '#fff3b0', street: '#ffd9a0', office: '#ffffff', beach: '#fff0c8', steppe_gold: '#ffcf8a', steppe_night: '#d8f5a0', steppe_blood: '#ff6a2a' }[theme] || '#ffd9a0';   // steppe: golden dust, fireflies, embers
+      const pc = { park: '#fff3b0', street: '#ffd9a0', office: '#ffffff', beach: '#fff0c8', steppe_gold: '#ffcf8a', steppe_night: '#d8f5a0', steppe_blood: '#ff6a2a', steppe_dark: '#a898ff' }[theme] || '#ffd9a0';   // steppe: golden dust, fireflies, embers
       const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: menu ? 0.08 : 0.16, map: G3.glowTex, color: col(pc), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
       pts.frustumCulled = false; R.add(pts);
       life.upd.push(t => {
