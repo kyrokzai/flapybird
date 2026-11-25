@@ -2328,8 +2328,8 @@
   }
 
   // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
-  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH', steppe_gold: 'SKY_STEPPE_GOLD', steppe_night: 'SKY_STEPPE_NIGHT', steppe_blood: 'SKY_STEPPE_BLOOD' };
-  const skyOf = t => t === 'steppe_dark' ? 'steppe_night' : t;   // the black night borrows the night sky, tinted by its mood
+  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH', steppe_gold: 'SKY_STEPPE_GOLD', steppe_night: 'SKY_STEPPE_NIGHT', steppe_blood: 'SKY_STEPPE_BLOOD', steppe_dark: 'SKY_STEPPE_DARK' };
+  const skyOf = t => t;   // every steppe hour has its own panorama now (the black night: violet aurora)
   function loadSky(name, done) {
     const key = SKY_KEYS[name];
     const go = () => {
@@ -4763,7 +4763,7 @@
     'mystan', 'dau', 'prop_car', 'prop_busstop', 'lm_station', 'lm_akorda', 'lm_nuralem', 'eagle', 'kydyr', 'zhalmauyz', 'aydahar', 'prop_desk', 'prop_server', 'prop_palm', 'prop_umbrella'];
   // menu essentials first (sky, batyr, horse, yurt), then the other panoramas, then everything else
   const LOAD_ALL = [['sky', 'menu'], ['m', 'batyr'], ['m', 'horse'], ['m', 'yurt'], ['m', 'hero'], ['i', 'icons'], ['c', 'comic'], ['a', 'music_menu'], ['a', 'sfx'],
-    ['sky', 'steppe_gold'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'steppe_night'], ['sky', 'steppe_blood'], ['sky', 'street'], ...LOAD_ORDER.filter(n => !['batyr', 'hero', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
+    ['sky', 'steppe_gold'], ['a', 'music_battle'], ['a', 'music_boss'], ['sky', 'steppe_night'], ['sky', 'steppe_blood'], ['sky', 'steppe_dark'], ['sky', 'street'], ...LOAD_ORDER.filter(n => !['batyr', 'hero', 'horse', 'yurt'].includes(n)).map(n => ['m', n])];
   G3.loadTotal = LOAD_ALL.length; G3.loadDone = 0;
   (function next(i) {
     if (i >= LOAD_ALL.length) return;
@@ -6512,11 +6512,11 @@
     14: { name: 'eclipse', pano: ['#ffc8bc', 0.95], grade: [0.92, 1.12, '#ffeae2'], mist: 0.05, light: '#ffb08a' },
     15: { name: 'eclipse', sunI: 0.9, pano: ['#ffc0b0', 0.9], grade: [0.93, 1.14, '#ffe6de'], mist: 0.06, light: '#ff9a7a' },
     // black night: no moon, violet haze, ghost-blue fire on the torches
-    16: { name: 'dark', pano: ['#9a8ad0', 0.55], grade: [1.0, 1.06, '#ece4ff'], mist: 0.09, light: '#c8b0ff' },
-    17: { name: 'dark', pano: ['#9080c8', 0.52], grade: [1.0, 1.06, '#eae2ff'], mist: 0.1, light: '#c8b0ff' },
-    18: { name: 'dark', pano: ['#8a78c0', 0.5], grade: [1.0, 1.07, '#e8e0ff'], mist: 0.1, light: '#c8b0ff' },
-    19: { name: 'dark', pano: ['#8070b8', 0.48], grade: [1.01, 1.07, '#e6deff'], mist: 0.11, light: '#c8b0ff' },
-    20: { name: 'dark', sunI: 0.9, pano: ['#7a68b0', 0.45], grade: [1.02, 1.08, '#e4dcff'], mist: 0.12, light: '#d0b8ff' },
+    16: { name: 'dark', pano: ['#f4eeff', 1], grade: [1.0, 1.06, '#ece4ff'], mist: 0.09, light: '#c8b0ff' },
+    17: { name: 'dark', pano: ['#f0eaff', 1], grade: [1.0, 1.06, '#eae2ff'], mist: 0.1, light: '#c8b0ff' },
+    18: { name: 'dark', pano: ['#ece4ff', 0.97], grade: [1.0, 1.07, '#e8e0ff'], mist: 0.1, light: '#c8b0ff' },
+    19: { name: 'dark', pano: ['#e8e0ff', 0.95], grade: [1.01, 1.07, '#e6deff'], mist: 0.11, light: '#c8b0ff' },
+    20: { name: 'dark', sunI: 0.9, pano: ['#e4dcff', 0.92], grade: [1.02, 1.08, '#e4dcff'], mist: 0.12, light: '#d0b8ff' },
     [SURV_ROOM]: { name: 'floodlights', sun: '#f2f5ff', sunI: 0.95, hemi: ['#c8d4ff', '#24342a', 0.65], pano: ['#5a68a8', 0.42], grade: [0.9, 1.12, '#f2f4ff'], mist: 0.03 },
   };
 
@@ -7527,7 +7527,7 @@
 
   // ---- temporary skies painted in code (replaced by the owner's panoramas: assets/sky_steppe_gold|night|blood.js)
   function steppeSkyTex(theme) {
-    const v = svar(theme), W2 = 2048, H2 = 1024, hz = 512, r = mulberry32(v.length * 101);
+    const v0 = svar(theme), v = v0 === 'dark' ? 'night' : v0, W2 = 2048, H2 = 1024, hz = 512, r = mulberry32(v.length * 101);   // the painted stand-in for the black night is the night one
     return canvasTex(W2, H2, g => {
       const sky = { gold: ['#2a2c58', '#7a4a6a', '#e0884a', '#ffc070'], night: ['#03060f', '#0c1630', '#1c2c4c', '#34466a'], blood: ['#080204', '#2a0808', '#6a1410', '#a8301a'] }[v];
       const gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, sky[0]); gr.addColorStop(0.45, sky[1]); gr.addColorStop(0.8, sky[2]); gr.addColorStop(1, sky[3]);

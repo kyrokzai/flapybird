@@ -348,7 +348,7 @@
 
   // ---- temporary skies painted in code (replaced by the owner's panoramas: assets/sky_steppe_gold|night|blood.js)
   function steppeSkyTex(theme) {
-    const v = svar(theme), W2 = 2048, H2 = 1024, hz = 512, r = mulberry32(v.length * 101);
+    const v0 = svar(theme), v = v0 === 'dark' ? 'night' : v0, W2 = 2048, H2 = 1024, hz = 512, r = mulberry32(v.length * 101);   // the painted stand-in for the black night is the night one
     return canvasTex(W2, H2, g => {
       const sky = { gold: ['#2a2c58', '#7a4a6a', '#e0884a', '#ffc070'], night: ['#03060f', '#0c1630', '#1c2c4c', '#34466a'], blood: ['#080204', '#2a0808', '#6a1410', '#a8301a'] }[v];
       const gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, sky[0]); gr.addColorStop(0.45, sky[1]); gr.addColorStop(0.8, sky[2]); gr.addColorStop(1, sky[3]);

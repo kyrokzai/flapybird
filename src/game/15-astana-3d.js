@@ -307,8 +307,8 @@
   }
 
   // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
-  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH', steppe_gold: 'SKY_STEPPE_GOLD', steppe_night: 'SKY_STEPPE_NIGHT', steppe_blood: 'SKY_STEPPE_BLOOD' };
-  const skyOf = t => t === 'steppe_dark' ? 'steppe_night' : t;   // the black night borrows the night sky, tinted by its mood
+  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH', steppe_gold: 'SKY_STEPPE_GOLD', steppe_night: 'SKY_STEPPE_NIGHT', steppe_blood: 'SKY_STEPPE_BLOOD', steppe_dark: 'SKY_STEPPE_DARK' };
+  const skyOf = t => t;   // every steppe hour has its own panorama now (the black night: violet aurora)
   function loadSky(name, done) {
     const key = SKY_KEYS[name];
     const go = () => {
