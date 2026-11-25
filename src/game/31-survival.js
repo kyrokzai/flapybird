@@ -14,7 +14,6 @@
   });
   // the arena is endless: waves keep coming until the batyr falls; at most SURV_ALIVE monsters stand on the pitch at once
   const SURV_ALIVE = 18;
-  const fmtClock = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const SURV_POOL = [['s', 1], ['w', 1], ['j', 3], ['a', 5], ['m', 7]];   // [type, first wave]
   const SURV_BOSS = ['D', 'J', 'A'];
   const isSurv = () => !!(run && run.mode === 'survival');
