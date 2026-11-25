@@ -1,5 +1,6 @@
   // =================================================================== Astana 3D: floors, props, walls and landmarks per theme
   function themeFloor(theme, n, obs) {
+    if (isSteppe(theme)) return steppeFloor(theme, n, obs);
     const S = 1.6, AW = ARENA.w, AH = ARENA.h;
     return canvasTex(Math.round(AW * S), Math.round(AH * S), (g) => {
       g.scale(S, S);
@@ -67,6 +68,7 @@
     const g = new THREE.Group(); g.position.set(cx, 0, cz);
     const add = (geo, m, x, y, z, sx, sy, sz) => { const me = mesh(geo, m, x, y, z, sx, sy, sz); me.receiveShadow = true; g.add(me); return me; };
     const M = (h, o2) => mat(h, o2);
+    if (isSteppe(theme)) return steppeProp(theme, kind, o, cx, cz);
     if (kind === 'water') {
       if (theme === 'park' || theme === 'beach') {
         const w = new THREE.Mesh(G3.geo.plane, G3.waterMat); w.rotation.x = -Math.PI / 2; w.position.y = 0.03; w.receiveShadow = true; g.add(w);
@@ -305,7 +307,7 @@
   }
 
   // 360° panoramas (equirectangular) drawn on a sphere that follows the camera; also used for metal reflections
-  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH' };
+  const SKY_KEYS = { park: 'SKY_PARK', menu: 'SKY_MENU', street: 'SKY_STREET', office: 'SKY_OFFICE', beach: 'SKY_BEACH', steppe_gold: 'SKY_STEPPE_GOLD', steppe_night: 'SKY_STEPPE_NIGHT', steppe_blood: 'SKY_STEPPE_BLOOD' };
   function loadSky(name, done) {
     const key = SKY_KEYS[name];
     const go = () => {
@@ -413,6 +415,7 @@
       for (let i = 0; i < n; i++) { const t = -L / 2 + l * (i + 0.5); runs.push({ x: x + (alongX ? t : 0), y, z: z + (alongX ? 0 : t), ry: alongX ? Math.PI / 2 : 0, w, h, l: l * 1.02 }); }
     };
     const seg = (L, alongX, x, z) => {
+      if (isSteppe(theme)) return;   // the palisade is built by steppeWalls
       if (hedge) lay(L, alongX, x, z, 2.1, 0.42, 0.62);
       else if (fence) {
         const curb = mesh(G3.geo.box, mat('#b8b4ac', { r: 0.7 }), x, 0.1, z, alongX ? L : 0.3, 0.2, alongX ? 0.3 : L); curb.receiveShadow = true; R.add(curb);
@@ -476,7 +479,7 @@
     G3.gateBeam.scale.y = 6; G3.gateBeam.position.set(0, 3, zN - 0.2); R.add(G3.gateBeam);
   }
 
-  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2 + 0.55, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2 };   // image centre faces the gate
+  const PANO_YAW = { park: -0.19, menu: -Math.PI / 2 + 0.55, street: -Math.PI / 2, office: -Math.PI / 2, beach: -Math.PI / 2, steppe_gold: -Math.PI / 2, steppe_night: -Math.PI / 2, steppe_blood: -Math.PI / 2 };   // image centre faces the gate
   function grassMaterial() { const m = new THREE.MeshStandardMaterial({ roughness: 1 }); windMaterial(m, WIND_GRASS); return m; }
   function build3D() {
     const menu = scene === 'menu';
@@ -528,11 +531,12 @@
       Sound.setAmbience('menu');
       return;
     }
-    G3.fountains = [];
+    G3.fountains = []; G3.stpAnim = []; G3.stpDyn = []; G3.stpCracks = null;
     const n = run.room, def = ROOM_DEFS[n - 1], th = THEMES[def.theme], theme = def.theme;
     const zN = Z3(ARENA.y), zS = Z3(AY2), zc = (zN + zS) / 2, rnd = mulberry32(n * 71 + 9);
     G3.scene.background = null;
     setSky(th.sky[0], th.sky[1], th.outer, new THREE.Vector3(-0.4, 0.55, 0.45), th.sun);
+    if (isSteppe(theme)) ensureSteppeSky(theme);   // painted stand-in until the panorama file exists
     const pano = setPano(theme, PANO_YAW[theme]);
     G3.sun.color = col(th.sun); G3.sun.intensity = th.sunI; G3.fill.intensity = 0;
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
@@ -551,6 +555,7 @@
     // scenery beside the arena
     const lamps = [];
     if (def.arena) buildArenaScenery(R, zN, zS);
+    else if (isSteppe(theme)) G3.stpDyn = steppeScenery(R, theme, n, zN, zS);
     else for (let z = zN - 8; z < zS + 12; z += 2.2) for (const s of [-1, 1]) {
       const x = s * (5 + rnd() * 2.5);
       if (theme === 'park' && G3.models.prop_birch && rnd() < 0.45) { const t = propModel('prop_birch', 3 + rnd() * 1.4, 'h'); t.position.set(x + s * 0.6, 0, z + rnd()); t.rotation.y = rnd() * TAU; R.add(t); }
@@ -569,8 +574,9 @@
       const b = mesh(G3.geo.box, mat('#ffffff', { map: windowsTex(city() < 0.5 ? '#8a96a8' : '#c8c0b0', '#fff0c0'), r: 0.5 }), x, h / 2, z, 2.5, h, 2.5, false);
       b.material.map.repeat.set(1, h / 6); R.add(b);
     }
-    mergeStatic(R, [...(G3.doors || []).map(d => d.pv), G3.gateGlow, G3.gateBeam]);
+    mergeStatic(R, [...(G3.doors || []).map(d => d.pv), G3.gateGlow, G3.gateBeam, ...(G3.stpDyn || [])]);
     buildLife(R, theme, zN, zS, false);
+    for (const f of G3.stpAnim) G3.life.upd.push(f);   // torch flames, glowing cracks, the yurt door
     applyMood(R, n, theme, zN, zS);
     if (!def.arena) addCivilians(R, n, theme, zN, zS);
     Sound.setAmbience(theme);

@@ -1,8 +1,8 @@
-// BATIR01 service worker: the game works offline after the first full load and updates itself.
+// QARATUN service worker: the game works offline after the first full load and updates itself.
 // - the page (index.html): network first, so a new version shows up on the next launch; cached copy when offline
 // - game assets (assets/*.js, icons): served from cache at once, refreshed in the background
 // - libraries and fonts from CDNs: cache first (their URLs are versioned)
-const CACHE = 'batir01-v1';
+const CACHE = 'qaratun-v1';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

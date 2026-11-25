@@ -4,6 +4,7 @@
   const OUT_TILE = 6;   // world units per tile of the outer ground texture
   function outskirtGround(theme) {
     const key = 'outG_' + theme; if (G3[key]) return G3[key];
+    if (isSteppe(theme)) return (G3[key] = mat('#ffffff', { map: steppeOuterTex(theme), r: 1 }));
     const rnd = mulberry32(theme.length * 31 + 7);
     const t = canvasTex(256, 256, (g, w, h) => {
       const blot = (pal, k, r0, r1, a) => {
@@ -63,6 +64,8 @@
         // a crossing a little way out, and a stop line
         const zy = y0 < 0 ? len - 150 : 110;
         for (let x = 46; x < AW - 46; x += 16) { g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x, zy, 9, 34); }
+      } else if (isSteppe(theme)) {
+        steppePath(g, svar(theme), y => AW / 2 + Math.sin((y0 + y) / 70 + n) * 60, -20, len + 20);
       } else if (theme === 'park') {
         // only the path: the lawn underneath is the outer ground
         g.lineCap = 'round';
@@ -95,7 +98,15 @@
     };
     strip(zS, zS + 20); strip(zN - 12, zN - 0.3);
 
-    if (theme === 'park') {
+    if (isSteppe(theme)) {
+      // the steppe runs on: scattered stones, bushes, skulls and yurts south and north of the palisade, dry grass at the entrance
+      const avoid = (x, z) => Math.abs(x - pathX(z)) < 1.3 || (z < zN && Math.abs(x) < 3.2);
+      steppeScatter(R, theme, rnd, -13, 13, zS + 1, zS + 18, Math.round(30 * k + 8), avoid);
+      steppeScatter(R, theme, rnd, -13, 13, zN - 12, zN - 1.5, Math.round(16 * k + 4), avoid);
+      const tn = STP[svar(theme)].tint, gf = makeGrassField(Math.round(380 * Q.grass), r2 => { const x = (r2() - 0.5) * 16, z = zS + 0.4 + r2() * 9; return Math.abs(x - pathX(z)) < 0.9 ? null : [x, z, 0.7 + r2() * 0.6]; }, true, n * 5 + 3);
+      if (gf.instanceColor) { const a = gf.instanceColor.array; for (let i = 0; i < a.length; i += 3) { a[i] *= tn[0]; a[i + 1] *= tn[1]; a[i + 2] *= tn[2]; } }
+      R.add(gf);
+    } else if (theme === 'park') {
       // birch groves and round bushes on the lawns south and north of the walls, clear of the path
       const trees = [], bush = mat('#3f6f2a', { r: 1, flat: true }), bush2 = mat('#4f8034', { r: 1, flat: true });
       const spot = (z0, z1, xr, gap) => { for (let i = 0; i < 40; i++) { const z = z0 + rnd() * (z1 - z0), x = (rnd() * 2 - 1) * xr; if (Math.abs(x - pathX(z)) > gap) return [x, z]; } return null; };

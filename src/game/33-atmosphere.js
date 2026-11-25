@@ -3,21 +3,27 @@
   // the office from day to evening, warm beach light, the arena under floodlights.
   // sun: colour, sunI: × theme intensity, hemi: [sky, ground, intensity], pano: [tint, brightness], grade: [exposure, saturation, tint], lamps, mist, light (hero lantern)
   const MOODS = {
-    1: { name: 'morning', sun: '#ffe2bc', sunI: 0.92, hemi: ['#eef4ff', '#5a6a3a', 0.5], pano: ['#ffe8d0', 1], grade: [0.84, 1.16, '#fff8f0'], mist: 0.06 },
-    2: { name: 'day' }, 3: { name: 'day' },
-    4: { name: 'afternoon', sun: '#ffe0b4', sunI: 0.95, pano: ['#fff0d8', 1], grade: [0.81, 1.17, '#fffaf2'] },
-    5: { name: 'golden', sun: '#ffcf96', sunI: 1.0, hemi: ['#f4ecff', '#5a4a2a', 0.45], pano: ['#ffd6a8', 0.95], grade: [0.8, 1.15, '#fff4e8'] },
-    6: { name: 'golden', sun: '#ffc68a', sunI: 0.95, grade: [0.8, 1.2, '#fff0dc'] },
-    7: { name: 'sunset', sun: '#ff9a5c', sunI: 0.85, hemi: ['#ffc0a0', '#4a3a3a', 0.5], pano: ['#ffb088', 0.9], grade: [0.8, 1.22, '#ffe4d2'], lamps: '#ffd890' },
-    8: { name: 'dusk', sun: '#d88070', sunI: 0.6, hemi: ['#8a90c8', '#352c3c', 0.6], pano: ['#a0a4d8', 0.62], grade: [0.86, 1.1, '#efeeff'], lamps: '#ffd890', mist: 0.05, light: '#ffcf8a' },
-    9: { name: 'night', sun: '#a4b4ff', sunI: 0.45, hemi: ['#7a86c8', '#1c1c28', 0.58], pano: ['#6a74b8', 0.42], grade: [0.95, 1.02, '#e8ebff'], lamps: '#ffd890', mist: 0.06, light: '#ffcf8a' },
-    10: { name: 'neon', sun: '#a89cff', sunI: 0.45, hemi: ['#8478d0', '#1a1430', 0.6], pano: ['#7a70c8', 0.45], grade: [0.95, 1.08, '#f2ecff'], lamps: 'neon', mist: 0.05, light: '#c8b0ff' },
-    11: { name: 'day' }, 12: { name: 'day' },
-    13: { name: 'evening', sun: '#ffc890', sunI: 0.8, hemi: ['#ffe2c0', '#6a5a48', 0.85], pano: ['#ffb890', 0.75], grade: [0.82, 1.12, '#fff0e0'] },
-    14: { name: 'night office', sun: '#b0c0ff', sunI: 0.55, hemi: ['#ffe8cc', '#5a4a3a', 0.95], pano: ['#5a6aa8', 0.45], grade: [0.86, 1.08, '#fff2e4'], light: '#ffd8a0' },
-    15: { name: 'beach', sun: '#ffd09a', sunI: 1.0, pano: ['#fff0d8', 1], grade: [0.8, 1.2, '#fff4e4'] },
+    // golden steppe: low sun behind the gate, long shadows towards the camera
+    1: { name: 'gold', sun: '#ffe6c4', pano: ['#fff0e0', 1], grade: [0.84, 1.16, '#fff4e6'] },
+    2: { name: 'gold', sun: '#ffe0b8', pano: ['#fff0e0', 1], grade: [0.84, 1.17, '#fff2e2'] },
+    3: { name: 'gold', sun: '#ffdab0', sunI: 0.97, pano: ['#ffeedc', 1], grade: [0.83, 1.18, '#fff0dc'] },
+    4: { name: 'sunset', sun: '#ffb478', sunI: 0.93, hemi: ['#f0c8a8', '#4a3422', 0.5], pano: ['#ffe2c8', 0.95], grade: [0.82, 1.2, '#ffe8d4'], light: '#ffcf8a' },
+    5: { name: 'sunset', sun: '#ff9a5c', sunI: 0.85, hemi: ['#ffc0a0', '#4a3a3a', 0.5], pano: ['#ffb088', 0.9], grade: [0.8, 1.22, '#ffe4d2'], light: '#ffcf8a' },
+    // moonlit steppe: cold light, low fog, torches warm the palisade
+    6: { name: 'moon', pano: ['#d0dcff', 0.95], grade: [0.95, 1.05, '#e8ecff'], mist: 0.07, light: '#ffcf8a' },
+    7: { name: 'moon', pano: ['#c8d4ff', 0.9], grade: [0.96, 1.04, '#e6eaff'], mist: 0.09, light: '#ffcf8a' },
+    8: { name: 'moon', pano: ['#d0dcff', 0.95], grade: [0.95, 1.05, '#ecefff'], mist: 0.06, light: '#ffcf8a' },
+    9: { name: 'moon', pano: ['#c0ccff', 0.9], grade: [0.96, 1.04, '#e4e8ff'], mist: 0.08, light: '#ffcf8a' },
+    10: { name: 'moon', sunI: 0.9, pano: ['#b8c4f0', 0.85], grade: [0.97, 1.06, '#e0e4ff'], mist: 0.09, light: '#ffcf8a' },
+    // blood eclipse: red sky, embers, glowing cracks
+    11: { name: 'eclipse', pano: ['#ffd8d0', 1], grade: [0.9, 1.1, '#fff0ea'], mist: 0.04, light: '#ffb08a' },
+    12: { name: 'eclipse', pano: ['#ffd0c8', 1], grade: [0.9, 1.1, '#ffeee8'], mist: 0.04, light: '#ffb08a' },
+    13: { name: 'eclipse', pano: ['#ffccc0', 0.95], grade: [0.91, 1.12, '#ffece6'], mist: 0.05, light: '#ffb08a' },
+    14: { name: 'eclipse', pano: ['#ffc8bc', 0.95], grade: [0.92, 1.12, '#ffeae2'], mist: 0.05, light: '#ffb08a' },
+    15: { name: 'eclipse', sunI: 0.9, pano: ['#ffc0b0', 0.9], grade: [0.93, 1.14, '#ffe6de'], mist: 0.06, light: '#ff9a7a' },
     16: { name: 'floodlights', sun: '#f2f5ff', sunI: 0.95, hemi: ['#c8d4ff', '#24342a', 0.65], pano: ['#5a68a8', 0.42], grade: [0.9, 1.12, '#f2f4ff'], mist: 0.03 },
   };
+
   const moodOf = n => MOODS[n] || {};
 
   function applyMood(R, n, theme, zN, zS) {
@@ -44,7 +50,7 @@
     if (m.mist && Q.fx > 0.5) {
       const tex = mistTex();
       for (let k = 0; k < 5; k++) {
-        const p = new THREE.Mesh(G3.geo.plane, new THREE.MeshBasicMaterial({ map: tex, color: col(n >= 8 && n <= 10 ? '#aab4ff' : '#ffffff'), transparent: true, opacity: m.mist, depthWrite: false }));
+        const p = new THREE.Mesh(G3.geo.plane, new THREE.MeshBasicMaterial({ map: tex, color: col(n >= 6 && n <= 10 ? '#aab4ff' : n >= 11 && n <= 15 ? '#ff9a80' : '#ffffff'), transparent: true, opacity: m.mist, depthWrite: false }));
         p.rotation.x = -Math.PI / 2; p.scale.set(9, 6, 1);
         const z0 = zN + (zS - zN) * (k + 0.5) / 5;
         p.position.set(0, 0.12 + k * 0.02, z0); R.add(p);
@@ -97,8 +103,9 @@
 
   // ---- grass tufts in park rooms (and dune grass on the beach): dense along the hedges, sparse on the lawn, never on the path
   function buildRoomGrass(R, theme, n, zN, zS) {
-    if (theme !== 'park' && theme !== 'beach') return;
-    const beach = theme === 'beach', nb = Math.round((beach ? 160 : 700) * Q.grass);
+    const stp = isSteppe(theme);
+    if (theme !== 'park' && theme !== 'beach' && !stp) return;
+    const beach = theme === 'beach', nb = Math.round((beach ? 160 : stp ? 620 : 700) * Q.grass);
     const pathX = py => W / 2 + Math.sin((py - ARENA.y) / 70 + n) * 60;
     const field = makeGrassField(nb, r => {
       const edge = r() < (beach ? 0.8 : 0.55);
@@ -107,7 +114,9 @@
       if (obstacles.some(o => px > o.x - 6 && px < o.x + o.w + 6 && py > o.y - 6 && py < o.y + o.h + 6)) return null;
       if (!beach && Math.abs(px - pathX(py)) < 26) return null;
       return [x, z, edge ? 0.75 + r() * 0.4 : 0.45 + r() * 0.3];
-    }, beach, n * 13 + 1);
+    }, beach || stp, n * 13 + 1);
+    // steppe: dry golden blades at sunset, dark blue-green at night, rust-brown under the eclipse
+    if (stp && field.instanceColor) { const tn = STP[svar(theme)].tint, a = field.instanceColor.array; for (let i = 0; i < a.length; i += 3) { a[i] *= tn[0]; a[i + 1] *= tn[1]; a[i + 2] *= tn[2]; } field.instanceColor.needsUpdate = true; }
     R.add(field);
   }
 

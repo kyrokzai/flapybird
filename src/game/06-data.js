@@ -52,58 +52,78 @@
          pats: ['walk', 'breath', 'charge', 'rings', 'walk', 'wolves', 'breath', 'charge'] },
   };
 
-  // Rooms: real places of Astana. Layout legend: '#' small solid prop, 'Y' big solid prop, '~' low prop (blocks walking, not arrows),
+  // Rooms: the steppe around Astana (the city only on the horizon). Layout legend: '#' small solid prop, 'Y' big solid prop, '~' low prop (blocks walking, not arrows),
   // enemies w s j a m, bosses D J A. Each theme decides what the props look like.
   const ROOM_DEFS = [
-    { theme: 'park', place: { ru: 'Набережная Есиля', kz: 'Есіл жағалауы', en: 'Esil Embankment' }, lm: [['baiterek', 2, 0, 1], ['towers', -9, 6, 0.9]], L: [
+    { theme: 'steppe_gold', place: { ru: 'Есильская степь', kz: 'Есіл даласы', en: 'Esil Steppe' }, lm: [['khanshatyr', -16, 26, 1.4]], L: [
       '........', '........', '..s..s..', '........', '.#....#.', '........', '..~~~~..', '..~~~~..',
       '........', '.w....w.', '........', '#..YY..#', '........', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Парк влюблённых', kz: 'Ғашықтар саябағы', en: 'Lovers\' Park' }, lm: [['khanshatyr', 0, 0, 1]], L: [
+    { theme: 'steppe_gold', place: { ru: 'Курган предков', kz: 'Ата-баба қорғаны', en: 'Ancestors\' Barrow' }, lm: [['towers', 18, 30, 1.3]], L: [
       '........', '..j..j..', '........', '#.#..#.#', '........', '....s...', '........', '~~....~~', '~~.Y..~~',
       '........', '.w....w.', '........', '..#..#..', '........', '........', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Президентский парк', kz: 'Президент саябағы', en: 'Presidential Park' }, lm: [['pyramid', 0, 0, 1], ['baiterek', 12, 8, 0.8]], L: [
+    { theme: 'steppe_gold', place: { ru: 'Долина балбалов', kz: 'Балбалдар алқабы', en: 'Valley of Balbals' }, lm: [], L: [
       '........', '.w....w.', '........', '..#..#..', '..#..#..', '....j...', '.s....s.', '........', 'Y......Y',
       '........', '..~~~~..', '........', '......s.', '........', '#......#', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Центральный парк', kz: 'Орталық саябақ', en: 'Central Park' }, lm: [['baiterek', -3, 0, 1], ['khanshatyr', 9, 6, 0.8], ['portal', 5, 1, 0.8]], L: [
+    { theme: 'steppe_gold', place: { ru: 'Аул у реки', kz: 'Өзен жағасындағы ауыл', en: 'Riverside Aul' }, lm: [['khanshatyr', 14, 28, 1.3], ['portal', 5, 1, 0.8]], L: [
       '........', '...a....', '........', '~~~..~~~', '........', '.j....j.', '........', '..#..#..', '........', '...s.s..',
       '........', '#.Y..Y.#', '........', '.w....w.', '........', '..~..~..', '........', '........', '........', '........'] },
-    { theme: 'park', place: { ru: 'Площадь у Байтерека', kz: 'Бәйтерек алаңы', en: 'Baiterek Square' }, lm: [['baiterek', 0, -4, 1.25], ['portal', -8, 1, 1.15]], L: [
+    { theme: 'steppe_gold', place: { ru: 'Логово Дэу', kz: 'Дәудің ордасы', en: 'Lair of Dau' }, lm: [['portal', -8, 1, 1.15]], L: [
       '........', '........', '........', '...D....', '........', '........', '#......#', '........',
       '..~..~..', '........', '#......#', '........', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Проспект Мангилик Ел', kz: 'Мәңгілік Ел даңғылы', en: 'Mangilik El Avenue' }, lm: [['khanshatyr', 0, 0, 1], ['towers', -10, 4, 1]], L: [
+    { theme: 'steppe_night', place: { ru: 'Лунная тропа', kz: 'Айлы соқпақ', en: 'Moonlit Trail' }, lm: [['nuralem', -15, 28, 1.4]], L: [
       '........', '.m....m.', '........', '..#..#..', '........', 'w..ss..w', '........', '.#....#.', '........',
       '~~....~~', '........', '..j..j..', '........', '#.Y..Y.#', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Вокзал «Нурлы жол»', kz: '«Нұрлы жол» вокзалы', en: 'Nurly Zhol Station' }, lm: [['station', 0, 0, 1], ['towers', 11, 6, 0.9]], L: [
+    { theme: 'steppe_night', place: { ru: 'Туманный перевал', kz: 'Тұманды асу', en: 'Misty Pass' }, lm: [], L: [
       '........', '..a..a..', '........', '#.#..#.#', '........', '..j..j..', '........', '~~~..~~~', '........', '..w..w..',
       '........', '.Y....Y.', '........', '.s.ss.s.', '........', '#......#', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Площадь у Акорды', kz: 'Ақорда алаңы', en: 'Akorda Square' }, lm: [['akorda', 0, 0, 1]], L: [
+    { theme: 'steppe_night', place: { ru: 'Стойбище кочевников', kz: 'Көшпелілер қонысы', en: 'Nomad Camp' }, lm: [['khanshatyr', 16, 30, 1.3]], L: [
       '........', 'm......m', '..####..', '........', '.s.ss.s.', '........', '..Y..Y..', '........', '..j..j..', '........',
       '~~....~~', '........', '.w.ww.w.', '........', '#..##..#', '........', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'Водно-зелёный бульвар', kz: 'Су-жасыл бульвары', en: 'Water-Green Boulevard' }, lm: [['towers', 0, 0, 1.1], ['baiterek', 10, 6, 0.8]], L: [
+    { theme: 'steppe_night', place: { ru: 'Поле каменных стражей', kz: 'Тас күзетшілер даласы', en: 'Field of Stone Guardians' }, lm: [], L: [
       '........', '...aa...', '........', '.~~..~~.', '.~~..~~.', '..w..w..', '........', '#..m...#', '........', '.ss..ss.', '........',
       '..#..#..', '........', 'j......j', '........', 'Y......Y', '........', '..a..a..', '........', '........', '........', '........'] },
-    { theme: 'street', place: { ru: 'ЭКСПО, «Нұр Әлем»', kz: 'ЭКСПО, «Нұр Әлем»', en: 'EXPO, Nur Alem' }, lm: [['nuralem', 0, -2, 1.1]], L: [
+    { theme: 'steppe_night', place: { ru: 'Курган Жалмауыз', kz: 'Жалмауыз қорғаны', en: 'Barrow of Zhalmauyz' }, lm: [['towers', -18, 32, 1.3]], L: [
       '........', '........', '...J....', '........', '..#..#..', '........', '........', '..#..#..', '........',
       '~~....~~', '........', '........', '#......#', '........', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'Изумрудный квартал, 24 этаж', kz: 'Изумруд кварталы, 24-қабат', en: 'Emerald Quarter, 24th floor' }, lm: [['towers', 0, 0, 1.2]], L: [
+    { theme: 'steppe_blood', place: { ru: 'Выжженная земля', kz: 'Күйген жер', en: 'Scorched Land' }, lm: [], L: [
       '........', '.j.mm.j.', '........', '##.##.##', '........', '.w.ww.w.', '........', '##.##.##', '........', '..~~~~..',
       '........', '.s....s.', '........', 'Y.#..#.Y', '........', '........', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'Опенспейс IT-компании', kz: 'IT-компанияның ашық кеңсесі', en: 'IT company open space' }, lm: [['baiterek', 0, 0, 1], ['towers', -10, 2, 0.9]], L: [
+    { theme: 'steppe_blood', place: { ru: 'Кровавый брод', kz: 'Қанды өткел', en: 'Blood Ford' }, lm: [['akorda', 17, 32, 1.3]], L: [
       '........', 'a..a..a.', '........', '#.##.##.', '........', 'j......j', '...ss...', '.##..##.', '........', '.m....m.', '........',
       '~~.~~.~~', '........', '.w.ww.w.', '........', '#.#..#.#', '........', '..s..s..', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'Переговорные и серверная', kz: 'Келіссөз бөлмелері мен серверлік', en: 'Meeting rooms & server room' }, lm: [['nuralem', 6, 4, 0.9], ['towers', -7, 0, 1]], L: [
+    { theme: 'steppe_blood', place: { ru: 'Поле черепов', kz: 'Бас сүйектер даласы', en: 'Field of Skulls' }, lm: [], L: [
       '........', '..w..w..', '.Y.ww.Y.', '........', 'm.~~~~.m', '........', '..j..j..', '........', 'Y..aa..Y', '........', '##.##.##',
       '........', '.s.ss.s.', '........', '..Y..Y..', '........', 'j......j', '........', '........', '........', '........', '........'] },
-    { theme: 'office', place: { ru: 'ТРЦ «Хан Шатыр»', kz: '«Хан Шатыр» СОО', en: 'Khan Shatyr Mall' }, lm: [['khanshatyr', 0, -2, 1.1]], L: [
+    { theme: 'steppe_blood', place: { ru: 'Врата Қара түн', kz: 'Қара түн қақпасы', en: 'Gates of Qara Tun' }, lm: [['nuralem', -16, 30, 1.3]], L: [
       '........', '.a.aa.a.', '........', '#.j..j.#', '........', '..Y..Y..', '.s.ss.s.', '........', '..m..m..', '........', '~~....~~',
       '........', '.w.ww.w.', '........', '#.#..#.#', '........', '..j..j..', '........', 'Y......Y', '........', '........', '........'] },
-    { theme: 'beach', place: { ru: 'Пляж «Хан Шатыра»', kz: '«Хан Шатыр» жағажайы', en: 'Khan Shatyr Beach' }, lm: [['khanshatyr', 0, -3, 1.2]], L: [
+    { theme: 'steppe_blood', place: { ru: 'Логово Айдахара', kz: 'Айдаһар ордасы', en: 'Aydahar\'s Lair' }, lm: [['portal', 0, 2, 1.3]], L: [
       '........', '........', '...A....', '........', '........', '#......#', '........', '........', '~~....~~', '~~....~~',
       '........', '........', '#.Y..Y.#', '........', '........', '........', '........', '........', '........', '........'] },
   ];
+  // QARATUN rooms are 1.5x longer: the middle of each layout is repeated once more (its obstacles, and at most two of its
+  // monsters, the weakest first; none in rooms 1–3, one in 4–7) between the fight at the north end and the entrance. Boss rooms get the extra stretch empty.
+  ROOM_DEFS.forEach((d, ri) => {
+    const L = d.L, n = L.length, boss = L.some(r => /[DJA]/.test(r)), k = Math.round(n * 0.5);
+    const from = Math.floor(n * 0.2), block = L.slice(from, from + k);
+    let left = boss || ri < 3 ? 0 : ri < 7 ? 1 : 2;   // the first rooms stay gentle (no wall in room 2)
+    const order = 'swjam';
+    const keep = new Set();
+    for (const t of order) block.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === t && left > 0) { keep.add(i + ':' + j); left--; } }));
+    const extra = block.map((row, i) => [...row].map((ch, j) => /[a-zA-Z]/.test(ch) && !keep.has(i + ':' + j) ? '.' : ch).join(''));
+    const at = Math.floor(n * 0.45);
+    d.L = [...L.slice(0, at), ...extra, ...L.slice(at)];
+  });
   const MENU_ROOM = ['Y......Y', '..Y.....', '........', '......#.', '........', '........', '........', '........', '........', '........', '........', '........', '........'];
 
   const THEMES = {
+    // QARATUN: the steppe around the capital in three hours of the black night
+    steppe_gold: { zone: { ru: 'Золотая степь', kz: 'Алтын дала', en: 'Golden Steppe' }, sky: ['#2a2c58', '#ffb070'], sun: '#ffe2bc', sunPos: [-6, 10, -7], sunI: 1.7,
+            hemi: ['#e8dcc8', '#4a3a26', 0.5], outer: '#9a7a3e', tuft: ['#8a6a2e', '#d8b060'] },
+    steppe_night: { zone: { ru: 'Лунная степь', kz: 'Айлы дала', en: 'Moonlit Steppe' }, sky: ['#060b18', '#34466a'], sun: '#a8b8ff', sunPos: [4, 12, -6], sunI: 1.05,
+            hemi: ['#8a9ac8', '#1a2018', 0.6], outer: '#2f3a30', tuft: ['#34442e', '#6a7a58'] },
+    steppe_blood: { zone: { ru: 'Кровавое затмение', kz: 'Қанды тұтылу', en: 'Blood Eclipse' }, sky: ['#120406', '#a8301a'], sun: '#ffb49a', sunPos: [5, 11, -7], sunI: 1.1,
+            hemi: ['#b89080', '#1e1410', 0.55], outer: '#5a3424', tuft: ['#5a3a22', '#a87a4a'] },
     park: { zone: { ru: 'Парки Астаны', kz: 'Астана саябақтары', en: 'Parks of Astana' }, sky: ['#4f8fd0', '#d8ecf6'], sun: '#fff1dc', sunPos: [-5, 14, 6], sunI: 1.75,
             hemi: ['#e4f4ff', '#6b7a3a', 0.45], outer: '#5f7f3a', tuft: ['#5f8a32', '#9cc25a'] },
     street: { zone: { ru: 'Улицы столицы', kz: 'Елорда көшелері', en: 'Streets of the capital' }, sky: ['#5a76b5', '#f6d9a8'], sun: '#ffdcae', sunPos: [-8, 11, 4], sunI: 1.9,

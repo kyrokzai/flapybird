@@ -136,7 +136,7 @@
       const cols = ['#0e3b5c', '#b3262e', '#0e3b5c', '#d9a42a'];
       for (let i = 0; i < 4; i++) { g.fillStyle = cols[i]; g.fillRect(i * w / 4, 0, w / 4, h); }
       g.font = `800 14px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff';
-      ['BATIR01', 'ASTANA ARENA', 'BATIR01', 'QAZAQSTAN'].forEach((t, i) => g.fillText(t, i * w / 4 + w / 8, h / 2 + 1));
+      ['QARATUN', 'ASTANA ARENA', 'QARATUN', 'QAZAQSTAN'].forEach((t, i) => g.fillText(t, i * w / 4 + w / 8, h / 2 + 1));
     }, true);
     return G3.boardTex;
   }

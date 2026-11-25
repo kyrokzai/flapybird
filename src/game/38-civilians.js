@@ -1,6 +1,6 @@
   // =================================================================== townsfolk behind the fences: they wave to the batyr for help and cheer when a room is cleared
   function addCivilians(R, n, theme, zN, zS) {
-    if (!G3.models.civ_woman || theme === 'office' || Q.fx < 0.5) return;
+    if (!G3.models.civ_woman || theme === 'office' || isSteppe(theme) || Q.fx < 0.5) return;
     const rnd = mulberry32(n * 53 + 3);
     // two by the gate (behind the north wall, facing the batyr) and one or two along the side fences
     const spots = [[-(1.5 + rnd() * 1.2), zN - 0.75, -Math.PI / 2], [1.5 + rnd() * 1.2, zN - 0.75, -Math.PI / 2]];

@@ -104,7 +104,7 @@
     ctx.restore();
   }
 
-  // ---- the BATIR01 logo: emblem ring, golden eagle over mountains, metallic lettering, a ruled divider
+  // ---- the QARATUN logo: emblem ring, golden eagle over mountains, metallic lettering, a ruled divider
   function eaglePath() {
     ctx.beginPath();
     ctx.moveTo(0, -6);
@@ -134,20 +134,20 @@
     ctx.shadowColor = 'rgba(255,200,90,0.55)'; ctx.shadowBlur = 10;
     eaglePath(); ctx.fillStyle = goldGrad(-32, 50); ctx.fill('evenodd');
     ctx.restore();
-    // lettering: BATIR in brushed silver, 01 in gold
+    // lettering: QARA in brushed silver, TUN in gold (Қара түн — the black night)
     const size = 46;
     ctx.font = `900 ${size}px ${FONTS.logo}`; ctx.textBaseline = 'middle';
-    const w1 = ctx.measureText('BATIR').width, w2 = ctx.measureText('01').width, gap = 4, x0 = -(w1 + w2 + gap) / 2;
+    const w1 = ctx.measureText('QARA').width, w2 = ctx.measureText('TUN').width, gap = 1, x0 = -(w1 + w2 + gap) / 2;
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
     ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
-    ctx.lineWidth = 5; ctx.strokeStyle = '#1a140c'; ctx.strokeText('BATIR', x0, 6); ctx.strokeText('01', x0 + w1 + gap, 6);
+    ctx.lineWidth = 5; ctx.strokeStyle = '#1a140c'; ctx.strokeText('QARA', x0, 6); ctx.strokeText('TUN', x0 + w1 + gap, 6);
     ctx.restore();
     const sil = ctx.createLinearGradient(0, -size / 2 + 6, 0, size / 2 + 6);
     sil.addColorStop(0, '#ffffff'); sil.addColorStop(0.45, '#dfe3ea'); sil.addColorStop(0.52, '#8c93a0'); sil.addColorStop(0.75, '#d3d8e0'); sil.addColorStop(1, '#f5f7fa');
-    ctx.fillStyle = sil; ctx.fillText('BATIR', x0, 6);
-    ctx.fillStyle = goldGrad(-size / 2 + 6, size); ctx.fillText('01', x0 + w1 + gap, 6);
-    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(255,240,200,0.55)'; ctx.strokeText('BATIR', x0, 6); ctx.strokeText('01', x0 + w1 + gap, 6);
+    ctx.fillStyle = sil; ctx.fillText('QARA', x0, 6);
+    ctx.fillStyle = goldGrad(-size / 2 + 6, size); ctx.fillText('TUN', x0 + w1 + gap, 6);
+    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(255,240,200,0.55)'; ctx.strokeText('QARA', x0, 6); ctx.strokeText('TUN', x0 + w1 + gap, 6);
     // a glint sweeping across the letters now and then
     if (!REDUCED_MOTION) {
       const ph = ((pNow / 1000) % 5) / 5, gx = -150 + ph * 600;
@@ -155,7 +155,7 @@
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         ctx.beginPath(); ctx.rect(x0, -20, w1 + w2 + gap, 50); ctx.clip();
         const gl = ctx.createLinearGradient(gx - 20, 0, gx + 20, 0); gl.addColorStop(0, 'rgba(255,255,255,0)'); gl.addColorStop(0.5, 'rgba(255,250,230,0.35)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = gl; ctx.font = `900 ${size}px ${FONTS.logo}`; ctx.fillText('BATIR', x0, 6); ctx.fillText('01', x0 + w1 + gap, 6);
+        ctx.fillStyle = gl; ctx.font = `900 ${size}px ${FONTS.logo}`; ctx.fillText('QARA', x0, 6); ctx.fillText('TUN', x0 + w1 + gap, 6);
         ctx.restore();
       }
     }
