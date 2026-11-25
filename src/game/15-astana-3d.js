@@ -313,6 +313,8 @@
     const key = SKY_KEYS[name];
     const go = () => {
       if (!window[key]) { done && done(); return; }
+      // room skies stay as compressed data until their act comes up (a decoded 2048x1024 image is 8 MB)
+      if (name !== 'menu') { G3.skyData[name] = window[key]; window[key] = null; done && done(); return; }
       new THREE.TextureLoader().load(window[key], tex => {
         window[key] = null;
         tex.encoding = THREE.sRGBEncoding; tex.mapping = THREE.EquirectangularReflectionMapping;
@@ -322,6 +324,18 @@
     };
     if (window[key]) go();
     else { const sc = document.createElement('script'); sc.src = 'assets/sky_' + name + '.js'; sc.onload = go; sc.onerror = () => done && done(); document.head.appendChild(sc); }
+  }
+  // decode a room sky from its data (async); every other room sky is dropped, GPU copy and image alike
+  function skyReady(name, cb) {
+    for (const k in G3.skyTex) if (k !== 'menu' && k !== name && G3.skyData[k]) { G3.skyTex[k].dispose(); delete G3.skyTex[k]; }
+    if (G3.skyTex[name] || !G3.skyData[name]) { cb && cb(); return; }
+    const want = G3.skyWant = name;
+    new THREE.TextureLoader().load(G3.skyData[name], tex => {
+      if (G3.skyWant !== want && G3.skyTex[name]) { tex.dispose(); return; }
+      tex.encoding = THREE.sRGBEncoding; tex.mapping = THREE.EquirectangularReflectionMapping;
+      tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
+      G3.skyTex[name] = tex; G3.dirty = true; cb && cb();
+    }, undefined, () => cb && cb());
   }
   function setPano(name, yaw) {
     const tex = name && G3.skyTex[name];
@@ -541,8 +555,19 @@
     const zN = Z3(ARENA.y), zS = Z3(AY2), zc = (zN + zS) / 2, rnd = mulberry32(n * 71 + 9);
     G3.scene.background = null;
     setSky(th.sky[0], th.sky[1], th.outer, new THREE.Vector3(-0.4, 0.55, 0.45), th.sun);
-    if (isSteppe(theme)) ensureSteppeSky(skyOf(theme));   // painted stand-in until the panorama file exists
-    const pano = setPano(skyOf(theme), PANO_YAW[theme]);
+    const skyName = skyOf(theme);
+    if (isSteppe(theme) && !G3.skyData[skyName]) ensureSteppeSky(skyName);   // painted stand-in until the panorama file exists
+    let pano = setPano(skyName, PANO_YAW[theme]);
+    if (!pano && G3.skyData[skyName]) {
+      // the act's panorama decodes in the background; the room is laid out as if it were already up
+      pano = true; G3.pano && (G3.pano.visible = false);
+      const built = G3.built;
+      skyReady(skyName, () => {
+        if (G3.built !== built || scene === 'menu') return;
+        setPano(skyName, PANO_YAW[theme]);
+        const m = MOODS[n]; if (m && m.pano && G3.pano.visible) G3.pano.material.color.setScalar(1.35 * m.pano[1]).multiply(col(m.pano[0]));
+      });
+    } else if (pano) skyReady(skyName);   // already decoded: just drop the other acts' skies
     G3.sun.color = col(th.sun); G3.sun.intensity = th.sunI; G3.fill.intensity = 0;
     G3.hemi.color = col(th.hemi[0]); G3.hemi.groundColor = col(th.hemi[1]); G3.hemi.intensity = th.hemi[2];
     G3.themeSun = th.sunPos;

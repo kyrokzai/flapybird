@@ -1,6 +1,6 @@
   // =================================================================== 3D world (Three.js)
   const G3 = {
-    r: null, dirty: true, built: '', fountains: [], life: null, rt: 0, hero: null, eagle: null, charms: [], metalMats: new Set(), models: {}, skyTex: {},
+    r: null, dirty: true, built: '', fountains: [], life: null, rt: 0, hero: null, eagle: null, charms: [], metalMats: new Set(), models: {}, skyTex: {}, skyData: {},
     ents: new Map(), arrowsM: new Map(), bulletsM: new Map(), pickM: new Map(), aimM: new Map(),
   };
   const colorCache = new Map();
@@ -135,7 +135,7 @@
     G3.hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7); sc.add(G3.hemi);
     const sun = G3.sun = new THREE.DirectionalLight(0xffffff, 1.75);
     sun.position.set(-5, 14, 6); sun.castShadow = true;
-    const sm = Math.min(2048, r.capabilities.maxTextureSize);
+    const sm = Math.min(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? 1024 : 2048, r.capabilities.maxTextureSize);   // phones: a quarter of the shadow-map memory
     sun.shadow.mapSize.set(sm, sm);
     Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 11, bottom: -11, near: 2, far: 40 });
     sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.025; sun.shadow.radius = 3;

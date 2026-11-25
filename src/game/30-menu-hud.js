@@ -354,7 +354,7 @@
     // timed bonus round, entered with a ticket; locked until the first boss (Dau) is beaten
     const aw = 250, ax = (W - aw) / 2, ay = TAB_Y - 114, open = arenaUnlocked();
     if (open) {
-      button(ax, ay, aw, 40, mt('survival') + ' · 3:00', () => { Sound.init(); Sound.click(); startGame('survival'); },
+      button(ax, ay, aw, 40, mt('survival') + ' · ∞', () => { Sound.init(); Sound.click(); startGame('survival'); },
         { col: '#7a2a24', col2: '#3a1210', size: 13, icon: (x, y, s, c) => icoArena(x, y, s * 1.05, T.goldLt), sub: '🎟' + Save.data.tickets.n });
     } else {
       button(ax, ay, aw, 40, '🔒 ' + mt('arenaLocked'), () => { Sound.click(); }, { col: '#2a3040', col2: '#151a26', size: 11 });

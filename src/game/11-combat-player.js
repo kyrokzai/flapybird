@@ -185,7 +185,7 @@
     if (scene !== 'play') return;
     scene = won ? 'victory' : 'dead';
     endT = 0; modal = null;
-    if (!SIM.on) { if (isSurv()) survivalRewards(won); else runRewards(won); }
+    if (!SIM.on) { if (isSurv()) survivalRewards(); else runRewards(won); }
     bank += run.coins; recordRun(won); saveProgress();
     const reached = won ? TOTAL_ROOMS : run.room;
     if (!isSurv() && reached > best) { best = reached; saveProgress(); }

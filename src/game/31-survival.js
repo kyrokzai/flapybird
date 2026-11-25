@@ -12,8 +12,9 @@
       return rows;
     })(),
   });
-  const ARENA_TIME = 180;   // the arena is a 3-minute bonus round
-  const fmtClock = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  // the arena is endless: waves keep coming until the batyr falls; at most SURV_ALIVE monsters stand on the pitch at once
+  const SURV_ALIVE = 18;
+  const fmtClock = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const SURV_POOL = [['s', 1], ['w', 1], ['j', 3], ['a', 5], ['m', 7]];   // [type, first wave]
   const SURV_BOSS = ['D', 'J', 'A'];
   const isSurv = () => !!(run && run.mode === 'survival');
@@ -23,7 +24,7 @@
   const diffLevel = () => isSurv() ? 1 + Math.max(0, run.wave - 1) * 0.55 : run.room;
 
   function survivalSetup() {
-    run.mode = 'survival'; run.timeLeft = ARENA_TIME; run.wave = 0; run.waveT = 4;   // counts down once the fly-over ends run.supplyT = 16; run.waveCleared = true;
+    run.mode = 'survival'; run.wave = 0; run.waveT = 4;   // counts down once the fly-over ends run.supplyT = 16; run.waveCleared = true;
     run.room = SURV_ROOM; buildRoom(SURV_ROOM);
     crates = [];   // supplies arrive during the fight
   }
@@ -31,12 +32,10 @@
   function survivalTick(dt) {
     if (!isSurv() || scene !== 'play' || introT > 0 || modal) return;
     const alive = enemies.filter(e => !e.dead).length;
-    run.timeLeft -= dt;
-    if (run.timeLeft <= 0) { if (alive === 0 && !run.waveCleared && run.wave > 0) run.waveCleared = true; endRun(true); return; }   // survived the round
     run.waveT -= dt;
     if (alive === 0 && !run.waveCleared && run.wave > 0) waveCleared();
     if (alive === 0 && run.waveT > 4) run.waveT = 4;   // no long waits on an empty pitch
-    if (run.waveT <= 0 && alive < 14) nextWave();
+    if (run.waveT <= 0 && alive < SURV_ALIVE - 8) nextWave();
     // supply crates keep arriving (at most two on the field)
     run.supplyT -= dt;
     if (run.supplyT <= 0) {
@@ -51,7 +50,8 @@
   function nextWave() {
     run.wave++; run.waveCleared = false;
     const w = run.wave, bossWave = w % 5 === 0;
-    const n = Math.min(16, Math.round((bossWave ? 3 : 6) + w * (bossWave ? 0.7 : 1.6)));
+    const alive = enemies.filter(e => !e.dead).length;
+    const n = Math.max(2, Math.min(14, SURV_ALIVE - alive - (bossWave ? 1 : 0), Math.round((bossWave ? 3 : 6) + w * (bossWave ? 0.7 : 1.6))));
     const pool = SURV_POOL.filter(p => w >= p[1]).map(p => p[0]);
     for (let i = 0; i < n; i++) {
       const t = pool[Math.floor(Math.random() * pool.length)], sp = freeSpotAwayFromPlayer(170);
@@ -65,7 +65,7 @@
       Sound.roar();
       banner = { kind: 'wave', wave: w, boss: type, t: 2.6 };
     } else banner = { kind: 'wave', wave: w, t: 2.0 };
-    run.waveT = 18 + w * 0.8;   // a timed round keeps the waves coming
+    run.waveT = Math.min(40, 18 + w * 0.8);   // the next wave comes even if a few stragglers are left
   }
 
   // a cleared wave pays out: a shower of coins around the batyr, a supply drop every second wave, a breather heal
@@ -83,11 +83,10 @@
     banner = { kind: 'waveClear', wave: w, t: 1.8 };
   }
 
-  // rewards for the end of a survival run: a chest for every 5 waves (up to 3), gems for waves
-  function survivalRewards(won) {
+  // rewards for the end of a survival run: a chest for every 5 waves (up to 6; every third is rare, epic from wave 30), gems for waves
+  function survivalRewards() {
     const w = wavesDone(), chests = [];
-    for (let i = 0; i < Math.min(3, Math.floor(w / 5)); i++) chests.push(i === 2 || w >= 15 && i === 0 ? 1 : 0);
-    if (won) chests.push(1);   // surviving the full 3 minutes: a rare chest
+    for (let i = 0; i < Math.min(6, Math.floor(w / 5)); i++) chests.push(w >= 30 && i === 0 ? 2 : i % 3 === 2 || (w >= 15 && i === 0) ? 1 : 0);
     const items = [];
     for (const minR of chests) { const it = addItem(rollItem(minR)); if (it) items.push(it); }
     const gems = run.gems + Math.floor(w / 3);

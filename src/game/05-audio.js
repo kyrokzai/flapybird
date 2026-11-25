@@ -24,8 +24,11 @@
         this.timer = setInterval(() => this.schedule(), 50);
         if (this.ambWant) { const k = this.ambWant; this.ambWant = null; this.setAmbience(k); }
         for (const p of this.packs) this.decodePack(p);
+        this.initStream();
       }
       if (this.ac.state === 'suspended') this.ac.resume();
+      // every tap retries a stalled track (iOS lets a media element start only inside a gesture)
+      if (this.el && this.cur && this.cur.url && this.music && this.el.paused && !document.hidden) this.el.play().catch(() => {});
     },
     // dombra-like plucked string (Karplus–Strong)
     karplus(freq, dur) {
@@ -54,8 +57,16 @@
     addPack(name) {
       const data = name === 'sfx' ? window.SFX_PACK : window['MUSIC_' + name.slice(6).toUpperCase()];
       if (!data) return;
-      const p = { name, data }; this.packs.push(p);
       if (name === 'sfx') window.SFX_PACK = null; else window['MUSIC_' + name.slice(6).toUpperCase()] = null;
+      if (name !== 'sfx') {
+        // music stays compressed (an mp3 blob played by a media element): decoded PCM of the three themes took ~80 MB
+        try {
+          const bin = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+          this.tracks[name.slice(6)] = URL.createObjectURL(new Blob([bin], { type: 'audio/mpeg' }));
+        } catch (e) { /* no blob support: keep the synth */ }
+        return;
+      }
+      const p = { name, data }; this.packs.push(p);
       if (this.ac) this.decodePack(p);
     },
     decodePack(p) {
@@ -67,9 +78,25 @@
           if (pr && pr.catch) pr.catch(() => {});
         } catch (e) { /* undecodable: keep the synth */ }
       };
-      if (p.name === 'sfx') for (const k in p.data) dec(p.data[k], buf => { this.samples[k] = buf; });
-      else dec(p.data, buf => { this.tracks[p.name.slice(6)] = buf; });
+      for (const k in p.data) dec(p.data[k], buf => { this.samples[k] = buf; });
       p.data = null;
+    },
+    // one <audio> element streams the current theme through the music gain (fades stay in Web Audio)
+    initStream() {
+      try {
+        const el = new Audio(); el.loop = true; el.preload = 'auto'; el.setAttribute('playsinline', '');
+        this.elGain = this.ac.createGain(); this.elGain.gain.value = 0.0001;
+        try { this.ac.createMediaElementSource(el).connect(this.elGain); this.elGain.connect(this.musicGain); this.elWA = true; } catch (e) { this.elWA = false; }
+        this.el = el;
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) el.pause();
+          else if (this.cur && this.cur.url && this.music) el.play().catch(() => {});
+        });
+      } catch (e) { this.el = null; }
+    },
+    fadeEl(to, sec) {
+      if (this.elWA) { const g = this.elGain.gain, t = this.ac.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(Math.max(0.0001, g.value), t); g.linearRampToValueAtTime(Math.max(0.0001, to), t + sec); }
+      else this.el.volume = clamp(to / 1.7 * (this.music ? 0.32 : 0), 0, 1);
     },
     // play a recorded effect; false when it is not loaded yet (the caller then uses the synth)
     play(name, vol, gap) {
@@ -83,26 +110,30 @@
       s.connect(g); g.connect(this.sfxGain); s.start();
       return true;
     },
-    // recorded music for the current mode with a 1.5 s crossfade; false = no track, use the synth
+    // recorded music for the current mode: fade out, swap the source, fade in; false = no track, use the synth
     musicTrack() {
-      const want = this.mode || 'menu', buf = this.tracks[want];
-      if (!buf) { if (this.cur) this.stopTrack(); return false; }
+      const want = this.mode || 'menu', url = this.tracks[want];
+      if (!url || !this.el) { if (this.cur) this.stopTrack(); return false; }
       if (!this.cur || this.cur.name !== want) {
-        this.stopTrack();
-        const ac = this.ac, src = ac.createBufferSource(), g = ac.createGain();
-        src.buffer = buf; src.loop = true;
-        g.gain.setValueAtTime(0.0001, ac.currentTime); g.gain.linearRampToValueAtTime(1.7, ac.currentTime + 1.5);
-        src.connect(g); g.connect(this.musicGain); src.start();
-        this.cur = { name: want, src, g };
+        const playing = this.cur && !this.el.paused;
+        this.cur = { name: want };
+        this.fadeEl(0.0001, playing ? 0.6 : 0.01);
+        clearTimeout(this.swapT);
+        this.swapT = setTimeout(() => {
+          if (!this.cur || this.cur.name !== want) return;
+          this.cur.url = url; this.el.src = url;
+          if (this.music && !document.hidden) this.el.play().catch(() => {});
+          this.fadeEl(1.7, 1.5);
+        }, playing ? 650 : 0);
       }
       return true;
     },
     stopTrack() {
       if (!this.cur) return;
-      const { src, g } = this.cur, t = this.ac.currentTime;
-      g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0.0001, t + 1.2);
-      try { src.stop(t + 1.3); } catch (e) { /* already stopped */ }
-      this.cur = null;
+      this.cur = null; clearTimeout(this.swapT);
+      if (!this.el) return;
+      this.fadeEl(0.0001, 1.2);
+      this.swapT = setTimeout(() => { if (!this.cur) this.el.pause(); }, 1300);
     },
     schedule() {
       this.ambEvents();
@@ -149,7 +180,10 @@
       for (const d of [-4, 5]) { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; o.connect(lp); o.start(t); o.stop(t + dur + 0.05); }
       lp.connect(g); g.connect(this.musicGain);
     },
-    setMusic(on) { this.music = on; Save.data.settings.music = on; Save.write(); if (this.musicGain) this.musicGain.gain.value = on ? 0.32 : 0; },
+    setMusic(on) {
+      this.music = on; Save.data.settings.music = on; Save.write(); if (this.musicGain) this.musicGain.gain.value = on ? 0.32 : 0;
+      if (this.el && this.cur && this.cur.url) { if (on) { this.el.play().catch(() => {}); if (!this.elWA) this.fadeEl(1.7, 0); } else this.el.pause(); }
+    },
     setSfx(on) { this.sfx = on; Save.data.settings.sfx = on; Save.write(); if (this.sfxGain) this.sfxGain.gain.value = on ? 1 : 0; if (this.ambGain) this.ambGain.gain.value = on ? 1 : 0; },
     ok() { return this.ac && this.sfx; },
     tone(type, f0, f1, t0, dur, vol) {

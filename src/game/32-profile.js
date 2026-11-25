@@ -45,7 +45,7 @@
 
   // ---- what a finished run is worth, and the lifetime statistics
   function gloryFor(won) {
-    if (isSurv()) return 18 * wavesDone() + Math.floor(run.coins / 5) + (won ? 80 : 0);
+    if (isSurv()) return 18 * wavesDone() + 60 * Math.floor(wavesDone() / 10) + Math.floor(run.coins / 5);
     const reached = won ? TOTAL_ROOMS : run.room;
     return 12 * Math.max(0, reached - 1) + 40 * (run.bossKills || 0) + (won ? 150 : 0);
   }

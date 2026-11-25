@@ -186,7 +186,7 @@
     ctx.fillStyle = C.gold; ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(20, 49, 7, 0, TAU); ctx.fill(); ctx.stroke();
     txt('₸', 20, 49.5, 9, C.goldDk, { weight: 900 });
     txt(String(run.coins), 32, 49, 14 * (1 + coinPulse * 0.35), coinPulse > 0.05 ? '#ffe27a' : '#fff', { align: 'left', weight: 700 });
-    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}  ·  ⏱ ${fmtClock(run.timeLeft)}` : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
+    const roomLabel = isSurv() ? `${mt('wave').toUpperCase()} ${Math.max(1, run.wave + (run.waveCleared ? 1 : 0))}  ·  ⏱ ${fmtClock(run.t || 0)}` : `${tr('room')} ${run.room}/${TOTAL_ROOMS}`;
     txt(roomLabel, W / 2, 48, 15, C.gold, { weight: 900, stroke: C.ink, lw: 3 });
     rr(ctx, W - 46, 8, 36, 36, 9); ctx.fillStyle = C.ink; ctx.fill();
     rr(ctx, W - 43, 11, 30, 30, 7); ctx.fillStyle = C.blueDk; ctx.fill();
@@ -401,6 +401,10 @@
       const vt = isSurv() ? mt('arenaWin') : tr('victory');
       txt(vt, W / 2, 156, fitText(vt, W - 90, 36), C.gold, { stroke: C.ink, lw: 7, weight: 900 });
       txt(isSurv() ? mt('arenaWinText') : tr('victoryText'), W / 2, 188, 13, T.text, { weight: 500 });
+    } else if (isSurv()) {
+      const vt = mt('arenaWin');
+      txt(vt, W / 2, 156, fitText(vt, W - 90, 30), T.gold, { weight: 900 });
+      txt(mt('arenaWinText', wavesDone()), W / 2, 184, 13, T.text, { weight: 500 });
     } else {
       txt(tr('dead'), W / 2, 156, 28, T.gold, { weight: 900 });
       txt(tr('deadText'), W / 2, 184, 13, T.text, { weight: 500 });

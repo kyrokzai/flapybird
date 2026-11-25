@@ -113,7 +113,8 @@
       const gr = g.createLinearGradient(0, 0, 0, hh); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0.9)');
       g.fillStyle = gr; g.fillRect(0, 0, w, hh);
     });
-    const geo = new THREE.CylinderGeometry(r * 0.55, r, h, 14, 1, true).translate(0, h / 2, 0);
+    const gk = h + '|' + r; G3.beamGeos = G3.beamGeos || {};   // one shared column per size: the loot of a long arena run no longer piles up buffers
+    const geo = G3.beamGeos[gk] || (G3.beamGeos[gk] = new THREE.CylinderGeometry(r * 0.55, r, h, 14, 1, true).translate(0, h / 2, 0));
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: G3.beamTex, color: col(hex), transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
     m.renderOrder = 3;
     return m;
